@@ -1,0 +1,40 @@
+﻿{
+  "id": "write_file",
+  "name": "Write file",
+  "domain": "archivos",
+  "type": "base",
+  "description": "Write text content to workspace file.",
+  "inputs": {
+    "path": {"type": "string", "required": true, "description": "Destination file path."},
+    "content": {"type": "string", "required": true, "description": "Text content."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]}
+  },
+  "requirements": {
+    "tools": ["filesystem_write_file"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "write_file",
+        "action": "filesystem_write_file",
+        "params": {
+          "path": "{{inputs.path}}",
+          "content": "{{inputs.content}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["write file", "escribir archivo"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

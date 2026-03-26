@@ -1,0 +1,128 @@
+﻿{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://capability-os.local/schemas/tool_contract.schema.json",
+  "title": "Tool Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "category",
+    "description",
+    "inputs",
+    "outputs",
+    "constraints",
+    "safety",
+    "lifecycle"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+        "pattern": "^(filesystem|execution|network|system|browser)_[a-z]+(?:_[a-z0-9]+)*$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "category": {
+      "type": "string",
+      "enum": ["filesystem", "execution", "network", "system", "browser"]
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/input_field"
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/output_field"
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["timeout_ms", "allowlist", "workspace_only"],
+      "properties": {
+        "timeout_ms": {"type": "integer", "minimum": 1},
+        "allowlist": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "workspace_only": {"type": "boolean"}
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "requires_confirmation"],
+      "properties": {
+        "level": {"type": "string", "minLength": 1},
+        "requires_confirmation": {"type": "boolean"}
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "status"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "available",
+            "not_configured",
+            "preparing",
+            "ready",
+            "running",
+            "error",
+            "experimental",
+            "disabled"
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "input_field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "required"],
+      "properties": {
+        "type": {"type": "string"},
+        "required": {"type": "boolean"},
+        "enum": {
+          "type": "array",
+          "items": {
+            "type": ["string", "number", "integer", "boolean", "null"]
+          }
+        },
+        "description": {"type": "string"}
+      }
+    },
+    "output_field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {"type": "string"},
+        "enum": {
+          "type": "array",
+          "items": {
+            "type": ["string", "number", "integer", "boolean", "null"]
+          }
+        },
+        "description": {"type": "string"}
+      }
+    }
+  }
+}

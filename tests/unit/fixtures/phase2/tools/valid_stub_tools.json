@@ -1,0 +1,55 @@
+﻿[
+  {
+    "id": "execution_run_command",
+    "name": "Run command",
+    "category": "execution",
+    "description": "Stub command executor",
+    "inputs": {
+      "command": {"type": "string", "required": true},
+      "cwd": {"type": "string", "required": false}
+    },
+    "outputs": {
+      "stdout": {"type": "string"},
+      "stderr": {"type": "string"},
+      "exit_code": {"type": "integer"}
+    },
+    "constraints": {
+      "timeout_ms": 30000,
+      "allowlist": ["npm", "node", "python", "pytest", "git", "npx"],
+      "workspace_only": true
+    },
+    "safety": {
+      "level": "medium",
+      "requires_confirmation": false
+    },
+    "lifecycle": {
+      "version": "1.1.0",
+      "status": "ready"
+    }
+  },
+  {
+    "id": "filesystem_read_file",
+    "name": "Read file",
+    "category": "filesystem",
+    "description": "Stub file reader",
+    "inputs": {
+      "path": {"type": "string", "required": true}
+    },
+    "outputs": {
+      "content": {"type": "string"}
+    },
+    "constraints": {
+      "timeout_ms": 30000,
+      "allowlist": ["read"],
+      "workspace_only": true
+    },
+    "safety": {
+      "level": "medium",
+      "requires_confirmation": false
+    },
+    "lifecycle": {
+      "version": "1.1.0",
+      "status": "ready"
+    }
+  }
+]

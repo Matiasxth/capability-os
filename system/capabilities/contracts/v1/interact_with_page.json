@@ -1,0 +1,65 @@
+{
+  "id": "interact_with_page",
+  "name": "Interact with page",
+  "domain": "web",
+  "type": "composed",
+  "description": "Perform a simple sequential interaction with a web page: wait, type and click.",
+  "inputs": {
+    "session_id": {"type": "string", "required": true, "description": "Browser session identifier."},
+    "selector": {"type": "string", "required": true, "description": "Selector used for wait/type/click."},
+    "text": {"type": "string", "required": true, "description": "Text to type in selector."},
+    "timeout_ms": {"type": "integer", "required": false, "description": "Optional timeout override in milliseconds."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "selector": {"type": "string"},
+    "url": {"type": "string"},
+    "session_id": {"type": "string"}
+  },
+  "requirements": {
+    "tools": ["browser_wait_for_selector", "browser_type_text", "browser_click_element"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "wait_for_selector",
+        "action": "browser_wait_for_selector",
+        "params": {
+          "session_id": "{{inputs.session_id}}",
+          "selector": "{{inputs.selector}}",
+          "timeout_ms": "{{inputs.timeout_ms}}"
+        }
+      },
+      {
+        "step_id": "type_text",
+        "action": "browser_type_text",
+        "params": {
+          "session_id": "{{inputs.session_id}}",
+          "selector": "{{inputs.selector}}",
+          "text": "{{inputs.text}}",
+          "timeout_ms": "{{inputs.timeout_ms}}"
+        }
+      },
+      {
+        "step_id": "click_selector",
+        "action": "browser_click_element",
+        "params": {
+          "session_id": "{{inputs.session_id}}",
+          "selector": "{{inputs.selector}}",
+          "timeout_ms": "{{inputs.timeout_ms}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["interact with page", "interactuar con pagina"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

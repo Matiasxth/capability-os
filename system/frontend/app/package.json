@@ -1,0 +1,22 @@
+{
+  "name": "capability-os-ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.4.8",
+    "@testing-library/react": "^16.0.0",
+    "jsdom": "^24.1.1",
+    "vite": "^5.4.10",
+    "vitest": "^2.1.2"
+  }
+}

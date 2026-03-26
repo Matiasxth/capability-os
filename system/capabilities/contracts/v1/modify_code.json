@@ -1,0 +1,49 @@
+{
+  "id": "modify_code",
+  "name": "Modify code",
+  "domain": "desarrollo",
+  "type": "composed",
+  "description": "Modify a file deterministically in replace or append mode.",
+  "inputs": {
+    "file_path": {"type": "string", "required": true, "description": "Target file path inside workspace."},
+    "modification": {"type": "string", "required": true, "description": "Content to write or append."},
+    "mode": {"type": "string", "required": true, "enum": ["replace", "append"], "description": "Modification mode."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "path": {"type": "string"}
+  },
+  "requirements": {
+    "tools": ["filesystem_read_file", "filesystem_write_file"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "read_target",
+        "action": "filesystem_read_file",
+        "params": {
+          "path": "{{inputs.file_path}}"
+        }
+      },
+      {
+        "step_id": "write_target",
+        "action": "filesystem_write_file",
+        "params": {
+          "path": "{{inputs.file_path}}",
+          "content": "{{inputs.modification}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["modify code", "modificar codigo"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

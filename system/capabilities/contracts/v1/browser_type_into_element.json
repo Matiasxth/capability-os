@@ -1,0 +1,48 @@
+﻿{
+  "id": "browser_type_into_element",
+  "name": "Type into element",
+  "domain": "web",
+  "type": "base",
+  "description": "Type text into an interactive element using worker-managed element_id.",
+  "inputs": {
+    "session_id": {"type": "string", "required": true, "description": "Browser session identifier."},
+    "element_id": {"type": "string", "required": true, "description": "Interactive element identifier."},
+    "text": {"type": "string", "required": true, "description": "Text to type."},
+    "timeout_ms": {"type": "integer", "required": false, "description": "Optional timeout override in milliseconds."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "session_id": {"type": "string"},
+    "element_id": {"type": "string"},
+    "selector": {"type": "string"},
+    "url": {"type": "string"}
+  },
+  "requirements": {
+    "tools": ["browser_type_into_element"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "type_by_id",
+        "action": "browser_type_into_element",
+        "params": {
+          "session_id": "{{inputs.session_id}}",
+          "element_id": "{{inputs.element_id}}",
+          "text": "{{inputs.text}}",
+          "timeout_ms": "{{inputs.timeout_ms}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["type into element", "escribir por id"]
+  },
+  "lifecycle": {
+    "version": "1.0.0",
+    "status": "ready"
+  }
+}

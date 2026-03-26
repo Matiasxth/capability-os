@@ -1,0 +1,201 @@
+﻿{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://capability-os.local/schemas/capability_contract.schema.json",
+  "title": "Capability Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "domain",
+    "type",
+    "description",
+    "inputs",
+    "outputs",
+    "requirements",
+    "strategy",
+    "exposure",
+    "lifecycle"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z]+(?:_[a-z0-9]+)+$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "domain": {
+      "type": "string",
+      "enum": [
+        "desarrollo",
+        "archivos",
+        "ejecucion",
+        "web",
+        "integraciones",
+        "automatizacion",
+        "observacion"
+      ]
+    },
+    "type": {
+      "type": "string",
+      "enum": ["base", "composed", "integration", "generated"]
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/input_field"
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/output_field"
+      }
+    },
+    "requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tools", "capabilities", "integrations"],
+      "properties": {
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(filesystem|execution|network|system|browser)_[a-z]+(?:_[a-z0-9]+)*$"
+          }
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z]+(?:_[a-z0-9]+)+$"
+          }
+        },
+        "integrations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+_[a-z0-9]+_connector$"
+          }
+        }
+      }
+    },
+    "strategy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "steps"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["sequential", "conditional", "retry_policy", "fallback"]
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/strategy_step"
+          }
+        }
+      }
+    },
+    "exposure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["visible_to_user", "trigger_phrases"],
+      "properties": {
+        "visible_to_user": {
+          "type": "boolean"
+        },
+        "trigger_phrases": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "status"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "available",
+            "not_configured",
+            "preparing",
+            "ready",
+            "running",
+            "error",
+            "experimental",
+            "disabled"
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "input_field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "required"],
+      "properties": {
+        "type": {"type": "string"},
+        "required": {"type": "boolean"},
+        "enum": {
+          "type": "array",
+          "items": {
+            "type": ["string", "number", "integer", "boolean", "null"]
+          }
+        },
+        "description": {"type": "string"}
+      }
+    },
+    "output_field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {"type": "string"},
+        "enum": {
+          "type": "array",
+          "items": {
+            "type": ["string", "number", "integer", "boolean", "null"]
+          }
+        },
+        "description": {"type": "string"}
+      }
+    },
+    "strategy_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step_id", "action", "params"],
+      "properties": {
+        "step_id": {
+          "type": "string",
+          "pattern": "^[a-z]+(?:_[a-z0-9]+)*$"
+        },
+        "action": {
+          "type": "string",
+            "pattern": "^(filesystem|execution|network|system|browser)_[a-z]+(?:_[a-z0-9]+)*$"
+        },
+        "params": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

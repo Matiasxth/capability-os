@@ -1,0 +1,31 @@
+{
+  "id": "browser_type",
+  "name": "Type in selector",
+  "category": "browser",
+  "description": "Deprecated alias of browser_type_text. Type text into an element in the active browser tab using a CSS selector.",
+  "inputs": {
+    "session_id": {"type": "string", "required": false, "description": "Optional browser session identifier. Uses active session when omitted."},
+    "selector": {"type": "string", "required": true, "description": "CSS selector to type into."},
+    "text": {"type": "string", "required": true, "description": "Text to type."},
+    "timeout_ms": {"type": "integer", "required": false, "description": "Optional timeout override in milliseconds."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "selector": {"type": "string"},
+    "url": {"type": "string"},
+    "session_id": {"type": "string"}
+  },
+  "constraints": {
+    "timeout_ms": 10000,
+    "allowlist": [],
+    "workspace_only": false
+  },
+  "safety": {
+    "level": "medium",
+    "requires_confirmation": false
+  },
+  "lifecycle": {
+    "version": "1.2.0",
+    "status": "ready"
+  }
+}

@@ -1,0 +1,38 @@
+﻿{
+  "id": "list_directory",
+  "name": "List directory",
+  "domain": "archivos",
+  "type": "base",
+  "description": "List workspace directory entries.",
+  "inputs": {
+    "path": {"type": "string", "required": true, "description": "Directory path."}
+  },
+  "outputs": {
+    "items": {"type": "array"}
+  },
+  "requirements": {
+    "tools": ["filesystem_list_directory"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "list_directory",
+        "action": "filesystem_list_directory",
+        "params": {
+          "path": "{{inputs.path}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["list directory", "listar directorio"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

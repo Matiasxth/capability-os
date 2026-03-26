@@ -1,0 +1,60 @@
+{
+  "id": "wait_for_whatsapp_login",
+  "name": "Wait for WhatsApp login",
+  "domain": "integraciones",
+  "type": "integration",
+  "description": "Assist login state detection for WhatsApp Web without automating QR authentication.",
+  "inputs": {
+    "session_id": {
+      "type": "string",
+      "required": false,
+      "description": "Optional browser session identifier to inspect."
+    },
+    "timeout_ms": {
+      "type": "integer",
+      "required": false,
+      "description": "Max waiting time in milliseconds."
+    },
+    "poll_interval_ms": {
+      "type": "integer",
+      "required": false,
+      "description": "Polling interval in milliseconds."
+    }
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "session_id": {"type": "string"},
+    "login_state": {"type": "string", "enum": ["qr_visible", "authenticated", "timeout", "unknown"]},
+    "url": {"type": "string"},
+    "attempts": {"type": "integer"},
+    "timeout_ms": {"type": "integer"}
+  },
+  "requirements": {
+    "tools": ["browser_wait_for_selector", "browser_read_text"],
+    "capabilities": [],
+    "integrations": ["whatsapp_web_connector"]
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "check_login_state",
+        "action": "browser_read_text",
+        "params": {
+          "session_id": "{{inputs.session_id}}",
+          "selector": "body",
+          "timeout_ms": "{{inputs.timeout_ms}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["wait for whatsapp login", "esperar login whatsapp"]
+  },
+  "lifecycle": {
+    "version": "1.0.0",
+    "status": "ready"
+  }
+}
+

@@ -1,0 +1,46 @@
+{
+  "id": "navigate_web",
+  "name": "Navigate web",
+  "domain": "web",
+  "type": "base",
+  "description": "Navigate active browser tab to a target URL.",
+  "inputs": {
+    "session_id": {"type": "string", "required": true, "description": "Browser session identifier."},
+    "url": {"type": "string", "required": true, "description": "Target URL."},
+    "timeout_ms": {"type": "integer", "required": false, "description": "Optional timeout override in milliseconds."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "url": {"type": "string"},
+    "status_code": {"type": "integer"},
+    "session_id": {"type": "string"}
+  },
+  "requirements": {
+    "tools": ["browser_navigate"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "navigate",
+        "action": "browser_navigate",
+        "params": {
+          "session_id": "{{inputs.session_id}}",
+          "url": "{{inputs.url}}",
+          "timeout_ms": "{{inputs.timeout_ms}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["navigate web", "ir a sitio web"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}
+

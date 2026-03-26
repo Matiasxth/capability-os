@@ -1,0 +1,27 @@
+{
+  "id": "browser_list_tabs",
+  "name": "List browser tabs",
+  "category": "browser",
+  "description": "List active tabs in a browser session. Uses active session when session_id is omitted.",
+  "inputs": {
+    "session_id": {"type": "string", "required": false, "description": "Optional browser session identifier. Uses active session when omitted."}
+  },
+  "outputs": {
+    "tabs": {"type": "array"},
+    "active_tab_index": {"type": "integer"},
+    "session_id": {"type": "string"}
+  },
+  "constraints": {
+    "timeout_ms": 10000,
+    "allowlist": [],
+    "workspace_only": false
+  },
+  "safety": {
+    "level": "medium",
+    "requires_confirmation": false
+  },
+  "lifecycle": {
+    "version": "1.2.0",
+    "status": "ready"
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "base_url": "https://web.whatsapp.com/",
+  "default_timeout_ms": 15000,
+  "default_poll_interval_ms": 2000,
+  "login": {
+    "authenticated_selectors": [
+      "div[role='grid']",
+      "div[aria-label='Chat list']",
+      "button[title='New chat']"
+    ],
+    "qr_visible_selectors": [
+      "canvas[aria-label*='Scan']",
+      "div[data-testid='qrcode']",
+      "div[data-ref] canvas"
+    ]
+  },
+  "chat": {
+    "search_input_selectors": [
+      "div[contenteditable='true'][data-tab='3']",
+      "div[role='textbox'][aria-label*='Search']",
+      "div[role='textbox'][aria-label*='Buscar']",
+      "div[contenteditable='true'][aria-label*='Search']",
+      "div[contenteditable='true'][aria-label*='Buscar']",
+      "div[contenteditable='true'][title*='Search input textbox']",
+      "div[contenteditable='true'][title*='Buscar']",
+      "div[role='textbox'][title*='Search']",
+      "div[role='textbox'][title*='Buscar']"
+    ],
+    "results_list_selectors": [
+      "div[role='grid']",
+      "div[aria-label='Chat list']"
+    ],
+    "chat_row_selector_template": "span[title=\"{chat_name}\"]",
+    "visible_list_selectors": [
+      "div[role='grid']",
+      "div[aria-label='Chat list']"
+    ]
+  },
+  "message": {
+    "message_list_selectors": [
+      "div[role='application']",
+      "div[data-testid='conversation-panel-body']"
+    ],
+    "composer_input_selectors": [
+      "div[contenteditable='true'][data-tab='10']",
+      "div[contenteditable='true'][aria-label*='Type a message']"
+    ],
+    "send_button_selectors": [
+      "button[aria-label='Send']",
+      "button[aria-label='Enviar']",
+      "button[aria-label*='Send']",
+      "button[aria-label*='Enviar']",
+      "button[data-testid='compose-btn-send']",
+      "div[role='button'][aria-label='Send']",
+      "div[role='button'][aria-label='Enviar']",
+      "div[role='button'][aria-label*='Send']",
+      "div[role='button'][aria-label*='Enviar']",
+      "span[data-icon='send']",
+      "button:has(span[data-icon='send'])",
+      "div[role='button']:has(span[data-icon='send'])"
+    ]
+  }
+}

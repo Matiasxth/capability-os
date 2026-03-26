@@ -1,0 +1,45 @@
+{
+  "id": "open_browser",
+  "name": "Open browser",
+  "domain": "web",
+  "type": "base",
+  "description": "Open a controlled browser session and return session_id.",
+  "inputs": {
+    "headless": {"type": "boolean", "required": false, "description": "Launch browser in headless mode."},
+    "start_url": {"type": "string", "required": false, "description": "Optional initial URL."},
+    "timeout_ms": {"type": "integer", "required": false, "description": "Optional timeout override in milliseconds."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "session_id": {"type": "string"},
+    "url": {"type": "string"}
+  },
+  "requirements": {
+    "tools": ["browser_open_session"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "open_session",
+        "action": "browser_open_session",
+        "params": {
+          "headless": "{{inputs.headless}}",
+          "start_url": "{{inputs.start_url}}",
+          "timeout_ms": "{{inputs.timeout_ms}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["open browser", "abrir navegador"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}
+

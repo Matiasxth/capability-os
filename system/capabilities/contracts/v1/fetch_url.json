@@ -1,0 +1,40 @@
+﻿{
+  "id": "fetch_url",
+  "name": "Fetch URL",
+  "domain": "web",
+  "type": "base",
+  "description": "Fetch URL content via HTTP GET.",
+  "inputs": {
+    "url": {"type": "string", "required": true, "description": "Target URL."},
+    "headers": {"type": "object", "required": false, "description": "Optional request headers."}
+  },
+  "outputs": {
+    "body": {"type": "string"},
+    "status_code": {"type": "integer"}
+  },
+  "requirements": {
+    "tools": ["network_http_get"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "fetch_url",
+        "action": "network_http_get",
+        "params": {
+          "url": "{{inputs.url}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["fetch url", "obtener url"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

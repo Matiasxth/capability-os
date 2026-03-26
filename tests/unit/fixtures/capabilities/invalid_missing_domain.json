@@ -1,0 +1,35 @@
+﻿{
+  "id": "create_project",
+  "name": "Crear proyecto React",
+  "type": "composed",
+  "description": "Crea un proyecto React usando Vite",
+  "inputs": {
+    "project_name": {"type": "string", "required": true}
+  },
+  "outputs": {
+    "project_path": {"type": "string"}
+  },
+  "requirements": {
+    "tools": ["execution_run_command"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "create_project",
+        "action": "execution_run_command",
+        "params": {}
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["crear proyecto react"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

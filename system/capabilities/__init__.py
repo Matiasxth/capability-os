@@ -1,0 +1,1 @@
+﻿"""Capability definitions and registries."""

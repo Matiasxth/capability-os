@@ -1,0 +1,47 @@
+﻿{
+  "id": "analyze_project",
+  "name": "Analyze project",
+  "domain": "desarrollo",
+  "type": "composed",
+  "description": "Deterministically analyze project structure and README file.",
+  "inputs": {
+    "project_path": {"type": "string", "required": true, "description": "Project path inside workspace."}
+  },
+  "outputs": {
+    "analysis_report": {"type": "object"}
+  },
+  "requirements": {
+    "tools": ["filesystem_list_directory", "filesystem_read_file"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "scan_project",
+        "action": "filesystem_list_directory",
+        "params": {
+          "path": "{{inputs.project_path}}"
+        }
+      },
+      {
+        "step_id": "read_readme",
+        "action": "filesystem_read_file",
+        "params": {
+          "path": "{{inputs.project_path}}/README.md",
+          "project_path": "{{inputs.project_path}}",
+          "project_items": "{{steps.scan_project.outputs.items}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["analyze project", "analizar proyecto"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "id": "browser_open_session",
+  "name": "Open browser session",
+  "category": "browser",
+  "description": "Open a controlled browser session and return session_id.",
+  "inputs": {
+    "headless": {"type": "boolean", "required": false, "description": "Launch browser in headless mode."},
+    "start_url": {"type": "string", "required": false, "description": "Optional initial URL to navigate after opening."},
+    "timeout_ms": {"type": "integer", "required": false, "description": "Optional timeout override in milliseconds."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "session_id": {"type": "string"},
+    "url": {"type": "string"}
+  },
+  "constraints": {
+    "timeout_ms": 15000,
+    "allowlist": ["http", "https"],
+    "workspace_only": true
+  },
+  "safety": {
+    "level": "medium",
+    "requires_confirmation": false
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}
+

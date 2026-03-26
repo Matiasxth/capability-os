@@ -1,0 +1,41 @@
+﻿{
+  "id": "execute_command",
+  "name": "Execute command",
+  "domain": "ejecucion",
+  "type": "base",
+  "description": "Execute an allowlisted command.",
+  "inputs": {
+    "command": {"type": "string", "required": true, "description": "Command to run."},
+    "cwd": {"type": "string", "required": false, "description": "Optional working directory."}
+  },
+  "outputs": {
+    "stdout": {"type": "string"},
+    "stderr": {"type": "string"},
+    "exit_code": {"type": "integer"}
+  },
+  "requirements": {
+    "tools": ["execution_run_command"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "execute_command",
+        "action": "execution_run_command",
+        "params": {
+          "command": "{{inputs.command}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["execute command", "ejecutar comando"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

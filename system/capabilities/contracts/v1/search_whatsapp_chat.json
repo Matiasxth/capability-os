@@ -1,0 +1,69 @@
+{
+  "id": "search_whatsapp_chat",
+  "name": "Search WhatsApp chat",
+  "domain": "integraciones",
+  "type": "integration",
+  "description": "Search and optionally select a visible WhatsApp chat by name.",
+  "inputs": {
+    "session_id": {
+      "type": "string",
+      "required": false,
+      "description": "Optional browser session identifier."
+    },
+    "chat_name": {
+      "type": "string",
+      "required": true,
+      "description": "Visible chat name to search."
+    },
+    "timeout_ms": {
+      "type": "integer",
+      "required": false,
+      "description": "Timeout in milliseconds for browser actions."
+    }
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "not_found", "error"]},
+    "session_id": {"type": "string"},
+    "chat_name": {"type": "string"},
+    "selected": {"type": "boolean"},
+    "matches": {"type": "array"}
+  },
+  "requirements": {
+    "tools": ["browser_click_element", "browser_type_text", "browser_read_text", "browser_wait_for_selector"],
+    "capabilities": [],
+    "integrations": ["whatsapp_web_connector"]
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "focus_search_input",
+        "action": "browser_click_element",
+        "params": {
+          "session_id": "{{inputs.session_id}}",
+          "selector": "div[role='textbox']",
+          "timeout_ms": "{{inputs.timeout_ms}}"
+        }
+      },
+      {
+        "step_id": "type_chat_query",
+        "action": "browser_type_text",
+        "params": {
+          "session_id": "{{inputs.session_id}}",
+          "selector": "div[role='textbox']",
+          "text": "{{inputs.chat_name}}",
+          "timeout_ms": "{{inputs.timeout_ms}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["search whatsapp chat", "buscar chat whatsapp"]
+  },
+  "lifecycle": {
+    "version": "1.0.0",
+    "status": "ready"
+  }
+}
+

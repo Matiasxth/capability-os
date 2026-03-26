@@ -1,0 +1,47 @@
+﻿{
+  "id": "browser_list_interactive_elements",
+  "name": "List interactive elements",
+  "domain": "web",
+  "type": "base",
+  "description": "List interactive elements discovered by the browser worker and return stable element IDs.",
+  "inputs": {
+    "session_id": {"type": "string", "required": true, "description": "Browser session identifier."},
+    "filters": {"type": "object", "required": false, "description": "Optional filters object with visible_only, in_viewport_only and text_contains."},
+    "limit": {"type": "integer", "required": false, "description": "Optional max elements to return."},
+    "timeout_ms": {"type": "integer", "required": false, "description": "Optional timeout override in milliseconds."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "session_id": {"type": "string"},
+    "elements": {"type": "array"},
+    "count": {"type": "integer"}
+  },
+  "requirements": {
+    "tools": ["browser_list_interactive_elements"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "list_interactive_elements",
+        "action": "browser_list_interactive_elements",
+        "params": {
+          "session_id": "{{inputs.session_id}}",
+          "filters": "{{inputs.filters}}",
+          "limit": "{{inputs.limit}}",
+          "timeout_ms": "{{inputs.timeout_ms}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["list interactive elements", "listar elementos interactivos"]
+  },
+  "lifecycle": {
+    "version": "1.0.0",
+    "status": "ready"
+  }
+}

@@ -1,0 +1,46 @@
+﻿{
+  "id": "browser_click_element_by_id",
+  "name": "Click element by id",
+  "domain": "web",
+  "type": "base",
+  "description": "Click an interactive element using worker-managed element_id instead of manual CSS selector.",
+  "inputs": {
+    "session_id": {"type": "string", "required": true, "description": "Browser session identifier."},
+    "element_id": {"type": "string", "required": true, "description": "Interactive element identifier."},
+    "timeout_ms": {"type": "integer", "required": false, "description": "Optional timeout override in milliseconds."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "session_id": {"type": "string"},
+    "element_id": {"type": "string"},
+    "selector": {"type": "string"},
+    "url": {"type": "string"}
+  },
+  "requirements": {
+    "tools": ["browser_click_element_by_id"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "click_by_id",
+        "action": "browser_click_element_by_id",
+        "params": {
+          "session_id": "{{inputs.session_id}}",
+          "element_id": "{{inputs.element_id}}",
+          "timeout_ms": "{{inputs.timeout_ms}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["click element by id", "click por id"]
+  },
+  "lifecycle": {
+    "version": "1.0.0",
+    "status": "ready"
+  }
+}

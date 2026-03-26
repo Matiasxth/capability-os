@@ -1,0 +1,28 @@
+﻿{
+  "id": "filesystem_write_file",
+  "name": "Write file",
+  "category": "filesystem",
+  "description": "Write a text file inside the allowed workspace.",
+  "inputs": {
+    "path": {"type": "string", "required": true, "description": "Destination file path."},
+    "content": {"type": "string", "required": true, "description": "Text content to write."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "path": {"type": "string"},
+    "bytes_written": {"type": "integer"}
+  },
+  "constraints": {
+    "timeout_ms": 30000,
+    "allowlist": [],
+    "workspace_only": true
+  },
+  "safety": {
+    "level": "medium",
+    "requires_confirmation": false
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

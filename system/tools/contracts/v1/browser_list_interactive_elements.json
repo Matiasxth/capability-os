@@ -1,0 +1,31 @@
+﻿{
+  "id": "browser_list_interactive_elements",
+  "name": "List interactive elements",
+  "category": "browser",
+  "description": "List normalized interactive DOM elements for the active page using internal element IDs.",
+  "inputs": {
+    "session_id": {"type": "string", "required": false, "description": "Optional browser session identifier. Uses active session when omitted."},
+    "filters": {"type": "object", "required": false, "description": "Optional filters object with visible_only, in_viewport_only and text_contains."},
+    "limit": {"type": "integer", "required": false, "description": "Optional max elements to return."},
+    "timeout_ms": {"type": "integer", "required": false, "description": "Optional timeout override in milliseconds."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "session_id": {"type": "string"},
+    "elements": {"type": "array"},
+    "count": {"type": "integer"}
+  },
+  "constraints": {
+    "timeout_ms": 12000,
+    "allowlist": [],
+    "workspace_only": false
+  },
+  "safety": {
+    "level": "medium",
+    "requires_confirmation": false
+  },
+  "lifecycle": {
+    "version": "1.0.0",
+    "status": "ready"
+  }
+}

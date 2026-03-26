@@ -1,0 +1,58 @@
+{
+  "id": "list_whatsapp_visible_chats",
+  "name": "List WhatsApp visible chats",
+  "domain": "integraciones",
+  "type": "integration",
+  "description": "List currently visible chats from the WhatsApp chat panel.",
+  "inputs": {
+    "session_id": {
+      "type": "string",
+      "required": false,
+      "description": "Optional browser session identifier."
+    },
+    "max_chats": {
+      "type": "integer",
+      "required": false,
+      "description": "Max chats to return from current visible panel."
+    },
+    "timeout_ms": {
+      "type": "integer",
+      "required": false,
+      "description": "Timeout in milliseconds for browser actions."
+    }
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "session_id": {"type": "string"},
+    "chats": {"type": "array"},
+    "chat_count": {"type": "integer"}
+  },
+  "requirements": {
+    "tools": ["browser_read_text", "browser_wait_for_selector"],
+    "capabilities": [],
+    "integrations": ["whatsapp_web_connector"]
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "read_visible_chats",
+        "action": "browser_read_text",
+        "params": {
+          "session_id": "{{inputs.session_id}}",
+          "selector": "div[role='grid']",
+          "timeout_ms": "{{inputs.timeout_ms}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["list whatsapp chats", "listar chats whatsapp"]
+  },
+  "lifecycle": {
+    "version": "1.0.0",
+    "status": "ready"
+  }
+}
+

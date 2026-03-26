@@ -1,0 +1,31 @@
+﻿{
+  "id": "filesystem_read_file",
+  "name": "Read file",
+  "category": "filesystem",
+  "description": "Read a text file inside the allowed workspace.",
+  "inputs": {
+    "path": {"type": "string", "required": true, "description": "File path to read."},
+    "project_path": {"type": "string", "required": false, "description": "Optional project path for composed analysis."},
+    "project_items": {"type": "array", "required": false, "description": "Optional project listing for composed analysis."}
+  },
+  "outputs": {
+    "content": {"type": "string"},
+    "path": {"type": "string"},
+    "size_bytes": {"type": "integer"},
+    "encoding": {"type": "string"},
+    "analysis_report": {"type": "object"}
+  },
+  "constraints": {
+    "timeout_ms": 30000,
+    "allowlist": [],
+    "workspace_only": true
+  },
+  "safety": {
+    "level": "medium",
+    "requires_confirmation": false
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

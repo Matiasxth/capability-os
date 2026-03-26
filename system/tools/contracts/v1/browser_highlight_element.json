@@ -1,0 +1,32 @@
+﻿{
+  "id": "browser_highlight_element",
+  "name": "Highlight element",
+  "category": "browser",
+  "description": "Temporarily highlight a previously discovered interactive element for visual debugging.",
+  "inputs": {
+    "session_id": {"type": "string", "required": false, "description": "Optional browser session identifier. Uses active session when omitted."},
+    "element_id": {"type": "string", "required": true, "description": "Internal element identifier (e.g. el_001)."},
+    "duration_ms": {"type": "integer", "required": false, "description": "Highlight duration in milliseconds."},
+    "timeout_ms": {"type": "integer", "required": false, "description": "Optional timeout override in milliseconds."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "session_id": {"type": "string"},
+    "element_id": {"type": "string"},
+    "selector": {"type": "string"},
+    "url": {"type": "string"}
+  },
+  "constraints": {
+    "timeout_ms": 12000,
+    "allowlist": [],
+    "workspace_only": false
+  },
+  "safety": {
+    "level": "low",
+    "requires_confirmation": false
+  },
+  "lifecycle": {
+    "version": "1.0.0",
+    "status": "ready"
+  }
+}

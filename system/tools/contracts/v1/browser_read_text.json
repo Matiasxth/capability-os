@@ -1,0 +1,30 @@
+{
+  "id": "browser_read_text",
+  "name": "Read text from page",
+  "category": "browser",
+  "description": "Read text from a selector or from page body in the active tab. Uses active session when session_id is omitted.",
+  "inputs": {
+    "session_id": {"type": "string", "required": false, "description": "Optional browser session identifier. Uses active session when omitted."},
+    "selector": {"type": "string", "required": false, "description": "Optional CSS selector to extract text from."},
+    "timeout_ms": {"type": "integer", "required": false, "description": "Optional timeout override in milliseconds."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "text": {"type": "string"},
+    "url": {"type": "string"},
+    "session_id": {"type": "string"}
+  },
+  "constraints": {
+    "timeout_ms": 10000,
+    "allowlist": [],
+    "workspace_only": false
+  },
+  "safety": {
+    "level": "medium",
+    "requires_confirmation": false
+  },
+  "lifecycle": {
+    "version": "1.2.0",
+    "status": "ready"
+  }
+}

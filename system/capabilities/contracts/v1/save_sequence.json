@@ -1,0 +1,40 @@
+{
+  "id": "save_sequence",
+  "name": "Save sequence",
+  "domain": "automatizacion",
+  "type": "base",
+  "description": "Validate and persist a reusable sequence definition in workspace storage.",
+  "inputs": {
+    "sequence_definition": {"type": "object", "required": true, "description": "Sequence definition object with id, name and steps."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "sequence_id": {"type": "string"}
+  },
+  "requirements": {
+    "tools": ["filesystem_write_file"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "save_sequence",
+        "action": "filesystem_write_file",
+        "params": {
+          "path": "sequences/{{inputs.sequence_definition.id}}.json",
+          "content": "{{inputs.sequence_definition}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["save sequence", "guardar secuencia"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

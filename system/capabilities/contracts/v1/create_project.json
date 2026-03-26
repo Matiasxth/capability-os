@@ -1,0 +1,48 @@
+﻿{
+  "id": "create_project",
+  "name": "Create project",
+  "domain": "desarrollo",
+  "type": "composed",
+  "description": "Create a minimal project directory inside workspace.",
+  "inputs": {
+    "project_name": {"type": "string", "required": true, "description": "Project folder name."},
+    "target_dir": {"type": "string", "required": false, "description": "Optional target directory."}
+  },
+  "outputs": {
+    "project_path": {"type": "string"},
+    "status": {"type": "string", "enum": ["success", "error"]}
+  },
+  "requirements": {
+    "tools": ["execution_run_command", "filesystem_list_directory"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "create_project_dir",
+        "action": "execution_run_command",
+        "params": {
+          "command": "py -c \"from pathlib import Path; import sys; p = Path(r'{{inputs.project_name}}'); p.mkdir(parents=True, exist_ok=True); (p / 'README.md').write_text('# ' + r'{{inputs.project_name}}', encoding='utf-8'); sys.stdout.write(str(p.resolve()))\"",
+          "cwd": "{{inputs.target_dir}}"
+        }
+      },
+      {
+        "step_id": "inspect_project",
+        "action": "filesystem_list_directory",
+        "params": {
+          "path": "{{steps.create_project_dir.outputs.stdout}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["create project", "crear proyecto"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

@@ -1,0 +1,48 @@
+﻿{
+  "id": "create_project",
+  "name": "Create project",
+  "domain": "desarrollo",
+  "type": "composed",
+  "description": "Sequential capability for engine tests",
+  "inputs": {
+    "project_name": {"type": "string", "required": true},
+    "target_dir": {"type": "string", "required": false}
+  },
+  "outputs": {
+    "project_path": {"type": "string"},
+    "status": {"type": "string", "enum": ["success", "error"]}
+  },
+  "requirements": {
+    "tools": ["execution_run_command"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "create_project",
+        "action": "execution_run_command",
+        "params": {
+          "command": "create {{inputs.project_name}}",
+          "cwd": "{{inputs.target_dir}}"
+        }
+      },
+      {
+        "step_id": "install_dependencies",
+        "action": "execution_run_command",
+        "params": {
+          "command": "install {{steps.create_project.outputs.project_path}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["create project"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

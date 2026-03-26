@@ -1,0 +1,30 @@
+{
+  "id": "browser_navigate",
+  "name": "Navigate browser tab",
+  "category": "browser",
+  "description": "Navigate the active browser tab to a target URL. Uses active session when session_id is omitted.",
+  "inputs": {
+    "session_id": {"type": "string", "required": false, "description": "Optional browser session identifier. Uses active session when omitted."},
+    "url": {"type": "string", "required": true, "description": "Target URL (http/https)."},
+    "timeout_ms": {"type": "integer", "required": false, "description": "Optional timeout override in milliseconds."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "url": {"type": "string"},
+    "status_code": {"type": "integer"},
+    "session_id": {"type": "string"}
+  },
+  "constraints": {
+    "timeout_ms": 30000,
+    "allowlist": ["http", "https"],
+    "workspace_only": false
+  },
+  "safety": {
+    "level": "medium",
+    "requires_confirmation": false
+  },
+  "lifecycle": {
+    "version": "1.2.0",
+    "status": "ready"
+  }
+}

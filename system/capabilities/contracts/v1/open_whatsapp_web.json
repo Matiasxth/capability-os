@@ -1,0 +1,63 @@
+{
+  "id": "open_whatsapp_web",
+  "name": "Open WhatsApp Web",
+  "domain": "integraciones",
+  "type": "integration",
+  "description": "Open or reuse a browser session and navigate to WhatsApp Web in assisted mode.",
+  "inputs": {
+    "session_id": {
+      "type": "string",
+      "required": false,
+      "description": "Optional browser session identifier to reuse."
+    },
+    "url": {
+      "type": "string",
+      "required": false,
+      "description": "Optional URL override for WhatsApp Web."
+    },
+    "headless": {
+      "type": "boolean",
+      "required": false,
+      "description": "Browser headless mode when opening a new session."
+    },
+    "timeout_ms": {
+      "type": "integer",
+      "required": false,
+      "description": "Timeout in milliseconds for browser actions."
+    }
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "session_id": {"type": "string"},
+    "url": {"type": "string"},
+    "login_state": {"type": "string", "enum": ["qr_visible", "authenticated", "unknown", "timeout"]}
+  },
+  "requirements": {
+    "tools": ["browser_open_session", "browser_navigate", "browser_read_text", "browser_wait_for_selector"],
+    "capabilities": [],
+    "integrations": ["whatsapp_web_connector"]
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "open_session",
+        "action": "browser_open_session",
+        "params": {
+          "headless": "{{inputs.headless}}",
+          "start_url": "{{inputs.url}}",
+          "timeout_ms": "{{inputs.timeout_ms}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["open whatsapp web", "abrir whatsapp web"]
+  },
+  "lifecycle": {
+    "version": "1.0.0",
+    "status": "ready"
+  }
+}
+

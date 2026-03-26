@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# Local runtime temp dirs
+.tmp_tests/
+tests/unit/.tmp_runtime/
+artifacts/
+
+# Frontend
+system/frontend/app/node_modules/
+system/frontend/app/dist/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+

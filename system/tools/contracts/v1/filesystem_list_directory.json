@@ -1,0 +1,28 @@
+﻿{
+  "id": "filesystem_list_directory",
+  "name": "List directory",
+  "category": "filesystem",
+  "description": "List entries in a directory inside the allowed workspace.",
+  "inputs": {
+    "path": {"type": "string", "required": true, "description": "Directory path to list."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "path": {"type": "string"},
+    "project_path": {"type": "string"},
+    "items": {"type": "array"}
+  },
+  "constraints": {
+    "timeout_ms": 30000,
+    "allowlist": [],
+    "workspace_only": true
+  },
+  "safety": {
+    "level": "medium",
+    "requires_confirmation": false
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

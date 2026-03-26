@@ -1,0 +1,59 @@
+{
+  "id": "read_whatsapp_messages",
+  "name": "Read WhatsApp messages",
+  "domain": "integraciones",
+  "type": "integration",
+  "description": "Read only currently visible messages from the active WhatsApp chat.",
+  "inputs": {
+    "session_id": {
+      "type": "string",
+      "required": false,
+      "description": "Optional browser session identifier."
+    },
+    "max_messages": {
+      "type": "integer",
+      "required": false,
+      "description": "Max visible messages to return."
+    },
+    "timeout_ms": {
+      "type": "integer",
+      "required": false,
+      "description": "Timeout in milliseconds for browser actions."
+    }
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "session_id": {"type": "string"},
+    "messages": {"type": "array"},
+    "message_count": {"type": "integer"},
+    "scope": {"type": "string", "enum": ["visible_only"]}
+  },
+  "requirements": {
+    "tools": ["browser_read_text", "browser_wait_for_selector"],
+    "capabilities": [],
+    "integrations": ["whatsapp_web_connector"]
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "read_visible_messages",
+        "action": "browser_read_text",
+        "params": {
+          "session_id": "{{inputs.session_id}}",
+          "selector": "div[role='application']",
+          "timeout_ms": "{{inputs.timeout_ms}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["read whatsapp messages", "leer mensajes whatsapp"]
+  },
+  "lifecycle": {
+    "version": "1.0.0",
+    "status": "ready"
+  }
+}
+

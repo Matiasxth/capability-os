@@ -1,0 +1,57 @@
+﻿{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://capability-os.local/schemas/integration_manifest.schema.json",
+  "title": "Integration Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "type", "status", "capabilities", "requirements", "lifecycle"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+_[a-z0-9]+_connector$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "type": {
+      "type": "string",
+      "enum": ["web_app", "rest_api", "local_app", "file_based"]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "available",
+        "not_configured",
+        "preparing",
+        "ready",
+        "running",
+        "error",
+        "experimental",
+        "disabled"
+      ]
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z]+(?:_[a-z0-9]+)+$"
+      }
+    },
+    "requirements": {
+      "type": "object"
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        }
+      }
+    }
+  }
+}

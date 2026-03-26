@@ -1,0 +1,31 @@
+{
+  "id": "browser_screenshot",
+  "name": "Capture screenshot",
+  "category": "browser",
+  "description": "Deprecated alias of browser_take_screenshot. Capture a screenshot of the active browser tab inside allowed workspace.",
+  "inputs": {
+    "session_id": {"type": "string", "required": false, "description": "Optional browser session identifier. Uses active session when omitted."},
+    "path": {"type": "string", "required": false, "description": "Optional destination path in workspace."},
+    "full_page": {"type": "boolean", "required": false, "description": "Capture full page when true."},
+    "timeout_ms": {"type": "integer", "required": false, "description": "Optional timeout override in milliseconds."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "path": {"type": "string"},
+    "url": {"type": "string"},
+    "session_id": {"type": "string"}
+  },
+  "constraints": {
+    "timeout_ms": 15000,
+    "allowlist": [],
+    "workspace_only": true
+  },
+  "safety": {
+    "level": "medium",
+    "requires_confirmation": false
+  },
+  "lifecycle": {
+    "version": "1.2.0",
+    "status": "ready"
+  }
+}

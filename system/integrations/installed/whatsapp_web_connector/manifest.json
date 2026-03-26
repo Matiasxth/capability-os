@@ -1,0 +1,22 @@
+{
+  "id": "whatsapp_web_connector",
+  "name": "WhatsApp Web Connector",
+  "type": "web_app",
+  "status": "ready",
+  "capabilities": [
+    "open_whatsapp_web",
+    "wait_for_whatsapp_login",
+    "search_whatsapp_chat",
+    "read_whatsapp_messages",
+    "send_whatsapp_message",
+    "list_whatsapp_visible_chats"
+  ],
+  "requirements": {
+    "browser": true,
+    "auth": "qr_login_manual",
+    "mode": "assisted"
+  },
+  "lifecycle": {
+    "version": "1.0.0"
+  }
+}

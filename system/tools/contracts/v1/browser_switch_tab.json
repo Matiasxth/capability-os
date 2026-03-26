@@ -1,0 +1,29 @@
+{
+  "id": "browser_switch_tab",
+  "name": "Switch browser tab",
+  "category": "browser",
+  "description": "Switch active browser tab in a browser session by tab index. Uses active session when session_id is omitted.",
+  "inputs": {
+    "session_id": {"type": "string", "required": false, "description": "Optional browser session identifier. Uses active session when omitted."},
+    "tab_index": {"type": "integer", "required": true, "description": "Target tab index."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "active_tab_index": {"type": "integer"},
+    "url": {"type": "string"},
+    "session_id": {"type": "string"}
+  },
+  "constraints": {
+    "timeout_ms": 10000,
+    "allowlist": [],
+    "workspace_only": false
+  },
+  "safety": {
+    "level": "medium",
+    "requires_confirmation": false
+  },
+  "lifecycle": {
+    "version": "1.2.0",
+    "status": "ready"
+  }
+}

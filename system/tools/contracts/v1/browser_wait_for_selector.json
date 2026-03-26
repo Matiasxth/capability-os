@@ -1,0 +1,30 @@
+{
+  "id": "browser_wait_for_selector",
+  "name": "Wait for selector",
+  "category": "browser",
+  "description": "Wait for a selector to appear in the active browser tab.",
+  "inputs": {
+    "session_id": {"type": "string", "required": false, "description": "Optional browser session identifier. Uses active session when omitted."},
+    "selector": {"type": "string", "required": true, "description": "CSS selector to wait for."},
+    "timeout_ms": {"type": "integer", "required": false, "description": "Optional timeout override in milliseconds."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "selector": {"type": "string"},
+    "url": {"type": "string"},
+    "session_id": {"type": "string"}
+  },
+  "constraints": {
+    "timeout_ms": 15000,
+    "allowlist": [],
+    "workspace_only": false
+  },
+  "safety": {
+    "level": "medium",
+    "requires_confirmation": false
+  },
+  "lifecycle": {
+    "version": "1.2.0",
+    "status": "ready"
+  }
+}

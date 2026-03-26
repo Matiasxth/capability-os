@@ -1,0 +1,38 @@
+﻿{
+  "id": "read_file",
+  "name": "Read file",
+  "domain": "archivos",
+  "type": "base",
+  "description": "Read a text file from workspace.",
+  "inputs": {
+    "path": {"type": "string", "required": true, "description": "File path."}
+  },
+  "outputs": {
+    "content": {"type": "string"}
+  },
+  "requirements": {
+    "tools": ["filesystem_read_file"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "read_file",
+        "action": "filesystem_read_file",
+        "params": {
+          "path": "{{inputs.path}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["read file", "leer archivo"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

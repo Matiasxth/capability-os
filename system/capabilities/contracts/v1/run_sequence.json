@@ -1,0 +1,40 @@
+{
+  "id": "run_sequence",
+  "name": "Run sequence",
+  "domain": "automatizacion",
+  "type": "composed",
+  "description": "Execute reusable sequence steps through existing capabilities.",
+  "inputs": {
+    "sequence_id": {"type": "string", "required": false, "description": "Saved sequence id to execute."},
+    "sequence_definition": {"type": "object", "required": false, "description": "Inline sequence definition to execute directly."},
+    "inputs": {"type": "object", "required": false, "description": "Runtime inputs available as inputs.* in sequence step templates."}
+  },
+  "outputs": {
+    "final_output": {"type": "object"}
+  },
+  "requirements": {
+    "tools": ["filesystem_read_file"],
+    "capabilities": ["load_sequence"],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "prepare_sequence",
+        "action": "filesystem_read_file",
+        "params": {
+          "path": "sequences/{{inputs.sequence_id}}.json"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["run sequence", "ejecutar secuencia"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

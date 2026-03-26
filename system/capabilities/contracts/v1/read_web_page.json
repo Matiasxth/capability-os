@@ -1,0 +1,46 @@
+{
+  "id": "read_web_page",
+  "name": "Read web page",
+  "domain": "web",
+  "type": "base",
+  "description": "Read text from active browser tab or selector.",
+  "inputs": {
+    "session_id": {"type": "string", "required": true, "description": "Browser session identifier."},
+    "selector": {"type": "string", "required": false, "description": "Optional selector to extract text."},
+    "timeout_ms": {"type": "integer", "required": false, "description": "Optional timeout override in milliseconds."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "text": {"type": "string"},
+    "url": {"type": "string"},
+    "session_id": {"type": "string"}
+  },
+  "requirements": {
+    "tools": ["browser_read_text"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "read_text",
+        "action": "browser_read_text",
+        "params": {
+          "session_id": "{{inputs.session_id}}",
+          "selector": "{{inputs.selector}}",
+          "timeout_ms": "{{inputs.timeout_ms}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["read web page", "leer pagina web"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}
+

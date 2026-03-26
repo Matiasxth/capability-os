@@ -1,0 +1,40 @@
+{
+  "id": "diagnose_error",
+  "name": "Diagnose error",
+  "domain": "desarrollo",
+  "type": "composed",
+  "description": "Diagnose known error patterns deterministically from error output.",
+  "inputs": {
+    "error_output": {"type": "string", "required": true, "description": "Raw error output to diagnose."},
+    "project_path": {"type": "string", "required": false, "description": "Optional project path for context."},
+    "error_context": {"type": "string", "required": false, "description": "Optional additional context."}
+  },
+  "outputs": {
+    "diagnosis": {"type": "object"}
+  },
+  "requirements": {
+    "tools": ["filesystem_read_file"],
+    "capabilities": ["analyze_project"],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "collect_context",
+        "action": "filesystem_read_file",
+        "params": {
+          "path": "{{inputs.project_path}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["diagnose error", "diagnosticar error"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

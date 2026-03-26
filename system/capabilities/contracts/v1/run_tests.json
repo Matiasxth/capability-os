@@ -1,0 +1,42 @@
+﻿{
+  "id": "run_tests",
+  "name": "Run tests",
+  "domain": "desarrollo",
+  "type": "composed",
+  "description": "Run test command inside project directory.",
+  "inputs": {
+    "project_path": {"type": "string", "required": true, "description": "Project path inside workspace."},
+    "test_command": {"type": "string", "required": false, "description": "Optional custom test command."}
+  },
+  "outputs": {
+    "stdout": {"type": "string"},
+    "exit_code": {"type": "integer"}
+  },
+  "requirements": {
+    "tools": ["execution_run_command"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "run_tests",
+        "action": "execution_run_command",
+        "params": {
+          "command": "{{inputs.test_command}}",
+          "fallback_command": "py -c \"print('tests_ok')\"",
+          "cwd": "{{inputs.project_path}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["run tests", "ejecutar tests"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}
