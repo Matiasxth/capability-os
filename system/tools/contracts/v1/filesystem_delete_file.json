@@ -1,0 +1,26 @@
+{
+  "id": "filesystem_delete_file",
+  "name": "Delete file",
+  "category": "filesystem",
+  "description": "Permanently delete a file inside the allowed workspace.",
+  "inputs": {
+    "path": {"type": "string", "required": true, "description": "File path to delete."}
+  },
+  "outputs": {
+    "status": {"type": "string"},
+    "path": {"type": "string"}
+  },
+  "constraints": {
+    "timeout_ms": 30000,
+    "allowlist": [],
+    "workspace_only": true
+  },
+  "safety": {
+    "level": "high",
+    "requires_confirmation": true
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

@@ -4,7 +4,7 @@
       "id": "whatsapp_web_connector",
       "status": "enabled",
       "validated": true,
-      "last_validated_at": "2026-03-26T01:35:44.952011Z",
+      "last_validated_at": "2026-03-28T00:10:16.040214Z",
       "error": null,
       "metadata": {
         "name": "WhatsApp Web Connector",
@@ -17,7 +17,7 @@
           "send_whatsapp_message",
           "list_whatsapp_visible_chats"
         ],
-        "manifest_path": "E:\\AI\\Capability OS\\system\\integrations\\installed\\whatsapp_web_connector\\manifest.json"
+        "manifest_path": "C:\\Users\\Clever\\Documents\\AI\\capability-os\\system\\integrations\\installed\\whatsapp_web_connector\\manifest.json"
       }
     }
   ]

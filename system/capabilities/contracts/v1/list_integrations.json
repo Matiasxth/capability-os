@@ -1,0 +1,35 @@
+{
+  "id": "list_integrations",
+  "name": "List integrations",
+  "domain": "integraciones",
+  "type": "base",
+  "description": "List all registered integrations and their current status.",
+  "inputs": {},
+  "outputs": {
+    "integrations": {"type": "array"},
+    "workspace_root": {"type": "string"}
+  },
+  "requirements": {
+    "tools": ["system_get_workspace_info"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "get_workspace",
+        "action": "system_get_workspace_info",
+        "params": {}
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["list integrations", "listar integraciones", "show integrations", "ver integraciones"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

@@ -39,6 +39,11 @@ export default function ExecutionPanel({ execution, logs, selectedStepId, onSele
           <p>
             duration_ms: <strong>{execution.duration_ms ?? 0}</strong>
           </p>
+          {(execution.retry_count ?? 0) > 0 && (
+            <p>
+              retry_count: <strong>{execution.retry_count}</strong>
+            </p>
+          )}
           <p>
             failed_step: <strong>{execution.failed_step || "-"}</strong>
           </p>

@@ -1,0 +1,39 @@
+{
+  "id": "extract_links",
+  "name": "Extract links",
+  "domain": "web",
+  "type": "base",
+  "description": "Extract all hyperlinks from a parsed HTML document object.",
+  "inputs": {
+    "document": {"type": "object", "required": true, "description": "Parsed document from parse_html or network_parse_html."}
+  },
+  "outputs": {
+    "links": {"type": "array"},
+    "count": {"type": "integer"}
+  },
+  "requirements": {
+    "tools": ["network_extract_links"],
+    "capabilities": ["parse_html"],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "extract_links",
+        "action": "network_extract_links",
+        "params": {
+          "document": "{{inputs.document}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["extract links", "extraer enlaces", "get links", "obtener links"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

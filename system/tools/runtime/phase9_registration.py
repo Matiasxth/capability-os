@@ -19,11 +19,15 @@ def register_phase9_browser_tools(
 ) -> BrowserSessionManager:
     artifacts_root = kwargs.get("artifacts_root")
     auto_start = kwargs.get("auto_start", True)
+    cdp_port = kwargs.get("cdp_port", 0)
+    auto_restart_max_retries = kwargs.get("auto_restart_max_retries", 2)
     manager = BrowserSessionManager(
         workspace_root=workspace_root,
         ipc_client=ipc_client,
         artifacts_root=artifacts_root,
         auto_start=auto_start,
+        cdp_port=cdp_port,
+        auto_restart_max_retries=auto_restart_max_retries,
     )
 
     tool_runtime.register_handler(

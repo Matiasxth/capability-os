@@ -1,0 +1,41 @@
+{
+  "id": "get_error_report",
+  "name": "Get error report",
+  "domain": "observacion",
+  "type": "base",
+  "description": "Read a persisted error report from workspace artifacts.",
+  "inputs": {
+    "execution_id": {"type": "string", "required": false, "description": "Execution id to retrieve errors for."},
+    "capability_id": {"type": "string", "required": false, "description": "Capability id to filter error reports by."}
+  },
+  "outputs": {
+    "content": {"type": "string"},
+    "path": {"type": "string"},
+    "size_bytes": {"type": "integer"}
+  },
+  "requirements": {
+    "tools": ["filesystem_read_file"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "read_error_report",
+        "action": "filesystem_read_file",
+        "params": {
+          "path": "artifacts/traces/{{inputs.execution_id}}.json"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["error report", "reporte de error", "get errors", "ver errores"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "id": "system_get_env_var",
+  "name": "Get environment variable",
+  "category": "system",
+  "description": "Read the value of an environment variable by name.",
+  "inputs": {
+    "name": {"type": "string", "required": true, "description": "Name of the environment variable."},
+    "default": {"type": "string", "required": false, "description": "Value to return if the variable is not set."}
+  },
+  "outputs": {
+    "name": {"type": "string"},
+    "value": {"type": "string"},
+    "found": {"type": "boolean"}
+  },
+  "constraints": {
+    "timeout_ms": 5000,
+    "allowlist": [],
+    "workspace_only": false
+  },
+  "safety": {
+    "level": "low",
+    "requires_confirmation": false
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

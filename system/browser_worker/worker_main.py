@@ -155,13 +155,13 @@ def run_worker(workspace_root: Path) -> int:
                         duration_ms=duration_ms,
                     )
                 )
-            except Exception as exc:  # pragma: no cover - fallback safety
+            except Exception as exc:
                 duration_ms = _duration_ms(started)
                 response = build_error_response(
                     request_message,
                     error_code="browser_worker_internal_error",
-                    error_message=f"Unexpected browser worker error: {exc}",
-                    details={},
+                    error_message=f"Unexpected browser worker error ({type(exc).__name__}): {exc}",
+                    details={"exception_type": type(exc).__name__},
                     duration_ms=duration_ms,
                 )
                 _write_message(response)

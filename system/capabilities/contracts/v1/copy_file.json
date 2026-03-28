@@ -1,0 +1,42 @@
+{
+  "id": "copy_file",
+  "name": "Copy file",
+  "domain": "archivos",
+  "type": "base",
+  "description": "Copy a file from source to destination within the workspace.",
+  "inputs": {
+    "source_path": {"type": "string", "required": true, "description": "Source file path."},
+    "destination_path": {"type": "string", "required": true, "description": "Destination file path."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "source_path": {"type": "string"},
+    "destination_path": {"type": "string"}
+  },
+  "requirements": {
+    "tools": ["filesystem_copy_file"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "copy_file",
+        "action": "filesystem_copy_file",
+        "params": {
+          "source_path": "{{inputs.source_path}}",
+          "destination_path": "{{inputs.destination_path}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["copy file", "copiar archivo", "duplicate file"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

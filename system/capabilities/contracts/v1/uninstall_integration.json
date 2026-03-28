@@ -1,0 +1,39 @@
+{
+  "id": "uninstall_integration",
+  "name": "Uninstall integration",
+  "domain": "integraciones",
+  "type": "base",
+  "description": "Remove an installed integration by deleting its manifest file. Requires confirmation.",
+  "inputs": {
+    "integration_id": {"type": "string", "required": true, "description": "Integration identifier to uninstall."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "path": {"type": "string"}
+  },
+  "requirements": {
+    "tools": ["filesystem_delete_file"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "delete_manifest",
+        "action": "filesystem_delete_file",
+        "params": {
+          "path": "system/integrations/installed/{{inputs.integration_id}}/manifest.json"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["uninstall integration", "desinstalar integracion", "remove integration"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

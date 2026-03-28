@@ -1,0 +1,27 @@
+{
+  "id": "system_get_workspace_info",
+  "name": "Get workspace info",
+  "category": "system",
+  "description": "Return metadata about the active workspace: root path, artifact/sequence paths, disk usage.",
+  "inputs": {},
+  "outputs": {
+    "workspace_root": {"type": "string"},
+    "artifacts_path": {"type": "string"},
+    "sequences_path": {"type": "string"},
+    "capabilities_count": {"type": "integer"},
+    "tools_count": {"type": "integer"}
+  },
+  "constraints": {
+    "timeout_ms": 5000,
+    "allowlist": [],
+    "workspace_only": false
+  },
+  "safety": {
+    "level": "low",
+    "requires_confirmation": false
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

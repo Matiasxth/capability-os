@@ -20,8 +20,11 @@ EVENTS = {
 class ObservationLogger:
     """Emits spec events and keeps the canonical runtime model in sync."""
 
-    def __init__(self):
+    def __init__(self, metrics_collector: Any | None = None, execution_history: Any | None = None, semantic_memory: Any | None = None):
         self.runtime: dict[str, Any] | None = None
+        self._metrics_collector = metrics_collector
+        self._execution_history = execution_history
+        self._semantic_memory = semantic_memory
 
     def initialize(self, capability_id: str, initial_state: dict[str, Any] | None = None) -> dict[str, Any]:
         self.runtime = {
@@ -136,7 +139,31 @@ class ObservationLogger:
                 "failed_step": failed_step,
             },
         )
-        return self.get_runtime_model()
+
+        model = self.get_runtime_model()
+        if self._metrics_collector is not None:
+            try:
+                self._metrics_collector.record_execution(model)
+            except Exception:
+                pass  # metrics failure must not break execution
+        if self._execution_history is not None:
+            try:
+                self._execution_history.record(model)
+            except Exception:
+                pass  # history failure must not break execution
+        if self._semantic_memory is not None and status in ("ready", "success"):
+            try:
+                cap_id = model.get("capability_id", "")
+                intent = f"{cap_id} execution"
+                self._semantic_memory.remember_semantic(
+                    intent,
+                    metadata={"capability_id": cap_id, "execution_id": model.get("execution_id")},
+                    memory_type="execution_pattern",
+                    capability_id=cap_id,
+                )
+            except Exception:
+                pass  # semantic failure must not break execution
+        return model
 
     def get_runtime_model(self) -> dict[str, Any]:
         if self.runtime is None:

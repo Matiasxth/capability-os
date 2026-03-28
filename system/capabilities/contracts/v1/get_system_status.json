@@ -1,0 +1,43 @@
+{
+  "id": "get_system_status",
+  "name": "Get system status",
+  "domain": "observacion",
+  "type": "composed",
+  "description": "Return OS information and workspace metadata as a system health snapshot.",
+  "inputs": {},
+  "outputs": {
+    "platform": {"type": "string"},
+    "python_version": {"type": "string"},
+    "workspace_root": {"type": "string"},
+    "capabilities_count": {"type": "integer"},
+    "tools_count": {"type": "integer"}
+  },
+  "requirements": {
+    "tools": ["system_get_os_info", "system_get_workspace_info"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "get_os_info",
+        "action": "system_get_os_info",
+        "params": {}
+      },
+      {
+        "step_id": "get_workspace_info",
+        "action": "system_get_workspace_info",
+        "params": {}
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["system status", "estado del sistema", "health check", "system info"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

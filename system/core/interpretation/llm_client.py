@@ -62,7 +62,7 @@ class LLMClient:
     def __init__(
         self,
         adapter: LLMAdapter | None = None,
-        timeout_sec: float = 15.0,
+        timeout_sec: float = 30.0,
         settings_provider: Callable[[], dict[str, Any]] | None = None,
     ):
         self._explicit_adapter = adapter
@@ -175,14 +175,21 @@ def _http_post_json(
     timeout_sec: float,
     provider: str,
 ) -> str:
+    # Ensure required headers for all providers (Cloudflare blocks without User-Agent)
+    merged = {
+        "Content-Type": "application/json",
+        "User-Agent": "CapabilityOS/1.0",
+        "Accept": "application/json",
+    }
+    merged.update(headers)
     req = Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
-        headers=headers,
+        headers=merged,
         method="POST",
     )
     try:
-        with urlopen(req, timeout=max(0.1, timeout_sec)) as resp:
+        with urlopen(req, timeout=max(1.0, timeout_sec)) as resp:
             body = resp.read().decode("utf-8")
     except HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")

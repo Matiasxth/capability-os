@@ -42,14 +42,15 @@ class InputExtractor:
         if not isinstance(steps, list) or not steps:
             raise InputExtractionError("Sequence interpretation requires non-empty 'steps' list.")
         cleaned_steps: list[dict[str, Any]] = []
-        for step in steps:
+        for index, step in enumerate(steps):
             if not isinstance(step, dict):
                 raise InputExtractionError("Sequence step must be an object.")
             step_id = step.get("step_id")
             capability = step.get("capability")
             inputs = step.get("inputs", {})
+            # Auto-generate step_id if missing (LLM often omits it)
             if not isinstance(step_id, str) or not step_id.strip():
-                raise InputExtractionError("Sequence step requires non-empty 'step_id'.")
+                step_id = f"step_{index + 1}"
             if not isinstance(capability, str) or not capability.strip():
                 raise InputExtractionError("Sequence step requires non-empty 'capability'.")
             if inputs is None:

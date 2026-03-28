@@ -1,0 +1,27 @@
+{
+  "id": "system_get_os_info",
+  "name": "Get OS info",
+  "category": "system",
+  "description": "Return basic operating system information: platform, version, architecture and Python runtime.",
+  "inputs": {},
+  "outputs": {
+    "platform": {"type": "string"},
+    "platform_version": {"type": "string"},
+    "architecture": {"type": "string"},
+    "python_version": {"type": "string"},
+    "hostname": {"type": "string"}
+  },
+  "constraints": {
+    "timeout_ms": 5000,
+    "allowlist": [],
+    "workspace_only": false
+  },
+  "safety": {
+    "level": "low",
+    "requires_confirmation": false
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

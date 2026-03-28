@@ -1,0 +1,10 @@
+# Capability OS — Python dependencies
+# Core (required)
+pytest>=7.4
+pytest-cov>=4.0
+
+# Browser automation (optional — only needed for browser tools/capabilities)
+# playwright>=1.40
+
+# optional: used by execution_list_processes with fallback to tasklist/ps
+# psutil>=5.9

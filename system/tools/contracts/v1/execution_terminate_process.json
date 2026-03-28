@@ -1,0 +1,27 @@
+{
+  "id": "execution_terminate_process",
+  "name": "Terminate process",
+  "category": "execution",
+  "description": "Send a termination signal to a running process by PID.",
+  "inputs": {
+    "process_id": {"type": "integer", "required": true, "description": "PID of the process to terminate."},
+    "force": {"type": "boolean", "required": false, "description": "If true, send SIGKILL instead of SIGTERM."}
+  },
+  "outputs": {
+    "status": {"type": "string"},
+    "process_id": {"type": "integer"}
+  },
+  "constraints": {
+    "timeout_ms": 15000,
+    "allowlist": [],
+    "workspace_only": false
+  },
+  "safety": {
+    "level": "high",
+    "requires_confirmation": true
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

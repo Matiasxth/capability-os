@@ -1,0 +1,30 @@
+{
+  "id": "network_http_post",
+  "name": "HTTP POST",
+  "category": "network",
+  "description": "Perform an HTTP/HTTPS POST request with a JSON or text body.",
+  "inputs": {
+    "url": {"type": "string", "required": true, "description": "Target URL."},
+    "body": {"type": "object", "required": false, "description": "Request body (will be JSON-encoded)."},
+    "body_text": {"type": "string", "required": false, "description": "Raw string body (used when body is not provided)."},
+    "headers": {"type": "object", "required": false, "description": "Optional request headers."}
+  },
+  "outputs": {
+    "body": {"type": "string"},
+    "status_code": {"type": "integer"},
+    "headers": {"type": "object"}
+  },
+  "constraints": {
+    "timeout_ms": 30000,
+    "allowlist": ["http", "https"],
+    "workspace_only": false
+  },
+  "safety": {
+    "level": "medium",
+    "requires_confirmation": false
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

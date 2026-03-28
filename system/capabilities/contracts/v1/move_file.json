@@ -1,0 +1,42 @@
+{
+  "id": "move_file",
+  "name": "Move file",
+  "domain": "archivos",
+  "type": "base",
+  "description": "Move or rename a file within the workspace.",
+  "inputs": {
+    "source_path": {"type": "string", "required": true, "description": "Source file path."},
+    "destination_path": {"type": "string", "required": true, "description": "Destination file path."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "source_path": {"type": "string"},
+    "destination_path": {"type": "string"}
+  },
+  "requirements": {
+    "tools": ["filesystem_move_file"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "move_file",
+        "action": "filesystem_move_file",
+        "params": {
+          "source_path": "{{inputs.source_path}}",
+          "destination_path": "{{inputs.destination_path}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["move file", "mover archivo", "rename file", "renombrar archivo"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

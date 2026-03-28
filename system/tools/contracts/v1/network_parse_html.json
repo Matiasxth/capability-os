@@ -1,0 +1,28 @@
+{
+  "id": "network_parse_html",
+  "name": "Parse HTML",
+  "category": "network",
+  "description": "Parse an HTML string into a structured document with title, links and text. Uses stdlib only.",
+  "inputs": {
+    "html": {"type": "string", "required": true, "description": "Raw HTML string to parse."}
+  },
+  "outputs": {
+    "title": {"type": "string"},
+    "text": {"type": "string"},
+    "links": {"type": "array"},
+    "tag_count": {"type": "integer"}
+  },
+  "constraints": {
+    "timeout_ms": 15000,
+    "allowlist": [],
+    "workspace_only": false
+  },
+  "safety": {
+    "level": "low",
+    "requires_confirmation": false
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

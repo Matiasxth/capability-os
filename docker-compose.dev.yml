@@ -1,0 +1,42 @@
+version: "3.8"
+
+# Development override: hot-reload for both backend and frontend.
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# - Source code mounted as volume (changes reflected immediately)
+# - Frontend runs Vite dev server on port 5173
+# - API runs on port 8000
+
+services:
+  capability-os:
+    build:
+      context: .
+      target: frontend
+      dockerfile: Dockerfile
+    image: capability-os:dev
+    container_name: capability-os-dev
+    command: >
+      bash -c "
+        cd /app &&
+        pip install --no-cache-dir -r requirements.txt 2>/dev/null &&
+        python -m system.core.ui_bridge.api_server &
+        cd /app/system/frontend/app &&
+        npm install --prefer-offline --no-audit 2>/dev/null &&
+        npx vite --host 0.0.0.0
+      "
+    ports:
+      - "8000:8000"
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - workspace:/data/workspace
+      - /app/system/frontend/app/node_modules
+    environment:
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - OLLAMA_BASE_URL=${LLM_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${LLM_MODEL:-llama3.1:8b}
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+
+volumes:
+  workspace:

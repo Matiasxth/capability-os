@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from pathlib import Path
 from typing import Any
 
 
@@ -88,8 +89,87 @@ class PlanBuilder:
                 }
             )
 
+        cleaned = _deduplicate_steps(normalized_steps)
+        cleaned = _filter_phantom_reads(cleaned)
+        cleaned = _filter_redundant_reads(cleaned)
         return {
             "type": "sequence",
             "suggest_only": suggest_only,
-            "steps": normalized_steps,
+            "steps": cleaned,
         }
+
+
+def _deduplicate_steps(steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Remove steps with identical capability + inputs, keeping the first."""
+    seen: set[tuple[str, str]] = set()
+    unique: list[dict[str, Any]] = []
+    for step in steps:
+        key = (
+            step.get("capability", ""),
+            str(sorted(step.get("inputs", {}).items())),
+        )
+        if key not in seen:
+            seen.add(key)
+            unique.append(step)
+    return unique
+
+
+_PHANTOM_PATTERNS = (
+    "output.txt", "result.txt", "results.txt", "temp.txt",
+    "list_directory_output", "_output.txt", "_result.txt",
+)
+
+
+def _filter_phantom_reads(steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Remove read_file steps that reference invented output/temp files."""
+    filtered: list[dict[str, Any]] = []
+    for step in steps:
+        cap = step.get("capability", "")
+        if cap == "read_file":
+            path = str(step.get("inputs", {}).get("path", "")).lower()
+            if any(p in path for p in _PHANTOM_PATTERNS):
+                continue  # Invented filename — skip
+        filtered.append(step)
+    return filtered
+
+
+def _filter_redundant_reads(steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Remove read_file steps that follow a list_directory on the same directory.
+
+    The LLM sometimes adds a read_file after list_directory thinking it needs
+    to "read" the directory output. list_directory already returns its results
+    directly, so the read_file is redundant.
+    """
+    listed_dirs: set[str] = set()
+    filtered: list[dict[str, Any]] = []
+    for step in steps:
+        cap = step.get("capability", "")
+        inputs = step.get("inputs", {})
+        if cap == "list_directory":
+            dir_path = str(inputs.get("path", ""))
+            if dir_path:
+                listed_dirs.add(dir_path.rstrip("/\\").lower())
+            filtered.append(step)
+        elif cap == "read_file" and listed_dirs:
+            file_path = str(inputs.get("path", ""))
+            # Check if this file's parent was just listed
+            parent = str(Path(file_path).parent).rstrip("/\\").lower() if file_path else ""
+            file_lower = file_path.lower()
+            # Skip if reading a file in a directory we just listed AND the
+            # filename looks auto-generated (not explicitly user-requested)
+            if parent in listed_dirs and _looks_auto_generated(file_lower):
+                continue
+            filtered.append(step)
+        else:
+            filtered.append(step)
+    return filtered
+
+
+def _looks_auto_generated(path_lower: str) -> bool:
+    """Heuristic: filenames the LLM commonly invents after list_directory."""
+    name = path_lower.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
+    return name in (
+        "readme.md", "readme.txt", "readme",
+        "output.txt", "result.txt", "results.txt",
+        "index.html", "index.js", "main.py",
+    )

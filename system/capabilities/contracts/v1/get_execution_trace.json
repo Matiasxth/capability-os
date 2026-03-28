@@ -1,0 +1,40 @@
+{
+  "id": "get_execution_trace",
+  "name": "Get execution trace",
+  "domain": "observacion",
+  "type": "base",
+  "description": "Read a persisted execution trace from workspace artifacts.",
+  "inputs": {
+    "execution_id": {"type": "string", "required": true, "description": "Execution id to retrieve the trace for."}
+  },
+  "outputs": {
+    "content": {"type": "string"},
+    "path": {"type": "string"},
+    "size_bytes": {"type": "integer"}
+  },
+  "requirements": {
+    "tools": ["filesystem_read_file"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "read_trace",
+        "action": "filesystem_read_file",
+        "params": {
+          "path": "artifacts/traces/{{inputs.execution_id}}.json"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["execution trace", "traza de ejecucion", "get trace", "ver traza"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

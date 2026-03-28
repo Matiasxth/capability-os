@@ -1,0 +1,39 @@
+{
+  "id": "inspect_integration",
+  "name": "Inspect integration",
+  "domain": "integraciones",
+  "type": "base",
+  "description": "Read the manifest of an installed integration to inspect its configuration.",
+  "inputs": {
+    "integration_id": {"type": "string", "required": true, "description": "Integration identifier (e.g. whatsapp_web_connector)."}
+  },
+  "outputs": {
+    "content": {"type": "string"},
+    "path": {"type": "string"}
+  },
+  "requirements": {
+    "tools": ["filesystem_read_file"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "read_manifest",
+        "action": "filesystem_read_file",
+        "params": {
+          "path": "system/integrations/installed/{{inputs.integration_id}}/manifest.json"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["inspect integration", "inspeccionar integracion", "show integration details"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

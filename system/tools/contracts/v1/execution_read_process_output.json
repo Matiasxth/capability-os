@@ -1,0 +1,28 @@
+{
+  "id": "execution_read_process_output",
+  "name": "Read process output",
+  "category": "execution",
+  "description": "Read captured stdout/stderr from a tracked background process.",
+  "inputs": {
+    "process_id": {"type": "integer", "required": true, "description": "PID of the tracked process."}
+  },
+  "outputs": {
+    "stdout": {"type": "string"},
+    "stderr": {"type": "string"},
+    "running": {"type": "boolean"},
+    "exit_code": {"type": "integer"}
+  },
+  "constraints": {
+    "timeout_ms": 10000,
+    "allowlist": [],
+    "workspace_only": false
+  },
+  "safety": {
+    "level": "low",
+    "requires_confirmation": false
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

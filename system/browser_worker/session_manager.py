@@ -31,14 +31,23 @@ class PlaywrightSession:
         playwright_error_cls: type[Exception],
         playwright_timeout_cls: type[Exception],
         headless: bool,
+        cdp_endpoint: str | None = None,
     ):
         self._playwright_error_cls = playwright_error_cls
         self._playwright_timeout_cls = playwright_timeout_cls
+        self._cdp_attached = False
         try:
-            self._browser = playwright_context.chromium.launch(headless=headless)
-            self._context = self._browser.new_context()
-            self._context.new_page()
+            if cdp_endpoint:
+                self._browser, self._context, self._cdp_attached = _try_cdp_attach(
+                    playwright_context, cdp_endpoint, headless,
+                )
+            else:
+                self._browser = playwright_context.chromium.launch(headless=headless)
+                self._context = self._browser.new_context()
+                self._context.new_page()
             self._active_tab_index = 0
+        except BrowserWorkerActionError:
+            raise
         except Exception as exc:
             raise BrowserWorkerActionError(
                 "browser_launch_failed",
@@ -46,10 +55,17 @@ class PlaywrightSession:
             ) from exc
 
     def close(self) -> None:
-        try:
-            self._context.close()
-        finally:
-            self._browser.close()
+        if self._cdp_attached:
+            # Disconnect without killing the external Chrome
+            try:
+                self._browser.close()
+            except Exception:
+                pass
+        else:
+            try:
+                self._context.close()
+            finally:
+                self._browser.close()
 
     def navigate(self, url: str, timeout_ms: int) -> dict[str, Any]:
         page = self._active_page()
@@ -344,7 +360,7 @@ class BrowserWorkerSessionManager:
     def playwright_available(self) -> bool:
         return self._playwright_available
 
-    def open_session(self, *, headless: bool) -> str:
+    def open_session(self, *, headless: bool, cdp_endpoint: str | None = None) -> tuple[str, bool]:
         self._ensure_playwright_available()
         if not isinstance(headless, bool):
             raise BrowserWorkerActionError("invalid_input", "Field 'headless' must be a boolean.")
@@ -357,12 +373,13 @@ class BrowserWorkerSessionManager:
             playwright_error_cls=self._playwright_error_cls,
             playwright_timeout_cls=self._playwright_timeout_cls,
             headless=headless,
+            cdp_endpoint=cdp_endpoint,
         )
         session_id = _new_session_id()
         with self._lock:
             self._sessions[session_id] = session
             self._active_session_id = session_id
-        return session_id
+        return session_id, session._cdp_attached
 
     def close_session(self, session_id: str | None) -> str:
         resolved_session_id, session = self.resolve_session(session_id)
@@ -451,6 +468,30 @@ class BrowserWorkerSessionManager:
             "Playwright is not installed or could not be initialized in browser worker.",
             details,
         )
+
+
+def _try_cdp_attach(
+    playwright_context: Any,
+    cdp_endpoint: str,
+    headless: bool,
+) -> tuple[Any, Any, bool]:
+    """Try CDP attachment; fall back to fresh launch on failure."""
+    try:
+        browser = playwright_context.chromium.connect_over_cdp(cdp_endpoint)
+        contexts = browser.contexts
+        if contexts:
+            context = contexts[0]
+        else:
+            context = browser.new_context()
+        if not context.pages:
+            context.new_page()
+        return browser, context, True
+    except Exception:
+        # Fallback: launch new browser
+        browser = playwright_context.chromium.launch(headless=headless)
+        context = browser.new_context()
+        context.new_page()
+        return browser, context, False
 
 
 def _new_session_id() -> str:

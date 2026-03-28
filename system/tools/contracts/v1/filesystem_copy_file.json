@@ -1,0 +1,28 @@
+{
+  "id": "filesystem_copy_file",
+  "name": "Copy file",
+  "category": "filesystem",
+  "description": "Copy a file from source to destination inside the allowed workspace.",
+  "inputs": {
+    "source_path": {"type": "string", "required": true, "description": "Source file path."},
+    "destination_path": {"type": "string", "required": true, "description": "Destination file path."}
+  },
+  "outputs": {
+    "status": {"type": "string"},
+    "source_path": {"type": "string"},
+    "destination_path": {"type": "string"}
+  },
+  "constraints": {
+    "timeout_ms": 30000,
+    "allowlist": [],
+    "workspace_only": true
+  },
+  "safety": {
+    "level": "medium",
+    "requires_confirmation": false
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

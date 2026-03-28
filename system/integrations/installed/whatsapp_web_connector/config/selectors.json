@@ -45,6 +45,13 @@
       "div[contenteditable='true'][data-tab='10']",
       "div[contenteditable='true'][aria-label*='Type a message']"
     ],
+    "delivery_selectors": [
+      "span[data-icon='msg-dblcheck']",
+      "span[aria-label*='Delivered']",
+      "span[aria-label*='Read']",
+      "span[aria-label*='Entregado']",
+      "span[aria-label*='Leído']"
+    ],
     "send_button_selectors": [
       "button[aria-label='Send']",
       "button[aria-label='Enviar']",

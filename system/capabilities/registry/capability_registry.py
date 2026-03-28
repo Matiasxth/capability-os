@@ -25,11 +25,15 @@ class CapabilityRegistry(BaseRegistry):
 
     def _post_schema_validation(self, contract: dict[str, Any], source: str) -> None:
         strategy = contract.get("strategy", {})
-        steps = strategy.get("steps", [])
-        for step in steps:
+        all_steps = list(strategy.get("steps", []))
+        all_steps.extend(strategy.get("fallback_steps", []))
+        for step in all_steps:
             params = step.get("params", {})
             for value in _iter_strings(params):
                 self._validate_template_variables(value, source)
+            condition = step.get("condition")
+            if isinstance(condition, str):
+                self._validate_condition_variables(condition, source)
 
     @staticmethod
     def _validate_template_variables(value: str, source: str) -> None:
@@ -38,6 +42,16 @@ class CapabilityRegistry(BaseRegistry):
             if not any(pattern.match(expr) for pattern in _ALLOWED_VARIABLE_PATTERNS):
                 raise SchemaValidationError(
                     f"{source}: invalid strategy variable '{{{{{expr}}}}}'. "
+                    "Allowed roots: inputs., state., steps.<step_id>.outputs., runtime."
+                )
+
+    @classmethod
+    def _validate_condition_variables(cls, condition: str, source: str) -> None:
+        for match in _TOKEN_PATTERN.findall(condition):
+            expr = match.strip()
+            if not any(pattern.match(expr) for pattern in _ALLOWED_VARIABLE_PATTERNS):
+                raise SchemaValidationError(
+                    f"{source}: invalid condition variable '{{{{{expr}}}}}'. "
                     "Allowed roots: inputs., state., steps.<step_id>.outputs., runtime."
                 )
 

@@ -1,0 +1,50 @@
+{
+  "id": "install_integration",
+  "name": "Install integration",
+  "domain": "integraciones",
+  "type": "composed",
+  "description": "Read a source integration manifest and copy it to the workspace integrations directory.",
+  "inputs": {
+    "integration_source": {"type": "string", "required": true, "description": "Path to the source integration manifest.json."},
+    "destination_path": {"type": "string", "required": true, "description": "Target path for the manifest inside integrations/installed/."},
+    "config": {"type": "object", "required": false, "description": "Optional configuration overrides."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "source_path": {"type": "string"},
+    "destination_path": {"type": "string"}
+  },
+  "requirements": {
+    "tools": ["filesystem_read_file", "filesystem_copy_file"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "read_source",
+        "action": "filesystem_read_file",
+        "params": {
+          "path": "{{inputs.integration_source}}"
+        }
+      },
+      {
+        "step_id": "copy_manifest",
+        "action": "filesystem_copy_file",
+        "params": {
+          "source_path": "{{inputs.integration_source}}",
+          "destination_path": "{{inputs.destination_path}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["install integration", "instalar integracion", "add integration", "agregar integracion"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "workspaces": [
+    {
+      "id": "ws_e722bf",
+      "name": "prueba",
+      "path": "C:\\Users\\Clever\\Documents\\test",
+      "access": "write",
+      "allowed_capabilities": "*",
+      "color": "#5588ff",
+      "icon": "folder",
+      "active": true,
+      "created_at": "2026-03-28T00:08:54.611243Z"
+    }
+  ],
+  "default_workspace_id": "ws_e722bf"
+}

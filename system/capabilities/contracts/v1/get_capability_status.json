@@ -1,0 +1,40 @@
+{
+  "id": "get_capability_status",
+  "name": "Get capability status",
+  "domain": "observacion",
+  "type": "base",
+  "description": "Read and return the contract of a specific capability to inspect its status and definition.",
+  "inputs": {
+    "capability_id": {"type": "string", "required": true, "description": "Capability id to inspect (e.g. read_file)."}
+  },
+  "outputs": {
+    "content": {"type": "string"},
+    "path": {"type": "string"},
+    "size_bytes": {"type": "integer"}
+  },
+  "requirements": {
+    "tools": ["filesystem_read_file"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "read_contract",
+        "action": "filesystem_read_file",
+        "params": {
+          "path": "system/capabilities/contracts/v1/{{inputs.capability_id}}.json"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["capability status", "estado de capacidad", "inspect capability"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

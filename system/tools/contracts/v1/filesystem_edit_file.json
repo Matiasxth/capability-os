@@ -1,0 +1,29 @@
+{
+  "id": "filesystem_edit_file",
+  "name": "Edit file",
+  "category": "filesystem",
+  "description": "Apply a patch or replacement to a text file inside the allowed workspace.",
+  "inputs": {
+    "path": {"type": "string", "required": true, "description": "File path to edit."},
+    "old_string": {"type": "string", "required": false, "description": "Exact string to replace. If omitted, full content replacement is used."},
+    "new_string": {"type": "string", "required": true, "description": "Replacement string or full new content."}
+  },
+  "outputs": {
+    "status": {"type": "string"},
+    "path": {"type": "string"},
+    "bytes_written": {"type": "integer"}
+  },
+  "constraints": {
+    "timeout_ms": 30000,
+    "allowlist": [],
+    "workspace_only": true
+  },
+  "safety": {
+    "level": "medium",
+    "requires_confirmation": false
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

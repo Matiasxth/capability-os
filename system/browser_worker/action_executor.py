@@ -104,10 +104,17 @@ class BrowserActionExecutor:
         if not isinstance(headless, bool):
             raise BrowserWorkerActionError("invalid_input", "Field 'headless' must be a boolean.")
 
-        session_id = self.session_manager.open_session(headless=headless)
+        cdp_endpoint = payload.get("cdp_endpoint")
+        if cdp_endpoint is not None and not isinstance(cdp_endpoint, str):
+            cdp_endpoint = None
+
+        session_id, cdp_attached = self.session_manager.open_session(
+            headless=headless, cdp_endpoint=cdp_endpoint,
+        )
         result: dict[str, Any] = {
             "status": "success",
             "session_id": session_id,
+            "cdp_attached": cdp_attached,
         }
         self.element_registry.invalidate(session_id=session_id)
 

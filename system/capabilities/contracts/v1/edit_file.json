@@ -1,0 +1,44 @@
+{
+  "id": "edit_file",
+  "name": "Edit file",
+  "domain": "archivos",
+  "type": "base",
+  "description": "Apply a patch or full replacement to a text file in workspace.",
+  "inputs": {
+    "path": {"type": "string", "required": true, "description": "File path to edit."},
+    "old_string": {"type": "string", "required": false, "description": "Exact string to replace. Omit for full content replacement."},
+    "new_string": {"type": "string", "required": true, "description": "Replacement string or new full content."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "path": {"type": "string"},
+    "bytes_written": {"type": "integer"}
+  },
+  "requirements": {
+    "tools": ["filesystem_edit_file"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "edit_file",
+        "action": "filesystem_edit_file",
+        "params": {
+          "path": "{{inputs.path}}",
+          "old_string": "{{inputs.old_string}}",
+          "new_string": "{{inputs.new_string}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["edit file", "editar archivo", "patch file", "replace in file"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

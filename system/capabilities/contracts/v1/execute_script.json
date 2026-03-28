@@ -1,0 +1,42 @@
+{
+  "id": "execute_script",
+  "name": "Execute script",
+  "domain": "ejecucion",
+  "type": "base",
+  "description": "Execute a Python or shell script file within the workspace.",
+  "inputs": {
+    "script_path": {"type": "string", "required": true, "description": "Path to the script file."},
+    "args": {"type": "array", "required": false, "description": "Optional list of arguments."},
+    "cwd": {"type": "string", "required": false, "description": "Optional working directory."}
+  },
+  "outputs": {
+    "stdout": {"type": "string"},
+    "stderr": {"type": "string"},
+    "exit_code": {"type": "integer"}
+  },
+  "requirements": {
+    "tools": ["execution_run_script"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "execute_script",
+        "action": "execution_run_script",
+        "params": {
+          "script_path": "{{inputs.script_path}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["execute script", "ejecutar script", "run script", "correr script"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

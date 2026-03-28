@@ -1,0 +1,37 @@
+{
+  "id": "list_processes",
+  "name": "List processes",
+  "domain": "ejecucion",
+  "type": "base",
+  "description": "List running system processes, optionally filtered by name.",
+  "inputs": {
+    "filter": {"type": "string", "required": false, "description": "Optional substring to filter process names."}
+  },
+  "outputs": {
+    "processes": {"type": "array"},
+    "count": {"type": "integer"}
+  },
+  "requirements": {
+    "tools": ["execution_list_processes"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "list_processes",
+        "action": "execution_list_processes",
+        "params": {}
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["list processes", "listar procesos", "show processes", "ver procesos"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

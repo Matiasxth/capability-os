@@ -1,0 +1,40 @@
+{
+  "id": "stop_process",
+  "name": "Stop process",
+  "domain": "ejecucion",
+  "type": "base",
+  "description": "Send a termination signal to a running process by PID. Requires confirmation.",
+  "inputs": {
+    "process_id": {"type": "integer", "required": true, "description": "PID of the process to terminate."},
+    "force": {"type": "boolean", "required": false, "description": "If true, force-kill the process."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["terminated", "error"]},
+    "process_id": {"type": "integer"}
+  },
+  "requirements": {
+    "tools": ["execution_terminate_process"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "stop_process",
+        "action": "execution_terminate_process",
+        "params": {
+          "process_id": "{{inputs.process_id}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["stop process", "detener proceso", "kill process", "terminar proceso"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

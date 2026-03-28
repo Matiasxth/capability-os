@@ -97,6 +97,15 @@ class WhatsAppWebConnector:
             ("message", "send_button_selectors"),
             required=True,
         )
+        self.delivery_selectors = _read_selector_list(
+            self.config,
+            ("message", "delivery_selectors"),
+            required=False,
+        ) or [
+            "span[data-icon='msg-dblcheck']",
+            "span[aria-label*='Delivered']",
+            "span[aria-label*='Read']",
+        ]
 
     def open_whatsapp_web(self, inputs: dict[str, Any]) -> dict[str, Any]:
         session_id = _read_optional_string(inputs.get("session_id"), "session_id")
@@ -266,6 +275,20 @@ class WhatsAppWebConnector:
         message = _require_non_empty_string(inputs.get("message"), "message")
         timeout_ms = _read_positive_int(inputs.get("timeout_ms"), "timeout_ms", self.default_timeout_ms)
 
+        # Verify a chat is open by checking for the composer input
+        chat_open = False
+        for selector in self.composer_input_selectors:
+            probe = self._probe_selector(session_id, selector, timeout_ms=min(timeout_ms, self._SELECTOR_PROBE_TIMEOUT_MS))
+            if probe["visible"]:
+                chat_open = True
+                break
+        if not chat_open:
+            raise WhatsAppConnectorError(
+                "chat_not_open",
+                "No chat is currently open. Use search_whatsapp_chat first to open a conversation.",
+                {"session_id": session_id},
+            )
+
         composer_selector = self._pick_selector(session_id, self.composer_input_selectors, timeout_ms)
         clicked = self._execute_tool(
             "browser_click_element",
@@ -324,11 +347,23 @@ class WhatsAppWebConnector:
                 },
             )
 
+        # Confirm delivery (Fix 2.3)
+        confirm_timeout_ms = _read_positive_int(inputs.get("confirm_timeout_ms"), "confirm_timeout_ms", 10000)
+        confirmation = "sent_unconfirmed"
+        for selector in self.delivery_selectors:
+            probe = self._probe_selector(
+                resolved_session_id, selector,
+                timeout_ms=min(confirm_timeout_ms, 3000),
+            )
+            if probe["visible"]:
+                confirmation = "delivered"
+                break
+
         return {
             "status": "success",
             "session_id": resolved_session_id,
             "message": message,
-            "confirmation": "sent",
+            "confirmation": confirmation,
         }
 
     def list_whatsapp_visible_chats(self, inputs: dict[str, Any]) -> dict[str, Any]:
@@ -572,6 +607,16 @@ class WhatsAppWebConnector:
             | set(self._TRANSIENT_ELEMENT_ERROR_CODES)
             | {"click_failed", "type_failed"}
         )
+
+    @staticmethod
+    def _check_session_expired(login_state: str, session_id: str | None) -> None:
+        """Raise wsp_session_expired if we expected an authenticated session but got unknown."""
+        if login_state == "unknown" and session_id is not None:
+            raise WhatsAppConnectorError(
+                "wsp_session_expired",
+                "WhatsApp session appears expired. Re-authentication via QR or CDP attachment required.",
+                {"session_id": session_id, "login_state": "unknown"},
+            )
 
     def _detect_login_state(self, session_id: str | None, timeout_ms: int) -> dict[str, Any]:
         for selector in self.login_authenticated_selectors:

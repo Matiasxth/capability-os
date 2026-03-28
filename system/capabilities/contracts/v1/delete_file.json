@@ -1,0 +1,39 @@
+{
+  "id": "delete_file",
+  "name": "Delete file",
+  "domain": "archivos",
+  "type": "base",
+  "description": "Permanently delete a file from the workspace. Requires confirmation.",
+  "inputs": {
+    "path": {"type": "string", "required": true, "description": "File path to delete."}
+  },
+  "outputs": {
+    "status": {"type": "string", "enum": ["success", "error"]},
+    "path": {"type": "string"}
+  },
+  "requirements": {
+    "tools": ["filesystem_delete_file"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "delete_file",
+        "action": "filesystem_delete_file",
+        "params": {
+          "path": "{{inputs.path}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["delete file", "eliminar archivo", "remove file", "borrar archivo"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

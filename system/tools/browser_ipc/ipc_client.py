@@ -65,6 +65,8 @@ class BrowserIPCClient:
         self._closed = False
         self._start_attempted = False
         self._dead_reason: str | None = None
+        self._restart_attempts = 0
+        self._max_restart_retries = 2  # will be configurable via setter
 
     def execute(
         self,
@@ -201,6 +203,10 @@ class BrowserIPCClient:
                 {"request_id": request_id},
             ) from exc
 
+        # Reset restart counter on successful communication
+        with self._state_lock:
+            self._restart_attempts = 0
+
         if parsed["status"] == "error":
             error = parsed["error"]
             raise BrowserIPCError(
@@ -214,6 +220,9 @@ class BrowserIPCClient:
             )
         return parsed["result"]
 
+    def set_max_restart_retries(self, value: int) -> None:
+        self._max_restart_retries = max(0, int(value))
+
     def _ensure_started(self) -> None:
         with self._state_lock:
             process = self._process
@@ -225,16 +234,19 @@ class BrowserIPCClient:
                     "Browser worker client is closed.",
                     self._transport_details(),
                 )
-            if self._worker_failed:
+            # Auto-restart on failure (configurable max retries)
+            if self._worker_failed and self._restart_attempts < self._max_restart_retries:
+                self._restart_attempts += 1
+                self._worker_failed = False
+                self._dead_reason = None
+                self._process = None
+                # Brief backoff
+                import time
+                time.sleep(min(1.0, 0.5 * self._restart_attempts))
+            elif self._worker_failed:
                 raise BrowserIPCError(
                     "browser_worker_unavailable",
-                    f"Browser worker is unavailable: {self._dead_reason or 'unknown failure'}.",
-                    self._transport_details(),
-                )
-            if self._start_attempted:
-                raise BrowserIPCError(
-                    "browser_worker_unavailable",
-                    "Browser worker is not running and automatic restart is disabled in this phase.",
+                    f"Browser worker failed after {self._restart_attempts} restart attempts: {self._dead_reason or 'unknown'}.",
                     self._transport_details(),
                 )
             self._start_worker_locked()

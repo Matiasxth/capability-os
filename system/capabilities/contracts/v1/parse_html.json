@@ -1,0 +1,41 @@
+{
+  "id": "parse_html",
+  "name": "Parse HTML",
+  "domain": "web",
+  "type": "base",
+  "description": "Parse an HTML string into a structured document with title, links and text.",
+  "inputs": {
+    "html": {"type": "string", "required": true, "description": "Raw HTML string to parse."}
+  },
+  "outputs": {
+    "title": {"type": "string"},
+    "text": {"type": "string"},
+    "links": {"type": "array"},
+    "tag_count": {"type": "integer"}
+  },
+  "requirements": {
+    "tools": ["network_parse_html"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "parse_html",
+        "action": "network_parse_html",
+        "params": {
+          "html": "{{inputs.html}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["parse html", "parsear html", "analyze html", "analizar html"]
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

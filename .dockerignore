@@ -1,0 +1,15 @@
+__pycache__
+*.pyc
+*.pyo
+.git
+.gitignore
+.pytest_cache
+.tmp_runtime
+node_modules
+system/frontend/app/node_modules
+system/frontend/app/dist
+tests/
+workspace/
+*.md
+!README.md
+.claude/

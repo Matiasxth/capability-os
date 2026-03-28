@@ -44,6 +44,8 @@ class BrowserSessionManager:
         ipc_client: BrowserIPCClient | None = None,
         artifacts_root: str | Path | None = None,
         auto_start: bool = True,
+        cdp_port: int = 0,
+        auto_restart_max_retries: int = 2,
     ):
         self.workspace_root = Path(workspace_root).resolve()
         self._ipc_client = ipc_client or BrowserIPCClient(workspace_root=self.workspace_root)
@@ -52,6 +54,9 @@ class BrowserSessionManager:
         self._lock = threading.RLock()
         self._active_session_id: str | None = None
         self._auto_start = bool(auto_start)
+        self._cdp_port = int(cdp_port) if isinstance(cdp_port, int) and cdp_port > 0 else 0
+        self._auto_restart_max_retries = int(auto_restart_max_retries) if isinstance(auto_restart_max_retries, int) and auto_restart_max_retries >= 0 else 2
+        self._ipc_client.set_max_restart_retries(self._auto_restart_max_retries)
 
     def set_auto_start(self, auto_start: bool) -> None:
         if not isinstance(auto_start, bool):
@@ -87,6 +92,8 @@ class BrowserSessionManager:
         if start_url not in (None, ""):
             _validate_url(start_url)
             payload["start_url"] = start_url
+        if self._cdp_port > 0:
+            payload["cdp_endpoint"] = f"http://localhost:{self._cdp_port}"
 
         result = self._execute_command(
             action="browser_open_session",
@@ -345,7 +352,20 @@ class BrowserSessionManager:
                     "details": exc.details,
                 }
 
+        # Map to spec canonical states (section 26.1)
+        if transport.get("closed"):
+            canonical_status = "disabled"
+        elif transport.get("worker_failed"):
+            canonical_status = "error"
+        elif not transport.get("alive"):
+            canonical_status = "available"  # not started yet
+        elif health is not None:
+            canonical_status = "ready"
+        else:
+            canonical_status = "preparing"
+
         return {
+            "status": canonical_status,
             "active_session_id": active_session_id,
             "known_sessions": known_sessions,
             "auto_start": auto_start,

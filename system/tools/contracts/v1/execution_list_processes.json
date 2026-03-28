@@ -1,0 +1,26 @@
+{
+  "id": "execution_list_processes",
+  "name": "List processes",
+  "category": "execution",
+  "description": "List running system processes, optionally filtered by name.",
+  "inputs": {
+    "filter": {"type": "string", "required": false, "description": "Optional substring to filter process names."}
+  },
+  "outputs": {
+    "processes": {"type": "array"},
+    "count": {"type": "integer"}
+  },
+  "constraints": {
+    "timeout_ms": 15000,
+    "allowlist": [],
+    "workspace_only": false
+  },
+  "safety": {
+    "level": "low",
+    "requires_confirmation": false
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}

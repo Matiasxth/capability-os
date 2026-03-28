@@ -118,6 +118,12 @@ class SettingsService:
         auto_start = browser.get("auto_start")
         if not isinstance(auto_start, bool):
             errors.append("Field 'browser.auto_start' must be boolean.")
+        cdp_port = browser.get("cdp_port")
+        if cdp_port is not None and (not isinstance(cdp_port, int) or cdp_port < 0):
+            errors.append("Field 'browser.cdp_port' must be a non-negative integer.")
+        auto_restart_max_retries = browser.get("auto_restart_max_retries")
+        if auto_restart_max_retries is not None and (not isinstance(auto_restart_max_retries, int) or auto_restart_max_retries < 0):
+            errors.append("Field 'browser.auto_restart_max_retries' must be a non-negative integer.")
 
         workspace = normalized.get("workspace")
         if not isinstance(workspace, dict):
@@ -139,6 +145,33 @@ class SettingsService:
                 workspace[field_name.split(".")[1]] = str(resolved)
             except SettingsValidationError as exc:
                 errors.append(str(exc))
+
+        mcp = normalized.get("mcp")
+        if mcp is not None:
+            if not isinstance(mcp, dict):
+                errors.append("Field 'mcp' must be an object when present.")
+            else:
+                servers = mcp.get("servers")
+                if servers is not None and not isinstance(servers, list):
+                    errors.append("Field 'mcp.servers' must be an array.")
+                auto_disc = mcp.get("auto_discover_capabilities")
+                if auto_disc is not None and not isinstance(auto_disc, bool):
+                    errors.append("Field 'mcp.auto_discover_capabilities' must be boolean.")
+                srv_timeout = mcp.get("server_timeout_ms")
+                if srv_timeout is not None and (not isinstance(srv_timeout, int) or srv_timeout <= 0):
+                    errors.append("Field 'mcp.server_timeout_ms' must be a positive integer.")
+
+        a2a = normalized.get("a2a")
+        if a2a is not None:
+            if not isinstance(a2a, dict):
+                errors.append("Field 'a2a' must be an object when present.")
+            else:
+                if a2a.get("enabled") is not None and not isinstance(a2a["enabled"], bool):
+                    errors.append("Field 'a2a.enabled' must be boolean.")
+                if a2a.get("server_url") is not None and not isinstance(a2a["server_url"], str):
+                    errors.append("Field 'a2a.server_url' must be a string.")
+                if a2a.get("known_agents") is not None and not isinstance(a2a["known_agents"], list):
+                    errors.append("Field 'a2a.known_agents' must be an array.")
 
         if errors:
             raise SettingsValidationError("Settings validation failed.", details=errors)
@@ -224,10 +257,22 @@ def _defaults_from_env(workspace_root: Path) -> dict[str, Any]:
         },
         "browser": {
             "auto_start": True,
+            "cdp_port": 0,
+            "auto_restart_max_retries": 2,
         },
         "workspace": {
             "artifacts_path": str((workspace_root / "artifacts").resolve()),
             "sequences_path": str((workspace_root / "sequences").resolve()),
+        },
+        "mcp": {
+            "servers": [],
+            "auto_discover_capabilities": False,
+            "server_timeout_ms": 10000,
+        },
+        "a2a": {
+            "enabled": True,
+            "server_url": "http://localhost:8000",
+            "known_agents": [],
         },
     }
 

@@ -1,0 +1,29 @@
+{
+  "id": "execution_run_script",
+  "name": "Run script",
+  "category": "execution",
+  "description": "Execute a script file (Python or shell) inside the allowed workspace.",
+  "inputs": {
+    "script_path": {"type": "string", "required": true, "description": "Path to the script file."},
+    "args": {"type": "array", "required": false, "description": "Optional list of arguments to pass to the script."},
+    "cwd": {"type": "string", "required": false, "description": "Optional working directory."}
+  },
+  "outputs": {
+    "stdout": {"type": "string"},
+    "stderr": {"type": "string"},
+    "exit_code": {"type": "integer"}
+  },
+  "constraints": {
+    "timeout_ms": 60000,
+    "allowlist": ["python", "python3", "py", "bash", "sh"],
+    "workspace_only": true
+  },
+  "safety": {
+    "level": "medium",
+    "requires_confirmation": false
+  },
+  "lifecycle": {
+    "version": "1.1.0",
+    "status": "ready"
+  }
+}
