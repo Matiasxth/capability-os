@@ -1,0 +1,10 @@
+{
+  "id": "capos.core.agent",
+  "name": "Agent",
+  "version": "1.0.0",
+  "dependencies": [
+    "capos.core.settings",
+    "capos.core.memory"
+  ],
+  "entry_point": "plugin:create_plugin"
+}

@@ -133,42 +133,15 @@ class CapabilityOSUIBridgeService:
             event_bus=event_bus,
         )
 
-        # Register all built-in plugins
-        from system.plugins.core_services.plugin import create_plugin as core_factory
-        from system.plugins.memory.plugin import create_plugin as mem_factory
-        from system.plugins.capabilities.plugin import create_plugin as cap_factory
-        from system.plugins.workspace.plugin import create_plugin as ws_factory
-        from system.plugins.agent.plugin import create_plugin as agent_factory
-        from system.plugins.skills.plugin import create_plugin as skills_factory
-        from system.plugins.browser.plugin import create_plugin as browser_factory
-        from system.plugins.voice.plugin import create_plugin as voice_factory
-        from system.plugins.mcp.plugin import create_plugin as mcp_factory
-        from system.plugins.a2a.plugin import create_plugin as a2a_factory
-        from system.plugins.growth.plugin import create_plugin as growth_factory
-        from system.plugins.sequences.plugin import create_plugin as seq_factory
-        from system.plugins.supervisor.plugin import create_plugin as sv_factory
-        from system.plugins.scheduler.plugin import create_plugin as sched_factory
-        from system.plugins.channels.telegram.plugin import create_plugin as tg_factory
-        from system.plugins.channels.slack.plugin import create_plugin as slack_factory
-        from system.plugins.channels.discord.plugin import create_plugin as discord_factory
-        from system.plugins.channels.whatsapp.plugin import create_plugin as wsp_factory
-        from system.plugins.auth.plugin import create_plugin as auth_factory
-        from system.plugins.workflows.plugin import create_plugin as wf_factory
-        from system.plugins.sandbox.plugin import create_plugin as sandbox_factory
-        from system.plugins.integrations.plugin import create_plugin as integ_factory
-
-        for factory in [
-            core_factory, auth_factory, mem_factory, cap_factory, ws_factory, agent_factory,
-            skills_factory, browser_factory, voice_factory, mcp_factory, a2a_factory,
-            growth_factory, seq_factory, sv_factory, sched_factory,
-            tg_factory, slack_factory, discord_factory, wsp_factory, wf_factory, sandbox_factory,
-            integ_factory,
-        ]:
+        # Auto-discover and register all plugins from system/plugins/
+        from system.container.plugin_loader import PluginLoader
+        plugins_dir = self.project_root / "system" / "plugins"
+        discovered = PluginLoader.load_from_directory(plugins_dir)
+        for plugin, manifest in discovered:
             try:
-                plugin = factory()
-                self.container.register_plugin(plugin)
+                self.container.register_plugin(plugin, manifest)
             except Exception as exc:
-                print(f"  Plugin registration failed: {exc}", flush=True)
+                print(f"  Plugin registration failed ({manifest.id}): {exc}", flush=True)
 
         # If an external LLMClient was passed, publish it before initialization
         if llm_client is not None:

@@ -37,30 +37,50 @@ class PluginLoader:
                             results.append(result)
                     except Exception as exc:
                         logger.error(f"Failed loading plugin {subdir.name}: {exc}")
+                # Recurse one level deeper for nested plugins (e.g. channels/telegram/)
+                for nested in sorted(subdir.iterdir()):
+                    if not nested.is_dir() or nested.name.startswith(("_", ".")):
+                        continue
+                    nested_manifest = nested / "capos-plugin.json"
+                    if nested_manifest.exists():
+                        try:
+                            result = PluginLoader._load_single(nested, nested_manifest)
+                            if result:
+                                results.append(result)
+                        except Exception as exc:
+                            logger.error(f"Failed loading nested plugin {nested.name}: {exc}")
                 continue
 
             try:
-                data = json.loads(manifest_path.read_text(encoding="utf-8"))
-                manifest = PluginManifest.from_dict(data)
-                module_name, func_name = manifest.entry_point.rsplit(":", 1)
-                module_path = subdir / (module_name.replace(".", "/") + ".py")
-                if not module_path.exists():
-                    module_path = subdir / module_name / "__init__.py"
-
-                spec = importlib.util.spec_from_file_location(
-                    f"capos_plugin_{manifest.id}", str(module_path),
-                )
-                if spec and spec.loader:
-                    module = importlib.util.module_from_spec(spec)
-                    spec.loader.exec_module(module)
-                    factory = getattr(module, func_name)
-                    plugin = factory()
-                    results.append((plugin, manifest))
-                    logger.info(f"Loaded plugin: {manifest.id}")
+                result = PluginLoader._load_single(subdir, manifest_path)
+                if result:
+                    results.append(result)
             except Exception as exc:
                 logger.error(f"Failed loading {subdir.name}: {exc}")
 
         return results
+
+    @staticmethod
+    def _load_single(plugin_dir: Path, manifest_path: Path) -> tuple[Any, PluginManifest] | None:
+        """Load a single plugin from its directory and manifest file."""
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest = PluginManifest.from_dict(data)
+        module_name, func_name = manifest.entry_point.rsplit(":", 1)
+        module_path = plugin_dir / (module_name.replace(".", "/") + ".py")
+        if not module_path.exists():
+            module_path = plugin_dir / module_name / "__init__.py"
+
+        spec = importlib.util.spec_from_file_location(
+            f"capos_plugin_{manifest.id}", str(module_path),
+        )
+        if spec and spec.loader:
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            factory = getattr(module, func_name)
+            plugin = factory()
+            logger.info(f"Loaded plugin: {manifest.id}")
+            return (plugin, manifest)
+        return None
 
     @staticmethod
     def _load_from_module(subdir: Path) -> tuple[Any, PluginManifest] | None:

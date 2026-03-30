@@ -1,0 +1,7 @@
+{
+  "id": "capos.core.settings",
+  "name": "Core Services",
+  "version": "1.0.0",
+  "dependencies": [],
+  "entry_point": "plugin:create_plugin"
+}

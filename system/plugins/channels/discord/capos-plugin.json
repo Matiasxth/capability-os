@@ -1,0 +1,9 @@
+{
+  "id": "capos.channels.discord",
+  "name": "Discord Channel",
+  "version": "1.0.0",
+  "dependencies": [
+    "capos.core.settings"
+  ],
+  "entry_point": "plugin:create_plugin"
+}

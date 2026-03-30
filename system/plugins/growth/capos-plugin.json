@@ -1,0 +1,10 @@
+{
+  "id": "capos.core.growth",
+  "name": "Growth",
+  "version": "1.0.0",
+  "dependencies": [
+    "capos.core.settings",
+    "capos.core.capabilities"
+  ],
+  "entry_point": "plugin:create_plugin"
+}

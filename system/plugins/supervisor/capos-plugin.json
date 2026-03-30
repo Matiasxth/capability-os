@@ -1,0 +1,10 @@
+{
+  "id": "capos.core.supervisor",
+  "name": "Supervisor",
+  "version": "1.0.0",
+  "dependencies": [
+    "capos.core.settings",
+    "capos.core.agent"
+  ],
+  "entry_point": "plugin:create_plugin"
+}
