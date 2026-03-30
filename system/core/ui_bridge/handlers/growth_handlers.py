@@ -15,11 +15,13 @@ def pending_gaps(service: Any, payload: Any, **kw: Any):
 
 
 def analyze_gap(service: Any, payload: Any, gap_id: str = "", **kw: Any):
-    return _resp(HTTPStatus.OK, service._analyze_gap(gap_id))
+    from system.core.ui_bridge.growth_service import analyze_gap as _analyze
+    return _resp(HTTPStatus.OK, _analyze(service, gap_id))
 
 
 def generate_gap(service: Any, payload: Any, gap_id: str = "", **kw: Any):
-    result = service._auto_generate_for_gap(gap_id)
+    from system.core.ui_bridge.growth_service import auto_generate_for_gap
+    result = auto_generate_for_gap(service, gap_id)
     try:
         from system.core.ui_bridge.event_bus import event_bus
         event_bus.emit("growth_update", {"action": "gap_generated", "gap_id": gap_id})
@@ -29,7 +31,8 @@ def generate_gap(service: Any, payload: Any, gap_id: str = "", **kw: Any):
 
 
 def approve_gap(service: Any, payload: Any, gap_id: str = "", **kw: Any):
-    result = service._approve_gap(gap_id)
+    from system.core.ui_bridge.growth_service import approve_gap as _approve
+    result = _approve(service, gap_id)
     try:
         from system.core.ui_bridge.event_bus import event_bus
         event_bus.emit("growth_update", {"action": "gap_approved", "gap_id": gap_id})
@@ -39,7 +42,8 @@ def approve_gap(service: Any, payload: Any, gap_id: str = "", **kw: Any):
 
 
 def reject_gap(service: Any, payload: Any, gap_id: str = "", **kw: Any):
-    return _resp(HTTPStatus.OK, service._reject_gap(gap_id))
+    from system.core.ui_bridge.growth_service import reject_gap as _reject
+    return _resp(HTTPStatus.OK, _reject(service, gap_id))
 
 
 def list_proposals(service: Any, payload: Any, **kw: Any):
@@ -47,11 +51,13 @@ def list_proposals(service: Any, payload: Any, **kw: Any):
 
 
 def regenerate_proposal(service: Any, payload: Any, prop_id: str = "", **kw: Any):
-    return _resp(HTTPStatus.OK, service._regenerate_proposal(prop_id))
+    from system.core.ui_bridge.growth_service import regenerate_proposal as _regen
+    return _resp(HTTPStatus.OK, _regen(service, prop_id))
 
 
 def approve_proposal(service: Any, payload: Any, cap_id: str = "", **kw: Any):
-    result = service._approve_proposal(cap_id)
+    from system.core.ui_bridge.growth_service import approve_proposal as _appr
+    result = _appr(service, cap_id)
     try:
         from system.core.ui_bridge.event_bus import event_bus
         event_bus.emit("growth_update", {"action": "proposal_approved", "capability_id": cap_id})
@@ -61,7 +67,8 @@ def approve_proposal(service: Any, payload: Any, cap_id: str = "", **kw: Any):
 
 
 def reject_proposal(service: Any, payload: Any, cap_id: str = "", **kw: Any):
-    return _resp(HTTPStatus.OK, service._reject_proposal(cap_id))
+    from system.core.ui_bridge.growth_service import reject_proposal as _rej
+    return _resp(HTTPStatus.OK, _rej(service, cap_id))
 
 
 def pending_optimizations(service: Any, payload: Any, **kw: Any):
@@ -69,7 +76,8 @@ def pending_optimizations(service: Any, payload: Any, **kw: Any):
 
 
 def approve_optimization(service: Any, payload: Any, opt_id: str = "", **kw: Any):
-    result = service._approve_optimization(opt_id, payload or {})
+    from system.core.ui_bridge.growth_service import approve_optimization as _aopt
+    result = _aopt(service, opt_id, payload or {})
     try:
         from system.core.ui_bridge.event_bus import event_bus
         event_bus.emit("growth_update", {"action": "optimization_approved", "optimization_id": opt_id})
@@ -79,4 +87,5 @@ def approve_optimization(service: Any, payload: Any, opt_id: str = "", **kw: Any
 
 
 def reject_optimization(service: Any, payload: Any, opt_id: str = "", **kw: Any):
-    return _resp(HTTPStatus.OK, service._reject_optimization(opt_id))
+    from system.core.ui_bridge.growth_service import reject_optimization as _ropt
+    return _resp(HTTPStatus.OK, _ropt(service, opt_id))

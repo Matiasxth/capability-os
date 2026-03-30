@@ -27,11 +27,13 @@ def task_events(service: Any, payload: Any, task_id: str = "", **kw: Any):
 
 
 def list_agents(service: Any, payload: Any, **kw: Any):
-    return _resp(HTTPStatus.OK, {"agents": service._a2a_list_agents()})
+    from system.core.ui_bridge.a2a_service import a2a_list_agents
+    return _resp(HTTPStatus.OK, {"agents": a2a_list_agents(service)})
 
 
 def add_agent(service: Any, payload: Any, **kw: Any):
-    result = service._a2a_add_agent(payload or {})
+    from system.core.ui_bridge.a2a_service import a2a_add_agent
+    result = a2a_add_agent(service, payload or {})
     try:
         from system.core.ui_bridge.event_bus import event_bus
         event_bus.emit("a2a_changed", {"action": "agent_added"})
@@ -41,7 +43,8 @@ def add_agent(service: Any, payload: Any, **kw: Any):
 
 
 def remove_agent(service: Any, payload: Any, agent_id: str = "", **kw: Any):
-    result = service._a2a_remove_agent(agent_id)
+    from system.core.ui_bridge.a2a_service import a2a_remove_agent
+    result = a2a_remove_agent(service, agent_id)
     try:
         from system.core.ui_bridge.event_bus import event_bus
         event_bus.emit("a2a_changed", {"action": "agent_removed", "agent_id": agent_id})
@@ -51,7 +54,8 @@ def remove_agent(service: Any, payload: Any, agent_id: str = "", **kw: Any):
 
 
 def delegate_task(service: Any, payload: Any, agent_id: str = "", **kw: Any):
-    result = service._a2a_delegate(agent_id, payload or {})
+    from system.core.ui_bridge.a2a_service import a2a_delegate
+    result = a2a_delegate(service, agent_id, payload or {})
     try:
         from system.core.ui_bridge.event_bus import event_bus
         event_bus.emit("a2a_changed", {"action": "task_delegated", "agent_id": agent_id})

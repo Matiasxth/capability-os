@@ -16,11 +16,13 @@ def _err(code, ec, msg):
 
 
 def list_capabilities(service: Any, payload: Any, **kw: Any):
-    return _resp(HTTPStatus.OK, {"capabilities": service._list_capabilities()})
+    from system.core.ui_bridge.execution_service import list_capabilities as _list
+    return _resp(HTTPStatus.OK, {"capabilities": _list(service)})
 
 
 def get_capability(service: Any, payload: Any, capability_id: str = "", **kw: Any):
-    return _resp(HTTPStatus.OK, {"capability": service._get_capability(capability_id)})
+    from system.core.ui_bridge.execution_service import get_capability as _get
+    return _resp(HTTPStatus.OK, {"capability": _get(service, capability_id)})
 
 
 def capabilities_health(service: Any, payload: Any, **kw: Any):
@@ -28,7 +30,8 @@ def capabilities_health(service: Any, payload: Any, **kw: Any):
 
 
 def execute(service: Any, payload: Any, **kw: Any):
-    return _resp(HTTPStatus.OK, service._execute_capability(payload or {}))
+    from system.core.ui_bridge.execution_service import execute_capability
+    return _resp(HTTPStatus.OK, execute_capability(service, payload or {}))
 
 
 def chat(service: Any, payload: Any, **kw: Any):
@@ -52,17 +55,21 @@ def chat(service: Any, payload: Any, **kw: Any):
 
 
 def interpret(service: Any, payload: Any, **kw: Any):
-    return _resp(HTTPStatus.OK, service._interpret_text(payload or {}))
+    from system.core.ui_bridge.execution_service import interpret_text
+    return _resp(HTTPStatus.OK, interpret_text(service, payload or {}))
 
 
 def plan(service: Any, payload: Any, **kw: Any):
-    return _resp(HTTPStatus.OK, service._plan_intent(payload or {}))
+    from system.core.ui_bridge.execution_service import plan_intent
+    return _resp(HTTPStatus.OK, plan_intent(service, payload or {}))
 
 
 def get_execution(service: Any, payload: Any, execution_id: str = "", **kw: Any):
-    return _resp(HTTPStatus.OK, service._get_execution(execution_id))
+    from system.core.ui_bridge.execution_service import get_execution as _get_exec
+    return _resp(HTTPStatus.OK, _get_exec(service, execution_id))
 
 
 def get_execution_events(service: Any, payload: Any, execution_id: str = "", **kw: Any):
-    execution = service._get_execution(execution_id)
+    from system.core.ui_bridge.execution_service import get_execution as _get_exec
+    execution = _get_exec(service, execution_id)
     return _resp(HTTPStatus.OK, {"execution_id": execution_id, "events": execution["runtime"].get("logs", [])})

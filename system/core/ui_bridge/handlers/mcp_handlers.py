@@ -15,7 +15,8 @@ def list_servers(service: Any, payload: Any, **kw: Any):
 
 
 def add_server(service: Any, payload: Any, **kw: Any):
-    result = service._mcp_add_server(payload or {})
+    from system.core.ui_bridge.mcp_service import mcp_add_server
+    result = mcp_add_server(service, payload or {})
     try:
         from system.core.ui_bridge.event_bus import event_bus
         event_bus.emit("mcp_changed", {"action": "server_added"})
@@ -25,7 +26,8 @@ def add_server(service: Any, payload: Any, **kw: Any):
 
 
 def remove_server(service: Any, payload: Any, server_id: str = "", **kw: Any):
-    result = service._mcp_remove_server(server_id)
+    from system.core.ui_bridge.mcp_service import mcp_remove_server
+    result = mcp_remove_server(service, server_id)
     try:
         from system.core.ui_bridge.event_bus import event_bus
         event_bus.emit("mcp_changed", {"action": "server_removed", "server_id": server_id})
@@ -35,7 +37,8 @@ def remove_server(service: Any, payload: Any, server_id: str = "", **kw: Any):
 
 
 def discover_tools(service: Any, payload: Any, server_id: str = "", **kw: Any):
-    return _resp(HTTPStatus.OK, service._mcp_discover_tools(server_id))
+    from system.core.ui_bridge.mcp_service import mcp_discover_tools
+    return _resp(HTTPStatus.OK, mcp_discover_tools(service, server_id))
 
 
 def list_tools(service: Any, payload: Any, **kw: Any):
@@ -43,7 +46,8 @@ def list_tools(service: Any, payload: Any, **kw: Any):
 
 
 def install_tool(service: Any, payload: Any, tool_id: str = "", **kw: Any):
-    result = service._mcp_install_tool(tool_id)
+    from system.core.ui_bridge.mcp_service import mcp_install_tool
+    result = mcp_install_tool(service, tool_id)
     try:
         from system.core.ui_bridge.event_bus import event_bus
         event_bus.emit("mcp_changed", {"action": "tool_installed", "tool_id": tool_id})
@@ -53,7 +57,8 @@ def install_tool(service: Any, payload: Any, tool_id: str = "", **kw: Any):
 
 
 def uninstall_tool(service: Any, payload: Any, tool_id: str = "", **kw: Any):
-    result = service._mcp_uninstall_tool(tool_id)
+    from system.core.ui_bridge.mcp_service import mcp_uninstall_tool
+    result = mcp_uninstall_tool(service, tool_id)
     try:
         from system.core.ui_bridge.event_bus import event_bus
         event_bus.emit("mcp_changed", {"action": "tool_uninstalled", "tool_id": tool_id})
