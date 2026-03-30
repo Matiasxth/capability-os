@@ -140,7 +140,23 @@ export default function ControlCenter() {
   </div>)}
 
   const _PRESETS={groq:{label:"Groq",provider:"openai",base_url:"https://api.groq.com/openai/v1",models:["llama-3.1-70b-versatile","llama-3.1-8b-instant","mixtral-8x7b-32768","gemma2-9b-it"],needsKey:true},ollama:{label:"Ollama",provider:"ollama",base_url:"http://localhost:11434",models:[],needsKey:false},openai:{label:"OpenAI",provider:"openai",base_url:"https://api.openai.com/v1",models:["gpt-4o","gpt-4o-mini","gpt-3.5-turbo"],needsKey:true},custom:{label:"Custom",provider:"openai",base_url:"",models:[],needsKey:false}};
-  function _detectPreset(url){if(!url)return"ollama";if(url.includes("groq.com"))return"groq";if(url.includes("localhost:11434")||url.includes("127.0.0.1:11434"))return"ollama";if(url.includes("openai.com"))return"openai";return"custom"}
+  function _detectPreset(url){
+    if (!url) return "ollama";
+    try {
+      const parsed = new URL(url);
+      const host = parsed.hostname || "";
+      const port = parsed.port || "";
+      // Groq: any subdomain of groq.com or groq.com itself
+      if (host === "groq.com" || host.endsWith(".groq.com")) return "groq";
+      // Ollama: localhost or 127.0.0.1 on port 11434
+      if ((host === "localhost" || host === "127.0.0.1") && port === "11434") return "ollama";
+      // OpenAI: any subdomain of openai.com or openai.com itself
+      if (host === "openai.com" || host.endsWith(".openai.com")) return "openai";
+    } catch (e) {
+      // If URL parsing fails, fall through to custom
+    }
+    return "custom";
+  }
   const [llmPreset,setLlmPreset]=useState(()=>_detectPreset(settings?.llm?.base_url));
   const [showKey,setShowKey]=useState(false);
   const [llmModel,setLlmModel]=useState(settings?.llm?.model||"");
