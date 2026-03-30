@@ -6,6 +6,7 @@ read-only workspace volume, network disabled.
 from __future__ import annotations
 
 import json
+import shlex
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -71,7 +72,7 @@ class DockerSandbox:
             docker_cmd.extend(["-v", f"{self.workspace_mount}:/workspace:ro"])
             docker_cmd.extend(["-w", "/workspace"])
 
-        docker_cmd.extend([self.image, "sh", "-c", command])
+        docker_cmd.extend([self.image, "sh", "-c", shlex.quote(command)])
 
         try:
             result = subprocess.run(

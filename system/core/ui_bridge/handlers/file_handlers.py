@@ -19,6 +19,32 @@ def _err(code, error_code, msg):
     raise type("E", (Exception,), {"status_code": code.value, "error_code": error_code, "error_message": msg, "details": {}})()
 
 
+def _validate_path(root: Path, user_path: str) -> Path:
+    """Resolve path and verify it stays within the workspace root."""
+    resolved = (root / user_path).resolve()
+    root_resolved = root.resolve()
+    try:
+        resolved.relative_to(root_resolved)
+    except ValueError:
+        from system.core.ui_bridge.api_server import APIRequestError
+        raise APIRequestError(
+            HTTPStatus.FORBIDDEN, "path_traversal",
+            "Access denied: path escapes workspace boundary",
+        )
+    # Symlink protection
+    if resolved.is_symlink():
+        real = resolved.resolve(strict=False)
+        try:
+            real.relative_to(root_resolved)
+        except ValueError:
+            from system.core.ui_bridge.api_server import APIRequestError
+            raise APIRequestError(
+                HTTPStatus.FORBIDDEN, "symlink_escape",
+                "Access denied: symlink points outside workspace",
+            )
+    return resolved
+
+
 def file_tree(service: Any, payload: Any, ws_id: str = "", _raw_path: str = "", **kw: Any):
     """Get file tree of a workspace."""
     ws = service.workspace_registry.get(ws_id) if ws_id else service.workspace_registry.get_default()
@@ -30,7 +56,7 @@ def file_tree(service: Any, payload: Any, ws_id: str = "", _raw_path: str = "", 
 
     qs = parse_qs(urlparse(_raw_path).query) if _raw_path else {}
     rel = qs.get("path", ["."])[0]
-    target = (root / rel).resolve()
+    target = _validate_path(root, rel)
 
     if not target.exists():
         return _resp(HTTPStatus.NOT_FOUND, {"error": "Path not found"})
@@ -76,7 +102,7 @@ def file_read(service: Any, payload: Any, **kw: Any):
     ws = service.workspace_registry.get(ws_id) if ws_id else service.workspace_registry.get_default()
     root = Path(ws["path"]) if ws else service.project_root
 
-    file_path = (root / path).resolve()
+    file_path = _validate_path(root, path)
     if not file_path.exists():
         return _resp(HTTPStatus.NOT_FOUND, {"error": f"File not found: {path}"})
     if not file_path.is_file():
@@ -118,7 +144,7 @@ def file_write(service: Any, payload: Any, **kw: Any):
     ws = service.workspace_registry.get(ws_id) if ws_id else service.workspace_registry.get_default()
     root = Path(ws["path"]) if ws else service.project_root
 
-    file_path = (root / path).resolve()
+    file_path = _validate_path(root, path)
 
     try:
         file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -137,7 +163,7 @@ def file_create(service: Any, payload: Any, **kw: Any):
 
     ws = service.workspace_registry.get(ws_id) if ws_id else service.workspace_registry.get_default()
     root = Path(ws["path"]) if ws else service.project_root
-    target = (root / path).resolve()
+    target = _validate_path(root, path)
 
     try:
         if is_dir:
@@ -158,7 +184,7 @@ def file_delete(service: Any, payload: Any, **kw: Any):
 
     ws = service.workspace_registry.get(ws_id) if ws_id else service.workspace_registry.get_default()
     root = Path(ws["path"]) if ws else service.project_root
-    target = (root / path).resolve()
+    target = _validate_path(root, path)
 
     if not target.exists():
         return _resp(HTTPStatus.NOT_FOUND, {"error": "Not found"})
@@ -213,8 +239,17 @@ def workspace_suggest_structure(service: Any, payload: Any, **kw: Any):
     return _resp(HTTPStatus.OK, WorkspaceMonitor().suggest_structure(project_type))
 
 
+TERMINAL_ALLOWED_COMMANDS = {
+    "ls", "dir", "cat", "head", "tail", "grep", "find", "tree", "wc", "echo", "pwd",
+    "git", "npm", "npx", "node", "python", "pip", "pytest",
+    "mkdir", "touch", "cp", "mv", "rm",
+}
+
+
 def file_terminal(service: Any, payload: Any, **kw: Any):
-    """Execute a command in the workspace directory."""
+    """Execute a command in the workspace directory (allowlisted)."""
+    import shlex
+
     p = payload or {}
     command = p.get("command", "")
     ws_id = p.get("ws_id", "")
@@ -222,12 +257,28 @@ def file_terminal(service: Any, payload: Any, **kw: Any):
     if not command.strip():
         return _resp(HTTPStatus.BAD_REQUEST, {"error": "Command required"})
 
+    try:
+        args = shlex.split(command)
+    except ValueError as exc:
+        return _resp(HTTPStatus.BAD_REQUEST, {"error": f"Invalid command syntax: {exc}"})
+
+    if not args:
+        return _resp(HTTPStatus.BAD_REQUEST, {"error": "Command required"})
+
+    # Allowlist check: only the base command name (not path) must be in the list
+    base_cmd = Path(args[0]).name.lower().removesuffix(".exe")
+    if base_cmd not in TERMINAL_ALLOWED_COMMANDS:
+        return _resp(HTTPStatus.FORBIDDEN, {
+            "status": "error",
+            "error": f"Command '{base_cmd}' is not allowed. Permitted: {', '.join(sorted(TERMINAL_ALLOWED_COMMANDS))}",
+        })
+
     ws = service.workspace_registry.get(ws_id) if ws_id else service.workspace_registry.get_default()
     cwd = Path(ws["path"]) if ws else service.project_root
 
     try:
         result = subprocess.run(
-            command, shell=True, cwd=str(cwd),
+            args, shell=False, cwd=str(cwd),
             capture_output=True, text=True,
             encoding="utf-8", errors="replace",
             timeout=30,
@@ -241,4 +292,4 @@ def file_terminal(service: Any, payload: Any, **kw: Any):
     except subprocess.TimeoutExpired:
         return _resp(HTTPStatus.OK, {"status": "error", "error": "Command timed out (30s)"})
     except Exception as exc:
-        return _resp(HTTPStatus.OK, {"status": "error", "error": str(exc)})
+        return _resp(HTTPStatus.OK, {"status": "error", "error": str(exc)[:200]})

@@ -62,11 +62,13 @@ class SandboxManager:
             return self.process_sandbox.execute(command, cwd=cwd)
 
         else:
-            # Level 1: direct (this shouldn't normally be called through sandbox)
+            # Level 1: direct execution (no sandbox)
+            import shlex
             import subprocess
             try:
+                args = shlex.split(command)
                 result = subprocess.run(
-                    command, shell=True, cwd=cwd,
+                    args, shell=False, cwd=cwd,
                     capture_output=True, text=True, timeout=60,
                     encoding="utf-8", errors="replace",
                 )

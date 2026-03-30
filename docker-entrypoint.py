@@ -110,7 +110,8 @@ class UnifiedHandler(BaseHTTPRequestHandler):
         self.wfile.write(content)
 
     def _cors_headers(self) -> None:
-        self.send_header("Access-Control-Allow-Origin", "*")
+        cors_origin = os.environ.get("CORS_ORIGIN", "*")
+        self.send_header("Access-Control-Allow-Origin", cors_origin)
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.send_header("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS")
 

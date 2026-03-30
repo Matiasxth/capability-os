@@ -1,7 +1,7 @@
 # ============================================================
 # Stage 1: Build frontend
 # ============================================================
-FROM node:18-slim AS frontend
+FROM node:18.20-slim AS frontend
 
 WORKDIR /build
 COPY system/frontend/app/package.json system/frontend/app/package-lock.json* ./
@@ -14,7 +14,7 @@ RUN npm run build
 # ============================================================
 # Stage 2: Runtime
 # ============================================================
-FROM python:3.12-slim
+FROM python:3.12.7-slim
 
 # System dependencies (minimal)
 RUN apt-get update \

@@ -6,6 +6,7 @@ Works on all platforms without Docker.
 from __future__ import annotations
 
 import os
+import shlex
 import subprocess
 import tempfile
 from pathlib import Path
@@ -35,9 +36,20 @@ class ProcessSandbox:
         env = self._build_env()
 
         try:
+            args = shlex.split(command)
+        except ValueError as exc:
+            return {
+                "status": "error",
+                "stdout": "",
+                "stderr": f"Invalid command syntax: {exc}",
+                "exit_code": -1,
+                "timed_out": False,
+            }
+
+        try:
             result = subprocess.run(
-                command,
-                shell=True,
+                args,
+                shell=False,
                 cwd=cwd,
                 capture_output=True,
                 text=True,

@@ -2,21 +2,25 @@ version: "3.8"
 
 services:
   chrome:
-    image: browserless/chrome:latest
+    image: browserless/chrome:1-chrome-stable
     container_name: capos-chrome
-    ports:
-      - "9222:3000"
+    # Not exposed to host — only accessible from capability-os via internal network
+    expose:
+      - "3000"
     environment:
       - MAX_CONCURRENT_SESSIONS=2
       - CONNECTION_TIMEOUT=120000
+      - TOKEN=${BROWSER_TOKEN:-capos_browser_secret}
     restart: unless-stopped
 
   capability-os:
     build: .
     container_name: capability-os
     ports:
-      - "8000:8000"
-      - "8001:8001"
+      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:8001:8001"
+    security_opt:
+      - no-new-privileges:true
     volumes:
       - workspace:/data/workspace
       - artifacts:/data/workspace/artifacts

@@ -44,11 +44,11 @@ def build_agent_system_prompt(
 
     parts = [base]
 
-    # Agent identity
+    # Agent identity (sanitized — user-configurable fields)
     if agent_config:
-        name = agent_config.get("name", "")
-        desc = agent_config.get("description", "")
-        lang = agent_config.get("language", "auto")
+        name = str(agent_config.get("name", ""))[:50]
+        desc = str(agent_config.get("description", ""))[:200]
+        lang = str(agent_config.get("language", "auto"))[:20]
         if name:
             parts.append(f"\n## Identity\nYour name is {name}.")
         if desc:
