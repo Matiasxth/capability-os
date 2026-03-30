@@ -410,6 +410,67 @@ The ServiceContainer initializes and starts plugins in topological order (depend
 
 5. **Publish services early.** Other plugins may depend on what you publish, so do it in `initialize()`.
 
-6. **Use the event bus for loose coupling.** Emit events instead of calling other plugins directly when possible.
+6. **Use the event bus for loose coupling.** Emit events instead of calling other plugins directly when possible. See [Event Catalog](events.md) for all available event types.
 
 7. **Settings convention.** Use `ctx.plugin_settings(self.plugin_id)` which maps `capos.channels.telegram` to `settings["telegram"]`.
+
+---
+
+## Emitting Events
+
+Plugins can emit events to notify the frontend and other subscribers in real time.
+
+### From initialize() or service methods
+
+```python
+def initialize(self, ctx: PluginContext) -> None:
+    self._event_bus = ctx.event_bus
+
+def some_action(self):
+    # Emit an event — delivered via WebSocket to all connected clients
+    self._event_bus.emit("my_plugin_event", {
+        "action": "data_processed",
+        "count": 42,
+    })
+```
+
+### From handlers (API route functions)
+
+```python
+def my_handler(service, payload, **kw):
+    from system.core.ui_bridge.event_bus import event_bus
+    # ... do work ...
+    event_bus.emit("integration_changed", {"action": "my_thing_happened"})
+    return _resp(HTTPStatus.OK, {"status": "success"})
+```
+
+### Frontend auto-refresh
+
+To make the ControlCenter auto-refresh when your event fires, add your event type to the `SECTION_FOR_EVENT` map in `ControlCenter.jsx`:
+
+```javascript
+const SECTION_FOR_EVENT = {
+  // ... existing mappings ...
+  my_plugin_event: "my-section",
+};
+```
+
+For the full list of events, payloads, and consumers, see **[docs/events.md](events.md)**.
+
+---
+
+## Registering API Routes
+
+Plugins don't register routes directly — routes are declared in `api_server.py._build_router()`. To add endpoints for your plugin:
+
+1. Create a handler module: `system/core/ui_bridge/handlers/my_handlers.py`
+2. Define handler functions following the signature: `def my_handler(service, payload, **kw) -> APIResponse`
+3. Register routes in `_build_router()`:
+
+```python
+from system.core.ui_bridge.handlers import my_handlers
+r.add("GET", "/my-plugin/status", my_handlers.get_status)
+r.add("POST", "/my-plugin/action", my_handlers.do_action)
+```
+
+4. Access your plugin's services via `service.container.get_plugin("my-org.my-plugin")`
