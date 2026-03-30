@@ -138,16 +138,45 @@ def main() -> None:
 
     host = os.environ.get("HOST", "0.0.0.0")
     port = int(os.environ.get("PORT", "8000"))
+    use_async = os.environ.get("CAPOS_ASYNC", "1") != "0"
 
     ws_port_str = os.environ.get("WS_PORT", "")
     ws_port = int(ws_port_str) if ws_port_str.isdigit() else None
 
     service = CapabilityOSUIBridgeService(workspace_root=WORKSPACE_ROOT)
+
+    # Start error notifier
+    try:
+        from system.core.ui_bridge.event_bus import event_bus
+        from system.core.observation.error_notifier import ErrorNotifier
+        _notifier = ErrorNotifier(project_root=PROJECT_ROOT)
+        _notifier.subscribe(event_bus)
+    except Exception as exc:
+        print(f"  ErrorNotifier: failed ({exc})")
+
+    print(f"  Workspace: {WORKSPACE_ROOT}")
+    print(f"  Frontend:  {'available' if (DIST_DIR / 'index.html').exists() else 'not built'}")
+
+    # Try async server (uvicorn), fallback to sync
+    if use_async:
+        try:
+            import uvicorn
+            from system.core.ui_bridge.asgi_server import CapOSASGI
+
+            app = CapOSASGI(service, static_dir=DIST_DIR)
+            print(f"Capability OS (async) listening on http://{host}:{port}")
+            uvicorn.run(app, host=host, port=port, log_level="warning", ws="auto")
+            return
+        except ImportError:
+            print("  uvicorn not available, falling back to sync server")
+        except Exception as exc:
+            print(f"  Async server failed ({exc}), falling back to sync server")
+
+    # Fallback: sync ThreadingHTTPServer
     server = ThreadingHTTPServer((host, port), UnifiedHandler)
     server.service = service
     server.ws_server = None
 
-    # Start WebSocket server if configured
     if ws_port is not None:
         try:
             from system.core.ui_bridge.ws_server import start_ws_server
@@ -157,18 +186,7 @@ def main() -> None:
         except Exception as exc:
             print(f"  WebSocket: failed ({exc})")
 
-    # Start error notifier → triggers Claude Code on errors
-    try:
-        from system.core.ui_bridge.event_bus import event_bus
-        from system.core.observation.error_notifier import ErrorNotifier
-        _notifier = ErrorNotifier(project_root=PROJECT_ROOT)
-        _notifier.subscribe(event_bus)
-    except Exception as exc:
-        print(f"  ErrorNotifier: failed ({exc})")
-
-    print(f"Capability OS listening on http://{host}:{port}")
-    print(f"  Workspace: {WORKSPACE_ROOT}")
-    print(f"  Frontend:  {'available' if (DIST_DIR / 'index.html').exists() else 'not built'}")
+    print(f"Capability OS (sync) listening on http://{host}:{port}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

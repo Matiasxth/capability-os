@@ -117,440 +117,188 @@ class CapabilityOSUIBridgeService:
         self.integration_manifest_schema_path = (
             self.project_root / "system" / "integrations" / "contracts" / "integration_manifest.schema.json"
         )
+
+        # ── ServiceContainer (replaces god-object wiring) ──
         self.settings_service = SettingsService(self.workspace_root)
         runtime_settings = self.settings_service.load_settings()
 
-        self.capability_registry = CapabilityRegistry()
-        self.tool_registry = ToolRegistry()
-        self._load_registries()
+        # ── Initialize ServiceContainer with all plugins ──
+        from system.container import ServiceContainer
+        from system.core.ui_bridge.event_bus import event_bus
+
+        self.container = ServiceContainer(
+            workspace_root=self.workspace_root,
+            project_root=self.project_root,
+            settings=runtime_settings,
+            event_bus=event_bus,
+        )
+
+        # Register all built-in plugins
+        from system.plugins.core_services.plugin import create_plugin as core_factory
+        from system.plugins.memory.plugin import create_plugin as mem_factory
+        from system.plugins.capabilities.plugin import create_plugin as cap_factory
+        from system.plugins.workspace.plugin import create_plugin as ws_factory
+        from system.plugins.agent.plugin import create_plugin as agent_factory
+        from system.plugins.skills.plugin import create_plugin as skills_factory
+        from system.plugins.browser.plugin import create_plugin as browser_factory
+        from system.plugins.voice.plugin import create_plugin as voice_factory
+        from system.plugins.mcp.plugin import create_plugin as mcp_factory
+        from system.plugins.a2a.plugin import create_plugin as a2a_factory
+        from system.plugins.growth.plugin import create_plugin as growth_factory
+        from system.plugins.sequences.plugin import create_plugin as seq_factory
+        from system.plugins.supervisor.plugin import create_plugin as sv_factory
+        from system.plugins.scheduler.plugin import create_plugin as sched_factory
+        from system.plugins.channels.telegram.plugin import create_plugin as tg_factory
+        from system.plugins.channels.slack.plugin import create_plugin as slack_factory
+        from system.plugins.channels.discord.plugin import create_plugin as discord_factory
+        from system.plugins.channels.whatsapp.plugin import create_plugin as wsp_factory
+
+        for factory in [
+            core_factory, mem_factory, cap_factory, ws_factory, agent_factory,
+            skills_factory, browser_factory, voice_factory, mcp_factory, a2a_factory,
+            growth_factory, seq_factory, sv_factory, sched_factory,
+            tg_factory, slack_factory, discord_factory, wsp_factory,
+        ]:
+            try:
+                plugin = factory()
+                self.container.register_plugin(plugin)
+            except Exception as exc:
+                print(f"  Plugin registration failed: {exc}", flush=True)
+
+        # If an external LLMClient was passed, publish it before initialization
+        if llm_client is not None:
+            from system.sdk.contracts import LLMClientContract
+            self.container.register_service(LLMClientContract, llm_client)
+
+        # Initialize all plugins (dependency-ordered)
+        print("── Initializing plugins ──", flush=True)
+        init_errors = self.container.initialize_all()
+        for err in init_errors:
+            print(f"  INIT ERROR: {err}", flush=True)
+
+        # Start plugins with background services
+        print("── Starting plugins ──", flush=True)
+        start_errors = self.container.start_all()
+        for err in start_errors:
+            print(f"  START ERROR: {err}", flush=True)
+
+        # ── Backward-compatible attribute aliases ──
+        # Handlers access service.xxx — these aliases map to container services/plugins
+        from system.sdk.contracts import (
+            SettingsProvider, ToolRegistryContract, ToolRuntimeContract,
+            CapabilityRegistryContract, SecurityServiceContract, HealthServiceContract,
+            MetricsCollectorContract, ExecutionHistoryContract, MemoryManagerContract,
+            SemanticMemoryContract, MarkdownMemoryContract, IntentInterpreterContract,
+            LLMClientContract, CapabilityEngineContract, AgentLoopContract,
+            AgentRegistryContract, WorkspaceRegistryContract,
+        )
+
+        def _get(ct):
+            return self.container.get_optional(ct)
+
+        self.settings_service = _get(SettingsProvider) or self.settings_service
+        self.capability_registry = _get(CapabilityRegistryContract)
+        self.tool_registry = _get(ToolRegistryContract)
+        self.tool_runtime = _get(ToolRuntimeContract)
+        self.security_service = _get(SecurityServiceContract)
+        self.health_service = _get(HealthServiceContract)
+        self.metrics_collector = _get(MetricsCollectorContract)
+        self.execution_history = _get(ExecutionHistoryContract)
+        self.memory_manager = _get(MemoryManagerContract)
+        self.semantic_memory = _get(SemanticMemoryContract)
+        self.markdown_memory = _get(MarkdownMemoryContract)
+        self.intent_interpreter = _get(IntentInterpreterContract)
+        self.engine = _get(CapabilityEngineContract)
+        self.agent_loop = _get(AgentLoopContract)
+        self.agent_registry = _get(AgentRegistryContract)
+        self.workspace_registry = _get(WorkspaceRegistryContract)
+
+        # Plugin-specific aliases for handlers that access deep attributes
+        _core = self.container.get_plugin("capos.core.settings")
+        _mem = self.container.get_plugin("capos.core.memory")
+        _cap = self.container.get_plugin("capos.core.capabilities")
+        _ws = self.container.get_plugin("capos.core.workspace")
+        _agent = self.container.get_plugin("capos.core.agent")
+        _skills = self.container.get_plugin("capos.core.skills")
+        _browser = self.container.get_plugin("capos.core.browser")
+        _voice = self.container.get_plugin("capos.core.voice")
+        _mcp = self.container.get_plugin("capos.core.mcp")
+        _a2a = self.container.get_plugin("capos.core.a2a")
+        _growth = self.container.get_plugin("capos.core.growth")
+        _seq = self.container.get_plugin("capos.core.sequences")
+        _sv = self.container.get_plugin("capos.core.supervisor")
+        _sched = self.container.get_plugin("capos.core.scheduler")
+        _tg = self.container.get_plugin("capos.channels.telegram")
+        _slack = self.container.get_plugin("capos.channels.slack")
+        _discord = self.container.get_plugin("capos.channels.discord")
+        _wsp = self.container.get_plugin("capos.channels.whatsapp")
+
+        self.user_context = getattr(_mem, "user_context", None) if _mem else None
+        self.memory_compactor = getattr(_mem, "compactor", None) if _mem else None
+        self.embeddings_engine = getattr(_mem, "embeddings_engine", None) if _mem else None
+        self.vector_store = getattr(_mem, "vector_store", None) if _mem else None
+        self.phase7_executor = getattr(_cap, "phase7_executor", None) if _cap else None
+        self.phase10_whatsapp_executor = getattr(_wsp, "executor", None) if _wsp else None
+        self.plan_builder = getattr(_cap, "plan_builder", None) if _cap else None
+        self.plan_validator = getattr(_cap, "plan_validator", None) if _cap else None
+        self.path_validator = getattr(_ws, "path_validator", None) if _ws else None
+        self.workspace_context = getattr(_ws, "workspace_context", None) if _ws else None
+        self.file_browser = getattr(_ws, "file_browser", None) if _ws else None
+        self.browser_session_manager = getattr(_browser, "browser_session_manager", None) if _browser else None
+        self.skill_registry = getattr(_skills, "skill_registry", None) if _skills else None
+        self.skill_creator = getattr(_sv, "skill_creator", None) if _sv else None
+        self.supervisor = getattr(_sv, "supervisor", None) if _sv else None
+        self.task_queue = getattr(_sched, "task_queue", None) if _sched else None
+        self.scheduler = getattr(_sched, "scheduler", None) if _sched else None
+        self.stt_service = getattr(_voice, "stt_service", None) if _voice else None
+        self.tts_service = getattr(_voice, "tts_service", None) if _voice else None
+        self.mcp_client_manager = getattr(_mcp, "mcp_client_manager", None) if _mcp else None
+        self.mcp_tool_bridge = getattr(_mcp, "mcp_tool_bridge", None) if _mcp else None
+        self.mcp_capability_generator = getattr(_mcp, "mcp_capability_generator", None) if _mcp else None
+        self.agent_card_builder = getattr(_a2a, "agent_card_builder", None) if _a2a else None
+        self.a2a_server = getattr(_a2a, "a2a_server", None) if _a2a else None
+        self.telegram_connector = getattr(_tg, "connector", None) if _tg else None
+        self.telegram_executor = getattr(_tg, "executor", None) if _tg else None
+        self.telegram_polling_worker = getattr(_tg, "polling_worker", None) if _tg else None
+        self.slack_connector = getattr(_slack, "connector", None) if _slack else None
+        self.slack_executor = getattr(_slack, "executor", None) if _slack else None
+        self.slack_polling_worker = getattr(_slack, "polling_worker", None) if _slack else None
+        self.discord_connector = getattr(_discord, "connector", None) if _discord else None
+        self.discord_executor = getattr(_discord, "executor", None) if _discord else None
+        self.discord_polling_worker = getattr(_discord, "polling_worker", None) if _discord else None
+        self.whatsapp_manager = getattr(_wsp, "backend_manager", None) if _wsp else None
+        self.whatsapp_reply_worker = getattr(_wsp, "reply_worker", None) if _wsp else None
+        self.capability_generator = getattr(_growth, "capability_generator", None) if _growth else None
+        self.auto_install_pipeline = getattr(_growth, "auto_install_pipeline", None) if _growth else None
+        self.gap_analyzer = getattr(_growth, "gap_analyzer", None) if _growth else None
+        self.performance_monitor = getattr(_growth, "performance_monitor", None) if _growth else None
+        self.strategy_optimizer = getattr(_growth, "strategy_optimizer", None) if _growth else None
+        self.integration_detector = getattr(_growth, "integration_detector", None) if _growth else None
+        self.capability_bridge = getattr(_growth, "capability_bridge", None) if _growth else None
+        self.sequence_storage = getattr(_seq, "sequence_storage", None) if _seq else None
+        self.sequence_registry = getattr(_seq, "sequence_registry", None) if _seq else None
+        self.sequence_runner = getattr(_seq, "sequence_runner", None) if _seq else None
+
+        # Integration registry (still managed directly — not yet a plugin)
         self.integration_registry = IntegrationRegistry(self.integration_registry_data_path)
         self.integration_loader = IntegrationLoader(
-            self.integrations_root,
-            self.integration_manifest_schema_path,
-            self.integration_registry,
+            self.integrations_root, self.integration_manifest_schema_path, self.integration_registry,
         )
         self.integration_validator = IntegrationValidator(
-            self.capability_registry,
-            self.integration_manifest_schema_path,
+            self.capability_registry, self.integration_manifest_schema_path,
         )
         self._refresh_integrations()
 
-        self.metrics_collector = MetricsCollector(
-            data_path=self.workspace_root / "artifacts" / "metrics.json",
-            traces_dir=self.workspace_root / "artifacts" / "traces",
-        )
-
-        self.tool_runtime = ToolRuntime(self.tool_registry, workspace_root=self.workspace_root)
-        register_phase3_real_tools(self.tool_runtime, self.workspace_root)
-        # Register extended system tools
-        from system.tools.implementations.system_tools_extended import (
-            system_monitor_overview, system_monitor_processes,
-            package_install, package_list,
-            git_status, git_log, git_commit,
-            backup_create, backup_list,
-        )
-        for tid, fn in [
-            ("system_monitor_overview", system_monitor_overview),
-            ("system_monitor_processes", system_monitor_processes),
-            ("package_install", package_install),
-            ("package_list", package_list),
-            ("git_status", git_status),
-            ("git_log", git_log),
-            ("git_commit", git_commit),
-            ("backup_create", backup_create),
-            ("backup_list", backup_list),
-        ]:
-            self.tool_runtime.register_handler(tid, lambda p, c, ctx=None, f=fn: f(p, c))
-
-        self.browser_session_manager = register_phase9_browser_tools(
-            self.tool_runtime,
-            self.workspace_root,
-            artifacts_root=runtime_settings["workspace"]["artifacts_path"],
-            auto_start=runtime_settings["browser"]["auto_start"],
-            cdp_port=runtime_settings["browser"].get("cdp_port", 0),
-            auto_restart_max_retries=runtime_settings["browser"].get("auto_restart_max_retries", 2),
-            backend=runtime_settings["browser"].get("backend", "playwright"),
-        )
-        # Skill registry
-        from system.core.skills import SkillRegistry
-        self.skill_registry = SkillRegistry(
-            skills_dir=self.workspace_root / "skills",
-            capability_registry=self.capability_registry,
-            tool_registry=self.tool_registry,
-            tool_runtime=self.tool_runtime,
-        )
-        self.skill_registry.load_installed()
-
-        self.execution_history = ExecutionHistory(
-            data_path=self.workspace_root / "memory" / "history.json",
-        )
-        self.memory_manager = MemoryManager(
-            data_path=self.workspace_root / "memory" / "memories.json",
-        )
-        self.user_context = UserContext(
-            memory=self.memory_manager,
-            metrics=self.metrics_collector,
-        )
-        self.embeddings_engine = EmbeddingsEngine(
-            vocab_path=self.workspace_root / "memory" / "tfidf_vocab.json",
-        )
-        self.vector_store = VectorStore(
-            data_path=self.workspace_root / "memory" / "vectors.json",
-        )
-        self.semantic_memory = SemanticMemory(
-            memory_manager=self.memory_manager,
-            vector_store=self.vector_store,
-            embeddings_engine=self.embeddings_engine,
-        )
-        # Markdown-based persistent memory (MEMORY.md, daily notes, session summaries)
-        self.markdown_memory = MarkdownMemory(
-            memory_dir=self.workspace_root / "memory",
-        )
-        # Initialize MEMORY.md with user preferences from existing memory
-        user_prefs = self.memory_manager.recall("user:custom_preferences") or {}
-        self.markdown_memory.init_memory_md(
-            user_name=user_prefs.get("name", ""),
-            language=user_prefs.get("language", "auto"),
-        )
-        self.memory_compactor = MemoryCompactor(
-            markdown_memory=self.markdown_memory,
-            max_context_tokens=runtime_settings.get("agent", {}).get("max_context_tokens", 4000) if isinstance(runtime_settings.get("agent"), dict) else 4000,
-        )
-        print(f"  Markdown Memory: active (MEMORY.md)", flush=True)
-
-        self.engine = CapabilityEngine(
-            self.capability_registry, self.tool_runtime,
-            metrics_collector=self.metrics_collector,
-            execution_history=self.execution_history,
-            semantic_memory=self.semantic_memory,
-        )
-        self.phase7_executor = Phase7CapabilityExecutor(self.capability_registry, self.engine)
-        whatsapp_selectors_config = (
-            self.project_root
-            / "system"
-            / "integrations"
-            / "installed"
-            / "whatsapp_web_connector"
-            / "config"
-            / "selectors.json"
-        )
-        self.phase10_whatsapp_executor = Phase10WhatsAppCapabilityExecutor(
-            self.capability_registry,
-            self.tool_runtime,
-            whatsapp_selectors_config,
-        )
-        # WhatsApp backend manager (3 switchable backends)
-        try:
-            from system.integrations.installed.whatsapp_web_connector.backends import WhatsAppBackendManager
-            from system.integrations.installed.whatsapp_web_connector.backends.baileys_backend import BaileysBackend
-            from system.integrations.installed.whatsapp_web_connector.backends.browser_backend import BrowserBackend
-            from system.integrations.installed.whatsapp_web_connector.backends.official_backend import OfficialBackend
-
-            self.whatsapp_manager = WhatsAppBackendManager()
-            self.whatsapp_manager.register(BaileysBackend())
-            self.whatsapp_manager.register(BrowserBackend())
-            official = OfficialBackend()
-            wsp_settings = runtime_settings.get("whatsapp", {})
-            if isinstance(wsp_settings, dict):
-                official_config = wsp_settings.get("official", {})
-                if isinstance(official_config, dict):
-                    official.configure(official_config)
-            self.whatsapp_manager.register(official)
-            wsp_backend = wsp_settings.get("backend", "browser") if isinstance(wsp_settings, dict) else "browser"
-            self.whatsapp_manager.switch(wsp_backend)
-            print(f"  WhatsApp backends: baileys, browser, official (active: {wsp_backend})")
-
-            self._wsp_reply_settings = wsp_settings  # defer reply worker until after interpreter
-        except Exception as exc:
-            print(f"  WhatsApp backend manager: failed ({exc})")
-
-        # Telegram connector — load bot_token from settings
-        tg_settings = runtime_settings.get("telegram", {})
-        tg_user_names: dict[str, str] = {}
-        for uid in tg_settings.get("allowed_user_ids", []):
-            tg_user_names[str(uid)] = tg_settings.get("display_name", "")
-        self.telegram_connector = TelegramConnector(
-            bot_token=tg_settings.get("bot_token", ""),
-            default_chat_id=tg_settings.get("default_chat_id", ""),
-            allowed_user_ids=tg_settings.get("allowed_user_ids", []),
-            allowed_usernames=tg_settings.get("allowed_usernames", []),
-            user_display_names=tg_user_names,
-        )
-        self.telegram_executor = TelegramCapabilityExecutor(self.telegram_connector)
-        if llm_client is None:
-            llm_client = LLMClient(
-                settings_provider=lambda: self.settings_service.get_settings(mask_secrets=False).get("llm", {})
-            )
-        self.intent_interpreter = IntentInterpreter(self.capability_registry, llm_client=llm_client)
-
-        # Telegram polling — must be after intent_interpreter
-        from system.integrations.installed.telegram_bot_connector.connector import TelegramPollingWorker
-        self.telegram_polling_worker = TelegramPollingWorker(
-            connector=self.telegram_connector,
-            interpreter=self.intent_interpreter,
-            executor=lambda cap_id, inputs: self._execute_capability({"capability_id": cap_id, "inputs": inputs}),
-            execution_history=self.execution_history,
-        )
-        if tg_settings.get("polling_enabled"):
-            self.telegram_polling_worker.start()
-
-        # WhatsApp auto-reply worker (must be after intent_interpreter)
-        try:
-            if hasattr(self, "whatsapp_manager"):
-                from system.integrations.installed.whatsapp_web_connector.whatsapp_reply_worker import WhatsAppReplyWorker
-                wsp_s = getattr(self, "_wsp_reply_settings", {}) or {}
-                wsp_allowed = wsp_s.get("allowed_user_ids", []) if isinstance(wsp_s, dict) else []
-                self.whatsapp_reply_worker = WhatsAppReplyWorker(
-                    backend_manager=self.whatsapp_manager,
-                    interpreter=self.intent_interpreter,
-                    executor=lambda cap_id, inputs: self._execute_capability_sync(cap_id, inputs),
-                    execution_history=self.execution_history,
-                    allowed_user_ids=wsp_allowed,
-                    agent_loop=getattr(self, "agent_loop", None),
-                )
-                self.whatsapp_reply_worker.start()
-                print(f"  WhatsApp auto-reply: active")
-        except Exception as exc:
-            print(f"  WhatsApp auto-reply: failed ({exc})")
-
-        # Voice services (STT + TTS)
-        try:
-            from system.core.voice import STTService, TTSService
-            voice_settings = runtime_settings.get("voice", {})
-            llm_key = runtime_settings.get("llm", {}).get("api_key", "")
-            self.stt_service = STTService(
-                provider=voice_settings.get("stt_provider", "whisper_api"),
-                api_key=voice_settings.get("stt_api_key") or llm_key,
-                language=voice_settings.get("language", "es"),
-            )
-            self.tts_service = TTSService(
-                provider=voice_settings.get("tts_provider", "web_speech"),
-                api_key=voice_settings.get("tts_api_key") or llm_key,
-                voice=voice_settings.get("tts_voice", "nova"),
-                speed=voice_settings.get("tts_speed", 1.0),
-                output_dir=self.workspace_root / "artifacts" / "voice",
-            )
-            print(f"  Voice: STT={self.stt_service._provider}, TTS={self.tts_service._provider}", flush=True)
-        except Exception as exc:
-            print(f"  Voice: failed ({exc})", flush=True)
-
-        # Agent registry (custom agent definitions)
-        try:
-            from system.core.agent.agent_registry import AgentRegistry
-            self.agent_registry = AgentRegistry(data_path=self.workspace_root / "agents.json")
-            print(f"  Agent Registry: {len(self.agent_registry.list())} agents", flush=True)
-        except Exception as exc:
-            print(f"  Agent Registry: failed ({exc})", flush=True)
-
-        # Agent Loop (autonomous agent with tool use)
-        try:
-            from system.core.agent import AgentLoop
-            from system.core.agent.tool_use_adapter import ToolUseAdapter
-            from system.core.security import SecurityService
-
-            security_svc = SecurityService(workspace_roots=[str(self.workspace_root)])
-            tool_adapter = ToolUseAdapter(llm_client=self.intent_interpreter.llm_client)
-            self.agent_loop = AgentLoop(
-                tool_use_adapter=tool_adapter,
-                tool_runtime=self.tool_runtime,
-                security_service=security_svc,
-                tool_registry=self.tool_registry,
-                workspace_root=str(self.workspace_root),
-                max_iterations=runtime_settings.get("agent", {}).get("max_iterations", 10) if isinstance(runtime_settings.get("agent"), dict) else 10,
-                execution_history=self.execution_history,
-                markdown_memory=self.markdown_memory,
-                memory_compactor=self.memory_compactor,
-            )
-            self.security_service = security_svc
-
-            # Skill Creator (hot-reload)
-            from system.core.supervisor.skill_creator import SkillCreator
-            self.skill_creator = SkillCreator(
-                tool_registry=self.tool_registry,
-                tool_runtime=self.tool_runtime,
-                agent_loop=self.agent_loop,
-                security_service=security_svc,
-                project_root=self.project_root,
-            )
-            print(f"  Agent Loop: active (max_iterations={self.agent_loop._max_iterations})", flush=True)
-
-            # Supervisor Daemon
-            try:
-                from system.core.supervisor.supervisor_daemon import SupervisorDaemon
-                sv_cfg = runtime_settings.get("supervisor", {}) if isinstance(runtime_settings.get("supervisor"), dict) else {}
-                self.supervisor = SupervisorDaemon(
-                    project_root=self.project_root,
-                    skill_creator=getattr(self, "skill_creator", None),
-                    execution_history=self.execution_history,
-                    max_claude_per_hour=sv_cfg.get("max_claude_per_hour", 10),
-                    health_interval_s=sv_cfg.get("health_interval_s", 60),
-                )
-                from system.core.ui_bridge.event_bus import event_bus as _sv_eb
-                self.supervisor.start(_sv_eb)
-                print(f"  Supervisor: active (claude={'yes' if self.supervisor.claude_bridge.available else 'no'})", flush=True)
-            except Exception as sv_exc:
-                print(f"  Supervisor: failed ({sv_exc})", flush=True)
-
-            # Proactive Scheduler
-            try:
-                from system.core.scheduler import TaskQueue, ProactiveScheduler
-                self.task_queue = TaskQueue(data_path=self.workspace_root / "queue.json")
-                self.scheduler = ProactiveScheduler(
-                    task_queue=self.task_queue,
-                    agent_loop=self.agent_loop,
-                    agent_registry=getattr(self, "agent_registry", None),
-                    whatsapp_manager=getattr(self, "whatsapp_manager", None),
-                )
-                self.scheduler.start()
-                print(f"  Scheduler: active ({len(self.task_queue.list())} tasks)", flush=True)
-            except Exception as sc_exc:
-                print(f"  Scheduler: failed ({sc_exc})", flush=True)
-        except Exception as exc:
-            import traceback
-            traceback.print_exc()
-            print(f"  Agent Loop: failed ({exc})", flush=True)
-
-        # Slack connector
-        slack_settings = runtime_settings.get("slack", {})
-        self.slack_connector = SlackConnector(
-            bot_token=slack_settings.get("bot_token", ""),
-            channel_id=slack_settings.get("channel_id", ""),
-            allowed_user_ids=[str(i) for i in slack_settings.get("allowed_user_ids", [])],
-        )
-        self.slack_executor = SlackCapabilityExecutor(self.slack_connector)
-        self.slack_polling_worker = SlackPollingWorker(
-            adapter=self.slack_connector,
-            interpreter=self.intent_interpreter,
-            executor=lambda cap_id, inputs: self._execute_capability({"capability_id": cap_id, "inputs": inputs}),
-            execution_history=self.execution_history,
-        )
-        if slack_settings.get("polling_enabled"):
-            self.slack_polling_worker.start()
-
-        # Discord connector
-        discord_settings = runtime_settings.get("discord", {})
-        self.discord_connector = DiscordConnector(
-            bot_token=discord_settings.get("bot_token", ""),
-            channel_id=discord_settings.get("channel_id", ""),
-            guild_id=discord_settings.get("guild_id", ""),
-            allowed_user_ids=[str(i) for i in discord_settings.get("allowed_user_ids", [])],
-        )
-        self.discord_executor = DiscordCapabilityExecutor(self.discord_connector)
-        self.discord_polling_worker = DiscordPollingWorker(
-            adapter=self.discord_connector,
-            interpreter=self.intent_interpreter,
-            executor=lambda cap_id, inputs: self._execute_capability({"capability_id": cap_id, "inputs": inputs}),
-            execution_history=self.execution_history,
-        )
-        if discord_settings.get("polling_enabled"):
-            self.discord_polling_worker.start()
-
-        self.plan_builder = PlanBuilder()
-        self.plan_validator = PlanValidator(
-            self.capability_registry,
-            integration_status_resolver=self._integration_status,
-        )
-        self.sequence_storage = SequenceStorage(
-            self.workspace_root,
-            sequences_path=runtime_settings["workspace"]["sequences_path"],
-        )
-        self.sequence_registry = SequenceRegistry(self.sequence_storage)
-        self.sequence_runner = SequenceRunner(
-            sequence_registry=self.sequence_registry,
-            capability_registry=self.capability_registry,
-            capability_engine=self.engine,
-            capability_executor=self._execute_capability_for_sequence_steps,
-        )
-        self.health_service = HealthService(
-            settings_service=self.settings_service,
-            browser_status_provider=self.browser_session_manager.status_snapshot,
-            integrations_provider=self._list_integrations,
-        )
-        self._apply_runtime_settings(runtime_settings)
-
-        self.integration_detector = IntegrationDetector()
-        self.gap_analyzer = GapAnalyzer(
-            detector=self.integration_detector,
-            classifier=IntegrationClassifier(),
-        )
-        self.performance_monitor = PerformanceMonitor(
-            metrics_collector=self.metrics_collector,
-        )
-        self.strategy_optimizer = StrategyOptimizer(
-            performance_monitor=self.performance_monitor,
-            capability_registry=self.capability_registry,
-        )
-        self.capability_generator = CapabilityGenerator(
-            llm_client=self.intent_interpreter.llm_client,
-            capability_registry=self.capability_registry,
-            proposals_dir=self.workspace_root / "proposals",
-        )
-        from system.core.self_improvement.python_sandbox import PythonSandbox
-        from system.core.self_improvement.nodejs_sandbox import NodejsSandbox
-        self.auto_install_pipeline = AutoInstallPipeline(
-            runtime_analyzer=RuntimeAnalyzer(tool_registry=self.tool_registry),
-            capability_generator=self.capability_generator,
-            tool_code_generator=ToolCodeGenerator(llm_client=self.intent_interpreter.llm_client),
-            tool_validator=ToolValidator(
-                python_sandbox=PythonSandbox(self.workspace_root / "sandbox" / "py"),
-                nodejs_sandbox=NodejsSandbox(self.workspace_root / "sandbox" / "js"),
-                llm_client=self.intent_interpreter.llm_client,
-            ),
-            tool_registry=self.tool_registry,
-            tool_runtime=self.tool_runtime,
-            capability_registry=self.capability_registry,
-            proposals_dir=self.workspace_root / "proposals" / "auto",
-        )
-        self.capability_bridge = CapabilityBridge(
-            capability_registry=self.capability_registry,
-            integrations_root=self.integrations_root,
-            global_contracts_dir=self.project_root / "system" / "capabilities" / "contracts" / "v1",
-        )
-
-        self.workspace_registry = WorkspaceRegistry(
-            data_path=self.workspace_root / "workspaces.json",
-        )
-        self.path_validator = PathValidator(self.workspace_registry)
-        self.workspace_context = WorkspaceContext(self.workspace_registry)
-        self.file_browser = FileBrowser(self.workspace_registry)
-        # Wire workspace context into intent interpreter (late binding)
-        self.intent_interpreter._workspace_registry = self.workspace_registry
-        # Wire path validator into filesystem tools (late binding)
+        # Late bindings
+        if self.intent_interpreter and self.workspace_registry:
+            self.intent_interpreter._workspace_registry = self.workspace_registry
         try:
             from system.tools.implementations.phase3_tools import set_path_validator
-            set_path_validator(self.path_validator)
+            if self.path_validator:
+                set_path_validator(self.path_validator)
         except Exception:
             pass
 
-        mcp_settings = runtime_settings.get("mcp", {})
-        self.mcp_client_manager = MCPClientManager(
-            default_timeout_ms=mcp_settings.get("server_timeout_ms", 10000),
-        )
-        self.mcp_tool_bridge = MCPToolBridge(
-            tool_registry=self.tool_registry,
-            tool_runtime=self.tool_runtime,
-        )
-        # Auto-load saved MCP servers from settings
-        for srv_cfg in mcp_settings.get("servers", []):
-            if isinstance(srv_cfg, dict) and srv_cfg.get("id"):
-                try:
-                    client = self.mcp_client_manager.add_server(srv_cfg)
-                    client.connect()
-                except Exception as exc:
-                    print(f"MCP auto-load '{srv_cfg.get('id')}' failed: {exc}", flush=True)
-
-        self.mcp_capability_generator = MCPCapabilityGenerator(
-            tool_bridge=self.mcp_tool_bridge,
-            proposals_dir=self.workspace_root / "proposals" / "mcp",
-        )
-        self.agent_card_builder = AgentCardBuilder(
-            capability_registry=self.capability_registry,
-            server_url=runtime_settings.get("a2a", {}).get("server_url", "http://localhost:8000"),
-        )
-        self.a2a_server = A2AServer(
-            capability_registry=self.capability_registry,
-            capability_engine=self.engine,
-        )
         self._a2a_known_agents: list[dict[str, Any]] = list(
             runtime_settings.get("a2a", {}).get("known_agents", [])
         )
