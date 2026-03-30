@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 import time
 from copy import deepcopy
 from typing import Any
@@ -145,7 +146,12 @@ class CapabilityEngine:
         logger: ObservationLogger,
         step_ref: list[str | None],
     ) -> dict[str, Any]:
-        """Execute one strategy step. Does NOT log failures — caller is responsible."""
+        """Execute one strategy step with optional per-step retry.
+
+        Steps can declare ``"retry": {"max_attempts": 3, "backoff_ms": 500}``
+        for exponential backoff with jitter on failure.
+        Does NOT log failures — caller is responsible.
+        """
         step_id = step.get("step_id")
         if not step_id:
             raise SchemaValidationError("Strategy steps require 'step_id'.")
@@ -158,17 +164,39 @@ class CapabilityEngine:
         if not isinstance(params, dict):
             raise SchemaValidationError(f"Step '{step_id}' params must be an object.")
 
+        retry_cfg = step.get("retry")
+        max_attempts = 1
+        backoff_ms = 0
+        if isinstance(retry_cfg, dict):
+            max_attempts = max(1, int(retry_cfg.get("max_attempts", 1)))
+            backoff_ms = max(0, int(retry_cfg.get("backoff_ms", 0)))
+
         step_ref[0] = step_id
         resolved_params = state_manager.resolve_templates(params)
-        logger.mark_step_started(step_id, resolved_params)
 
-        step_result = self.tool_runtime.execute(action, resolved_params)
-        state_manager.record_step_output(step_id, step_result)
-        if isinstance(step_result, dict):
-            state_manager.update_state(step_result)
+        last_exc: Exception | None = None
+        for attempt in range(max_attempts):
+            if attempt > 0 and backoff_ms > 0:
+                # Exponential backoff with jitter
+                delay = (backoff_ms * (2 ** (attempt - 1)) + random.randint(0, 200)) / 1000.0
+                time.sleep(delay)
 
-        logger.mark_step_succeeded(step_id, step_result, state_manager.state)
-        return self._normalize_output(step_result)
+            logger.mark_step_started(step_id, resolved_params)
+            try:
+                step_result = self.tool_runtime.execute(action, resolved_params)
+                state_manager.record_step_output(step_id, step_result)
+                if isinstance(step_result, dict):
+                    state_manager.update_state(step_result)
+                logger.mark_step_succeeded(step_id, step_result, state_manager.state)
+                return self._normalize_output(step_result)
+            except Exception as exc:
+                last_exc = exc
+                if attempt < max_attempts - 1:
+                    logger.mark_step_failed(step_id, self._error_code_from_exception(exc), str(exc), state_manager.state)
+                    continue
+                raise
+
+        raise last_exc  # pragma: no cover
 
     def _run_steps_sequential(
         self,

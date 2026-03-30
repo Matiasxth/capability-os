@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 import time
 from collections import defaultdict, deque
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from string import Template
 from typing import Any
 
@@ -63,6 +64,11 @@ class WorkflowExecutor:
             "variables": {},
         }
 
+        parallel = workflow.get("parallel", False)
+
+        if parallel:
+            return self._execute_parallel(nodes_by_id, edges, context, t0)
+
         for node_id in order:
             node = nodes_by_id[node_id]
             try:
@@ -78,6 +84,98 @@ class WorkflowExecutor:
                     "failed_node": node_id,
                     "duration_ms": self._elapsed(t0),
                 }
+
+        return {
+            "status": "success",
+            "results": results,
+            "duration_ms": self._elapsed(t0),
+        }
+
+    def _execute_parallel(
+        self,
+        nodes_by_id: dict[str, dict[str, Any]],
+        edges: list[dict[str, Any]],
+        context: dict[str, Any],
+        t0: float,
+    ) -> dict[str, Any]:
+        """Execute workflow with level-based parallelism.
+
+        Nodes at the same topological level (all predecessors completed)
+        run concurrently. Condition nodes always run sequentially.
+        """
+        results = context["previous_results"]
+
+        # Build adjacency and in-degree
+        in_degree: dict[str, int] = {nid: 0 for nid in nodes_by_id}
+        adjacency: dict[str, list[str]] = defaultdict(list)
+        for edge in edges:
+            adjacency[edge["source"]].append(edge["target"])
+            in_degree[edge["target"]] = in_degree.get(edge["target"], 0) + 1
+
+        # Process level by level
+        ready = [nid for nid, deg in in_degree.items() if deg == 0]
+
+        while ready:
+            # Separate condition nodes (must run sequentially)
+            parallel_batch = []
+            sequential_batch = []
+            for nid in ready:
+                node = nodes_by_id[nid]
+                if node.get("type") == "condition":
+                    sequential_batch.append(nid)
+                else:
+                    parallel_batch.append(nid)
+
+            # Run parallel batch concurrently
+            if len(parallel_batch) > 1:
+                with ThreadPoolExecutor(max_workers=min(len(parallel_batch), 8)) as pool:
+                    futures = {
+                        pool.submit(self._execute_node, nodes_by_id[nid], context, edges): nid
+                        for nid in parallel_batch
+                    }
+                    for future in as_completed(futures):
+                        nid = futures[future]
+                        try:
+                            results[nid] = future.result()
+                        except Exception as exc:
+                            results[nid] = {"error": str(exc)}
+                            return {
+                                "status": "error", "results": results,
+                                "error": str(exc), "failed_node": nid,
+                                "duration_ms": self._elapsed(t0),
+                            }
+            elif parallel_batch:
+                nid = parallel_batch[0]
+                try:
+                    results[nid] = self._execute_node(nodes_by_id[nid], context, edges)
+                except Exception as exc:
+                    results[nid] = {"error": str(exc)}
+                    return {
+                        "status": "error", "results": results,
+                        "error": str(exc), "failed_node": nid,
+                        "duration_ms": self._elapsed(t0),
+                    }
+
+            # Run sequential batch one by one
+            for nid in sequential_batch:
+                try:
+                    results[nid] = self._execute_node(nodes_by_id[nid], context, edges)
+                except Exception as exc:
+                    results[nid] = {"error": str(exc)}
+                    return {
+                        "status": "error", "results": results,
+                        "error": str(exc), "failed_node": nid,
+                        "duration_ms": self._elapsed(t0),
+                    }
+
+            # Find next level: decrease in-degree for successors
+            next_ready = []
+            for nid in ready:
+                for neighbor in adjacency.get(nid, []):
+                    in_degree[neighbor] -= 1
+                    if in_degree[neighbor] == 0:
+                        next_ready.append(neighbor)
+            ready = next_ready
 
         return {
             "status": "success",

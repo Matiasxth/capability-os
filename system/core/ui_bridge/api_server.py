@@ -155,12 +155,14 @@ class CapabilityOSUIBridgeService:
         from system.plugins.auth.plugin import create_plugin as auth_factory
         from system.plugins.workflows.plugin import create_plugin as wf_factory
         from system.plugins.sandbox.plugin import create_plugin as sandbox_factory
+        from system.plugins.integrations.plugin import create_plugin as integ_factory
 
         for factory in [
             core_factory, auth_factory, mem_factory, cap_factory, ws_factory, agent_factory,
             skills_factory, browser_factory, voice_factory, mcp_factory, a2a_factory,
             growth_factory, seq_factory, sv_factory, sched_factory,
             tg_factory, slack_factory, discord_factory, wsp_factory, wf_factory, sandbox_factory,
+            integ_factory,
         ]:
             try:
                 plugin = factory()
@@ -295,14 +297,20 @@ class CapabilityOSUIBridgeService:
         _sbx = self.container.get_plugin("capos.core.sandbox")
         self.sandbox_manager = getattr(_sbx, "sandbox_manager", None) if _sbx else None
 
-        # Integration registry (still managed directly — not yet a plugin)
-        self.integration_registry = IntegrationRegistry(self.integration_registry_data_path)
-        self.integration_loader = IntegrationLoader(
-            self.integrations_root, self.integration_manifest_schema_path, self.integration_registry,
-        )
-        self.integration_validator = IntegrationValidator(
-            self.capability_registry, self.integration_manifest_schema_path,
-        )
+        # Integration registry — prefer plugin, fallback to direct instantiation
+        _integ = self.container.get_plugin("capos.core.integrations")
+        if _integ and getattr(_integ, "integration_registry", None):
+            self.integration_registry = _integ.integration_registry
+            self.integration_loader = _integ.integration_loader
+            self.integration_validator = _integ.integration_validator
+        else:
+            self.integration_registry = IntegrationRegistry(self.integration_registry_data_path)
+            self.integration_loader = IntegrationLoader(
+                self.integrations_root, self.integration_manifest_schema_path, self.integration_registry,
+            )
+            self.integration_validator = IntegrationValidator(
+                self.capability_registry, self.integration_manifest_schema_path,
+            )
         self._refresh_integrations()
 
         # Late bindings — wire channel connectors to scheduler for multi-channel delivery
