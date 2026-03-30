@@ -65,6 +65,21 @@ class PluginLoader:
         """Load a single plugin from its directory and manifest file."""
         data = json.loads(manifest_path.read_text(encoding="utf-8"))
         manifest = PluginManifest.from_dict(data)
+
+        # SDK version compatibility check
+        if manifest.sdk_min_version:
+            try:
+                from system.sdk import SDK_VERSION
+                def _parse_ver(v: str) -> tuple[int, ...]:
+                    return tuple(int(x) for x in v.split(".")[:3])
+                if _parse_ver(SDK_VERSION) < _parse_ver(manifest.sdk_min_version):
+                    logger.error(
+                        f"Plugin {manifest.id} requires SDK >={manifest.sdk_min_version}, "
+                        f"current: {SDK_VERSION} — skipping"
+                    )
+                    return None
+            except Exception:
+                pass  # If version parsing fails, load anyway
         module_name, func_name = manifest.entry_point.rsplit(":", 1)
         module_path = plugin_dir / (module_name.replace(".", "/") + ".py")
         if not module_path.exists():

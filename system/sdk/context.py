@@ -31,9 +31,13 @@ class PluginContext:
     def get_service(self, contract_type: type) -> Any:
         """Resolve a service by its Protocol type.
 
-        Raises ``KeyError`` if no provider is registered.
+        Raises ``ServiceNotFoundError`` if no provider is registered.
         """
-        return self._get_service(contract_type)
+        try:
+            return self._get_service(contract_type)
+        except KeyError:
+            from system.sdk.errors import ServiceNotFoundError
+            raise ServiceNotFoundError(contract_type.__name__)
 
     def get_optional(self, contract_type: type) -> Any | None:
         """Like ``get_service`` but returns ``None`` instead of raising."""

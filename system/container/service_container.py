@@ -26,11 +26,13 @@ class ServiceContainer:
         project_root: Path,
         settings: dict[str, Any],
         event_bus: Any,
+        strict_contracts: bool = False,
     ) -> None:
         self._workspace_root = Path(workspace_root).resolve()
         self._project_root = Path(project_root).resolve()
         self._settings = settings
         self._event_bus = event_bus
+        self._strict = strict_contracts
 
         self._plugins: dict[str, Any] = {}
         self._manifests: dict[str, PluginManifest] = {}
@@ -51,12 +53,25 @@ class ServiceContainer:
         logger.debug(f"Registered plugin: {pid}")
 
     def register_service(self, contract_type: type, implementation: Any) -> None:
-        # Validate that the implementation actually satisfies the Protocol
-        if hasattr(contract_type, '__protocol_attrs__') or hasattr(contract_type, '__abstractmethods__'):
-            if not isinstance(implementation, contract_type):
+        """Register a service implementation for a Protocol contract.
+
+        In strict mode, raises ContractViolationError if validation fails.
+        In default mode, logs warnings and registers anyway.
+        """
+        from system.sdk.validation import validate_contract
+        violations = validate_contract(contract_type, implementation)
+        if violations:
+            if self._strict:
+                from system.sdk.errors import ContractViolationError
+                raise ContractViolationError(
+                    contract_type.__name__,
+                    type(implementation).__name__,
+                    violations,
+                )
+            else:
                 logger.warning(
-                    f"Contract violation: {type(implementation).__name__} "
-                    f"does not fully implement {contract_type.__name__} — registering anyway"
+                    f"Contract violations for {contract_type.__name__} "
+                    f"({type(implementation).__name__}): {violations}"
                 )
         self._services[contract_type] = implementation
 
@@ -66,10 +81,8 @@ class ServiceContainer:
 
     def get_service(self, contract_type: type) -> Any:
         if contract_type not in self._services:
-            raise KeyError(
-                f"No service for {contract_type.__name__}. "
-                f"Available: {[t.__name__ for t in self._services]}"
-            )
+            from system.sdk.errors import ServiceNotFoundError
+            raise ServiceNotFoundError(contract_type.__name__)
         return self._services[contract_type]
 
     def get_optional(self, contract_type: type) -> Any | None:

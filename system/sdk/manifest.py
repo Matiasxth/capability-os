@@ -19,6 +19,7 @@ class PluginManifest:
     entry_point: str = "plugin:create_plugin"
     settings_key: str = ""
     auto_start: bool = True
+    sdk_min_version: str = ""
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> PluginManifest:
