@@ -571,3 +571,10 @@ export function confirmAgentAction(sessionId, confirmationId, approved, password
 export function getAgentSession(sessionId) {
   return request(`/agent/${sessionId}`);
 }
+
+export function updateWorkspaceStatus(wsId, status) {
+  return request(`/workspaces/${wsId}/status`, {
+    method: "POST",
+    body: JSON.stringify({ status })
+  });
+}

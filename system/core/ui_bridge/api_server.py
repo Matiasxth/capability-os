@@ -482,6 +482,7 @@ class CapabilityOSUIBridgeService:
         r.add("POST", "/workspaces/{ws_id}", workspace_handlers.update_workspace)
         r.add("DELETE", "/workspaces/{ws_id}", workspace_handlers.delete_workspace)
         r.add("POST", "/workspaces/{ws_id}/set-default", workspace_handlers.set_default)
+        r.add("POST", "/workspaces/{ws_id}/status", workspace_handlers.update_status)
         r.add("GET", "/workspaces/{ws_id}/browse", workspace_handlers.browse)
         # Memory + metrics
         r.add("GET", "/metrics", memory_handlers.get_metrics)

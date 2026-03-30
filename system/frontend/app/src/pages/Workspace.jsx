@@ -4,6 +4,7 @@ import {
   getExecution, getExecutionEvents, getMemoryContext, getMemoryHistory,
   listCapabilities, planIntent, saveChatSession, streamChat,
   runAgent, confirmAgentAction,
+  listWorkspaces, addWorkspace, updateWorkspaceStatus, removeWorkspace, getSettings,
 } from "../api";
 import ChatInput from "../components/ChatInput";
 import ChatThread from "../components/ChatThread";
@@ -13,7 +14,8 @@ import FileDropZone from "../components/workspace/FileDropZone";
 import QuickActionsBar from "../components/workspace/QuickActionsBar";
 import { useVoice } from "../hooks/useVoice";
 import { useCollapsible } from "../hooks/useCollapsible";
-import SessionSidebar from "../components/SessionSidebar";
+import ProjectSidebar from "../components/ProjectSidebar";
+import NewProjectModal from "../components/NewProjectModal";
 import ToastContainer from "../components/ToastContainer";
 import { useToast } from "../hooks/useToast";
 import { useWebSocket } from "../hooks/useWebSocket";
@@ -48,10 +50,20 @@ export default function Workspace({ activeWorkspace, userName }) {
   const [agentEvents,setAgentEvents]=useState([]);
   const [agentSessionId,setAgentSessionId]=useState(null);
   const [pendingConfirmation,setPendingConfirmation]=useState(null);
+  const [workspaces,setWorkspaces]=useState([]);
+  const [activeProjectId,setActiveProjectId]=useState(null);
+  const [projectStates,setProjectStates]=useState([]);
+  const [showNewProject,setShowNewProject]=useState(false);
   const autoExecTimerRef=useRef(null);
   const sessionDirtyRef=useRef(false);
   const messagesRef=useRef(messages);
   const threadRef=useRef(null);
+
+  // ── Load workspaces & project states ──
+  useEffect(()=>{
+    listWorkspaces().then(r=>{setWorkspaces(r.workspaces||[]);if(!activeProjectId&&r.default_id)setActiveProjectId(r.default_id)}).catch(()=>{});
+    getSettings().then(r=>{const s=r.settings||r;setProjectStates(s.project_states||[])}).catch(()=>{});
+  },[]);
 
   // ── History loading ──
   const historyIdsRef=useRef("");
@@ -328,12 +340,15 @@ export default function Workspace({ activeWorkspace, userName }) {
   // ── Render ──
   return (
     <div className={`conv-layout${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
-      {!sidebarCollapsed && <SessionSidebar
-        history={history} wsConnected={wsConnected} userName={userName}
-        deletingId={deletingId} confirmClear={confirmClear}
+      {!sidebarCollapsed && <ProjectSidebar
+        workspaces={workspaces} activeProjectId={activeProjectId} projectStates={projectStates}
+        history={history} userName={userName} wsConnected={wsConnected}
+        onSelectProject={id=>{setActiveProjectId(id)}}
+        onNewProject={()=>setShowNewProject(true)}
+        onUpdateStatus={async(wsId,status)=>{try{await updateWorkspaceStatus(wsId,status);setWorkspaces(w=>w.map(ws=>ws.id===wsId?{...ws,status}:ws))}catch{}}}
+        onDeleteProject={async(wsId)=>{try{await removeWorkspace(wsId);setWorkspaces(w=>w.filter(ws=>ws.id!==wsId));if(activeProjectId===wsId)setActiveProjectId(null)}catch{}}}
         onNewSession={handleNewSession} onRestoreSession={restoreSession}
-        onDeleteSession={handleDeleteSession} setConfirmClear={setConfirmClear}
-        onClearAll={handleClearAll} onToggleSidebar={toggleSidebar}
+        onDeleteSession={handleDeleteSession} onClearAll={handleClearAll}
       />}
       <FileDropZone onFileDrop={(files)=>{const names=Array.from(files).map(f=>f.name).join(", ");setIntent(p=>(p?p+" ":"")+`[files: ${names}]`)}}>
       <div className="conv-main-col">
@@ -365,6 +380,22 @@ export default function Workspace({ activeWorkspace, userName }) {
         onConfirm={handleAgentConfirm}
         onDeny={handleAgentDeny}
       />
+      {showNewProject && <NewProjectModal
+        states={projectStates}
+        onCreate={async(p)=>{
+          try{
+            const r=await addWorkspace(p.name,p.path,"write","*","#00ff88");
+            if(r.workspace){
+              await updateWorkspaceStatus(r.workspace.id,p.status);
+              const ws={...r.workspace,status:p.status};
+              setWorkspaces(prev=>[...prev,ws]);
+              setActiveProjectId(ws.id);
+            }
+            setShowNewProject(false);
+          }catch(e){alert(e.message||"Failed to create project")}
+        }}
+        onClose={()=>setShowNewProject(false)}
+      />}
     </div>
   );
 }

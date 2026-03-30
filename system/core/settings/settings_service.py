@@ -303,6 +303,14 @@ def _defaults_from_env(workspace_root: Path) -> dict[str, Any]:
             "enabled": True,
             "max_iterations": 10,
         },
+        "project_states": [
+            {"name": "Idea", "color": "#a855f7", "icon": "\U0001f4a1"},
+            {"name": "En construccion", "color": "#ffaa00", "icon": "\U0001f3d7\ufe0f"},
+            {"name": "En progreso", "color": "#3b82f6", "icon": "\U0001f680"},
+            {"name": "Completado", "color": "#22c55e", "icon": "\u2705"},
+            {"name": "Pausado", "color": "#6b7280", "icon": "\u23f8\ufe0f"},
+            {"name": "Archivado", "color": "#475569", "icon": "\U0001f4e6"},
+        ],
         "mcp": {
             "servers": [],
             "auto_discover_capabilities": False,

@@ -69,6 +69,8 @@ class WorkspaceRegistry:
                 "color": color,
                 "icon": icon,
                 "active": True,
+                "status": {"name": "En construccion", "color": "#ffaa00", "icon": "\U0001f3d7\ufe0f"},
+                "description": "",
                 "created_at": _now(),
             }
             self._workspaces[ws_id] = record
@@ -95,7 +97,7 @@ class WorkspaceRegistry:
             if ws is None:
                 raise KeyError(f"Workspace '{ws_id}' not found.")
             for k, v in fields.items():
-                if k in ("name", "access", "allowed_capabilities", "color", "icon", "active"):
+                if k in ("name", "access", "allowed_capabilities", "color", "icon", "active", "status", "description"):
                     ws[k] = v
                 elif k == "path":
                     ws["path"] = str(Path(v).resolve())
