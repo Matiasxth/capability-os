@@ -125,7 +125,28 @@ export default function ControlCenter() {
   const colors=["#00ff88","#5588ff","#ffaa00","#ff4444","#aa66ff","#ff88aa"];
   function renderWorkspaces(){return(<div style={{display:"flex",flexDirection:"column",gap:8}}>
     <h2>Workspaces</h2>
-    {wsData.map(w=><div key={w.id} className="item-row"><div className="item-row-info"><div style={{display:"flex",alignItems:"center",gap:5}}><span className="dot" style={{background:w.color||"#00ff88"}}/><span style={{fontWeight:500,fontSize:12}}>{w.name}</span>{w.id===wsDefaultId&&<span className="badge badge-success">default</span>}<span className="badge badge-neutral">{w.access==="write"?"✏️":"👁️"}</span></div><div className="dim" style={{fontSize:10,marginTop:1}}>{w.path}</div></div><div className="item-row-actions">{w.id!==wsDefaultId&&<button style={{fontSize:10,height:22}} onClick={()=>act(async()=>{await setDefaultWorkspace(w.id);await refreshWorkspaces()},"Default set")}>Default</button>}<button className="btn-danger" style={{fontSize:10,height:22}} onClick={()=>act(async()=>{await removeWorkspace(w.id);await refreshWorkspaces()},"Removed")}>✕</button></div></div>)}
+    {wsData.map(w=><div key={w.id}>
+      <div className="item-row"><div className="item-row-info"><div style={{display:"flex",alignItems:"center",gap:5}}><span className="dot" style={{background:w.color||"#00ff88"}}/><span style={{fontWeight:500,fontSize:12}}>{w.name}</span>{w.id===wsDefaultId&&<span className="badge badge-success">default</span>}<span className="badge badge-neutral">{w.access==="write"?"✏️":"👁️"}</span></div><div className="dim" style={{fontSize:10,marginTop:1}}>{w.path}</div></div><div className="item-row-actions">
+        <button style={{fontSize:10,height:22}} onClick={async()=>{try{const r=await analyzeWorkspace(w.id);setWsAnalysis(p=>({...p,[w.id]:r}))}catch(e){toast(e.message,"error")}}}>Analyze</button>
+        <button style={{fontSize:10,height:22}} onClick={async()=>{try{const r=await autoCleanWorkspace(w.id,true);setWsCleanPreview({wsId:w.id,...r})}catch(e){toast(e.message,"error")}}}>Clean</button>
+        <button style={{fontSize:10,height:22}} onClick={async()=>{try{await generateReadme(w.id);toast("README generated")}catch(e){toast(e.message,"error")}}}>README</button>
+        {w.id!==wsDefaultId&&<button style={{fontSize:10,height:22}} onClick={()=>act(async()=>{await setDefaultWorkspace(w.id);await refreshWorkspaces()},"Default set")}>Default</button>}<button className="btn-danger" style={{fontSize:10,height:22}} onClick={()=>act(async()=>{await removeWorkspace(w.id);await refreshWorkspaces()},"Removed")}>✕</button></div></div>
+      {wsAnalysis[w.id]&&<div className="card" style={{padding:10,margin:"4px 0 8px",fontSize:11}}>
+        <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap"}}>{wsAnalysis[w.id].stats&&<><span className="badge badge-neutral">{wsAnalysis[w.id].stats.total_files||0} files</span><span className="badge badge-neutral">{wsAnalysis[w.id].stats.total_size_human||"?"}</span>{Object.entries(wsAnalysis[w.id].stats.languages||{}).slice(0,3).map(([l,c])=><span key={l} className="badge badge-info">{l}: {c}</span>)}</>}</div>
+        {(wsAnalysis[w.id].issues||[]).map((iss,i)=><div key={i} style={{padding:"2px 0",display:"flex",gap:6,alignItems:"center"}}><span className={`badge ${iss.severity==="high"?"badge-error":iss.severity==="medium"?"badge-warning":"badge-neutral"}`}>{iss.severity}</span><span>{iss.detail||iss.message}</span></div>)}
+        {(wsAnalysis[w.id].suggestions||[]).map((s,i)=><div key={i} style={{padding:"1px 0",color:"var(--text-muted)"}}>💡 {s}</div>)}
+        {!(wsAnalysis[w.id].issues||[]).length&&<span style={{color:"var(--success)"}}>No issues found</span>}
+      </div>}
+    </div>)}
+    {wsCleanPreview&&<div className="card" style={{padding:12,margin:"6px 0",border:"1px solid var(--warning)"}}>
+      <h4 style={{margin:"0 0 6px",color:"var(--warning)"}}>Auto-Clean Preview</h4>
+      <div style={{fontSize:11,marginBottom:6}}>{(wsCleanPreview.files_to_remove||[]).length} files to remove, {(wsCleanPreview.actions||[]).length} actions</div>
+      {(wsCleanPreview.files_to_remove||wsCleanPreview.actions||[]).slice(0,10).map((f,i)=><div key={i} style={{fontSize:10,color:"var(--text-muted)",padding:"1px 0"}}>{typeof f==="string"?f:f.detail||f.action}</div>)}
+      <div style={{display:"flex",gap:6,marginTop:8}}>
+        <button className="btn-primary" style={{fontSize:11,height:26}} onClick={async()=>{try{await autoCleanWorkspace(wsCleanPreview.wsId,false);toast("Cleaned");setWsCleanPreview(null)}catch(e){toast(e.message,"error")}}}>Confirm Clean</button>
+        <button style={{fontSize:11,height:26}} onClick={()=>setWsCleanPreview(null)}>Cancel</button>
+      </div>
+    </div>}
     {wsData.length===0&&<p className="dim" style={{fontSize:11}}>No workspaces.</p>}
     <h4>Add</h4>
     <form onSubmit={async e=>{e.preventDefault();await act(async()=>{await addWorkspace(wsName,wsPath,wsAccess,"*",wsColor);await refreshWorkspaces()},"Added");setWsName("");setWsPath("")}} style={{display:"flex",flexDirection:"column",gap:5}}>
@@ -489,6 +510,17 @@ export default function ControlCenter() {
         </header>
       </div>))}
     </div>
+    {autoSkills.length>0&&<>
+      <h3 style={{marginTop:12}}>Auto-Generated Skills</h3>
+      {autoSkills.map((s,i)=>(<div key={i} className="card" style={{padding:"8px 12px",marginBottom:4}}>
+        <div style={{display:"flex",alignItems:"center",gap:6}}>
+          <span className="badge badge-warning" style={{fontSize:9}}>auto</span>
+          <strong style={{fontSize:12}}>{s.tool_id||s.name||"skill"}</strong>
+          {s.domain&&<span className="badge badge-neutral">{s.domain}</span>}
+        </div>
+        {s.description&&<div style={{fontSize:10,color:"var(--text-muted)",marginTop:2}}>{s.description}</div>}
+      </div>))}
+    </>}
     <h4>Install from path</h4>
     <div style={{display:"flex",gap:6}}>
       <input value={newSkillPath} onChange={e=>setNewSkillPath(e.target.value)} placeholder="/path/to/skill-directory" style={{flex:1}}/>
@@ -752,7 +784,7 @@ export default function ControlCenter() {
   const [schStatus,setSchStatus]=useState({});
   const [schLog,setSchLog]=useState([]);
   const [schForm,setSchForm]=useState({description:"",schedule:"daily_09:00",action_message:"",agent_id:"",channel:""});
-  useEffect(()=>{if(activeSection==="scheduler"){listSchedulerTasks().then(r=>setSchTasks(r.tasks||[])).catch(()=>{});getSchedulerStatus().then(setSchStatus).catch(()=>{});getSchedulerLog().then(r=>setSchLog(r.log||[])).catch(()=>{})}},[activeSection]);
+  useEffect(()=>{if(activeSection==="scheduler"){listSchedulerTasks().then(r=>setSchTasks(r.tasks||[])).catch(()=>{});getSchedulerStatus().then(setSchStatus).catch(()=>{});getSchedulerLog().then(r=>setSchLog(r.log||[])).catch(()=>{});listAgents().then(r=>setAgents(r.agents||[])).catch(()=>{})}},[activeSection]);
 
   function renderScheduler(){return(<div style={{display:"flex",flexDirection:"column",gap:12}}>
     <h2>Scheduler</h2>
@@ -763,10 +795,11 @@ export default function ControlCenter() {
     </div>
 
     {schTasks.map(t=>(<div key={t.id} className="card" style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
-      <span className={`dot ${t.enabled?"dot-success":"dot-neutral"}`}/>
-      <div style={{flex:1}}>
+      <button style={{padding:0,border:"none",background:"none",cursor:"pointer",fontSize:16}} title={t.enabled?"Disable":"Enable"} onClick={async()=>{try{const body={enabled:!t.enabled};await fetch(`/scheduler/tasks/${t.id}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});toast(t.enabled?"Disabled":"Enabled");listSchedulerTasks().then(r=>setSchTasks(r.tasks||[]))}catch(e){toast(e.message,"error")}}}>{t.enabled?"🟢":"⚫"}</button>
+      <div style={{flex:1,opacity:t.enabled?1:0.5}}>
         <div style={{fontSize:12,fontWeight:600}}>{t.description}</div>
-        <div style={{fontSize:10,color:"var(--text-muted)"}}>{t.schedule} {t.channel?`→ ${t.channel}`:""} {t.last_run?`| Last: ${t.last_run.slice(11,19)}`:""}</div>
+        <div style={{fontSize:10,color:"var(--text-muted)"}}>{t.schedule} {t.agent_id?`[${t.agent_id}] `:""}{t.channel?`→ ${t.channel}`:""} {t.last_run?`| Last: ${t.last_run.slice(11,19)}`:""}</div>
+        {t.last_result&&<div style={{fontSize:10,color:t.last_result.status==="success"?"var(--success)":"var(--error)",marginTop:1}}>{t.last_result.status}: {(t.last_result.response||t.last_result.error||"").slice(0,80)}</div>}
       </div>
       <button style={{fontSize:10,height:24}} onClick={()=>act(async()=>{const r=await runSchedulerTaskNow(t.id);toast(r.status==="success"?"Executed":"Error")},"Executed")}>Run</button>
       <button style={{fontSize:10,height:24,color:"var(--error)"}} onClick={()=>act(async()=>{await deleteSchedulerTask(t.id);setSchTasks(s=>s.filter(x=>x.id!==t.id))},"Deleted")}>Del</button>
@@ -788,6 +821,12 @@ export default function ControlCenter() {
           <option value="">No channel</option>
           <option value="whatsapp">WhatsApp</option>
           <option value="telegram">Telegram</option>
+          <option value="slack">Slack</option>
+          <option value="discord">Discord</option>
+        </select>
+        <select value={schForm.agent_id||""} onChange={e=>setSchForm({...schForm,agent_id:e.target.value})} style={{flex:1,height:28,fontSize:11}}>
+          <option value="">Default agent</option>
+          {(agents||[]).map(a=><option key={a.id} value={a.id}>{a.emoji} {a.name}</option>)}
         </select>
       </div>
       <textarea value={schForm.action_message} onChange={e=>setSchForm({...schForm,action_message:e.target.value})} style={{width:"100%",height:50,fontSize:11,resize:"vertical",marginBottom:6}} placeholder="Message for the agent (what to do)"/>
