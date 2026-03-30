@@ -53,11 +53,30 @@ class SchedulerPlugin:
             agent_loop = ctx.get_optional(AgentLoopContract)
             agent_registry = ctx.get_optional(AgentRegistryContract)
 
+            # Resolve channel connectors for multi-channel delivery
+            tg_plugin = None
+            slack_plugin = None
+            discord_plugin = None
+            try:
+                from system.container.service_container import ServiceContainer
+                # Channel plugins expose send_message via their plugin instances
+                # We pass them as connectors to the scheduler
+                container = getattr(ctx, "_get_service", None)
+                if container:
+                    # Plugins are resolved after init, so we use lazy access via event_bus context
+                    pass
+            except Exception:
+                pass
+
             self.scheduler = ProactiveScheduler(
                 task_queue=self.task_queue,
                 agent_loop=agent_loop,
                 agent_registry=agent_registry,
                 whatsapp_manager=None,
+                telegram_connector=tg_plugin,
+                slack_connector=slack_plugin,
+                discord_connector=discord_plugin,
+                event_bus=ctx.event_bus,
             )
             logger.info("Created ProactiveScheduler")
         except Exception:

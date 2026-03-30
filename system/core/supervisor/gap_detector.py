@@ -75,18 +75,18 @@ class GapDetector:
             time.sleep(self._interval)
 
     def _detect(self) -> list[dict[str, Any]]:
-        """Analyze history for capability gaps."""
+        """Analyze history for capability gaps and tool failure patterns."""
         if self._history is None:
             return []
 
         gaps = []
         failure_patterns: Counter[str] = Counter()
+        tool_failures: Counter[str] = Counter()
 
         try:
             # Get recent history
             history = self._history.get_recent(limit=50) if hasattr(self._history, "get_recent") else []
             if not history:
-                # Fallback: try reading the history file
                 history = self._read_history_file()
 
             for entry in history:
@@ -96,7 +96,6 @@ class GapDetector:
 
                 # Detect "unknown" — interpreter couldn't match a capability
                 if status in ("unknown", "error") and intent:
-                    # Normalize the intent to find patterns
                     pattern = self._normalize(intent)
                     failure_patterns[pattern] += 1
 
@@ -105,24 +104,64 @@ class GapDetector:
                     pattern = self._normalize(intent)
                     failure_patterns[pattern] += 1
 
+                # Detect repeated tool failures from messages
+                messages = entry.get("messages", [])
+                for msg in messages:
+                    if isinstance(msg, dict) and msg.get("role") == "tool":
+                        content = msg.get("content", "")
+                        if isinstance(content, str) and "error" in content.lower():
+                            tool_id = msg.get("name", msg.get("tool_id", "unknown_tool"))
+                            tool_failures[tool_id] += 1
+
         except Exception:
             pass
 
-        # Filter patterns that exceed threshold
+        # Capability gaps: patterns that exceed threshold
         for pattern, count in failure_patterns.items():
             if count >= self._threshold:
                 gap = {
                     "pattern": pattern,
                     "count": count,
+                    "type": "capability_gap",
                     "detected_at": _now(),
                     "status": "detected",
                 }
                 gaps.append(gap)
-                # Add to detected list if new
+                if not any(g["pattern"] == pattern for g in self._detected_gaps):
+                    self._detected_gaps.append(gap)
+
+        # Tool failure gaps: tools failing 3+ times
+        for tool_id, count in tool_failures.items():
+            if count >= self._threshold:
+                pattern = f"tool_failure:{tool_id}"
+                gap = {
+                    "pattern": pattern,
+                    "tool_id": tool_id,
+                    "count": count,
+                    "type": "tool_failure",
+                    "detected_at": _now(),
+                    "status": "detected",
+                }
+                gaps.append(gap)
                 if not any(g["pattern"] == pattern for g in self._detected_gaps):
                     self._detected_gaps.append(gap)
 
         return gaps
+
+    def get_summary(self) -> dict[str, Any]:
+        """Return a summary of detected gaps for the supervisor UI."""
+        capability_gaps = [g for g in self._detected_gaps if g.get("type") != "tool_failure"]
+        tool_gaps = [g for g in self._detected_gaps if g.get("type") == "tool_failure"]
+        return {
+            "total_gaps": len(self._detected_gaps),
+            "capability_gaps": len(capability_gaps),
+            "tool_failure_gaps": len(tool_gaps),
+            "auto_created": len(self._auto_created),
+            "top_patterns": [
+                {"pattern": g["pattern"], "count": g["count"]}
+                for g in sorted(self._detected_gaps, key=lambda x: x.get("count", 0), reverse=True)[:5]
+            ],
+        }
 
     def _try_auto_create(self, gap: dict[str, Any]) -> None:
         """Try to auto-create a skill for a detected gap."""
@@ -202,6 +241,8 @@ class GapDetector:
         text = re.sub(r'["\'].*?["\']', 'X', text)  # Replace quoted strings
         text = re.sub(r'\b\d+\b', 'N', text)  # Replace numbers
         text = re.sub(r'\s+', ' ', text)  # Normalize whitespace
+        # Simple suffix removal for better pattern matching
+        text = re.sub(r'\b(\w+)(ing|ed|tion|ment|ness)\b', r'\1', text)
         return text[:80]
 
 

@@ -305,7 +305,17 @@ class CapabilityOSUIBridgeService:
         )
         self._refresh_integrations()
 
-        # Late bindings
+        # Late bindings — wire channel connectors to scheduler for multi-channel delivery
+        if self.scheduler:
+            if self.telegram_connector:
+                self.scheduler._telegram = self.telegram_connector
+            if self.slack_connector:
+                self.scheduler._slack = self.slack_connector
+            if self.discord_connector:
+                self.scheduler._discord = self.discord_connector
+            if self.whatsapp_manager:
+                self.scheduler._whatsapp = self.whatsapp_manager
+
         if self.intent_interpreter and self.workspace_registry:
             self.intent_interpreter._workspace_registry = self.workspace_registry
         try:

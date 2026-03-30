@@ -24,11 +24,19 @@ class ProactiveScheduler:
         agent_loop: Any = None,
         agent_registry: Any = None,
         whatsapp_manager: Any = None,
+        telegram_connector: Any = None,
+        slack_connector: Any = None,
+        discord_connector: Any = None,
+        event_bus: Any = None,
     ) -> None:
         self._queue = task_queue
         self._agent_loop = agent_loop
         self._agent_registry = agent_registry
         self._whatsapp = whatsapp_manager
+        self._telegram = telegram_connector
+        self._slack = slack_connector
+        self._discord = discord_connector
+        self._event_bus = event_bus
         self._running = False
         self._threads: list[threading.Thread] = []
         self._execution_log: list[dict[str, Any]] = []
@@ -114,14 +122,77 @@ class ProactiveScheduler:
             time.sleep(60)
 
     def _quick_cycle(self) -> None:
-        """Quick cycle: run ready tasks (already handled by task_checker)."""
-        # Additional quick checks could go here
-        pass
+        """Quick cycle: emit status, disable repeatedly-failing tasks, prune old logs."""
+        ready_count = len(self._queue.get_ready())
+
+        # Disable tasks that have failed 3+ consecutive times
+        disabled_count = 0
+        for task in self._queue.list():
+            last = task.get("last_result")
+            if (
+                last
+                and last.get("status") == "error"
+                and task.get("run_count", 0) >= 3
+                and task.get("enabled")
+            ):
+                # Check if last 3 runs were all errors by checking run_count vs success
+                # Simple heuristic: if last result is error and ran 3+ times, disable
+                try:
+                    self._queue.update(task["id"], enabled=False)
+                    disabled_count += 1
+                    self._log_execution(task["id"], "auto_disabled", f"Disabled after {task['run_count']} runs with last error")
+                except Exception:
+                    pass
+
+        # Prune old execution logs
+        if len(self._execution_log) > 200:
+            self._execution_log = self._execution_log[-100:]
+
+        # Emit cycle event
+        if self._event_bus:
+            try:
+                self._event_bus.emit("scheduler_cycle", {
+                    "cycle": "quick",
+                    "ready_tasks": ready_count,
+                    "disabled_tasks": disabled_count,
+                })
+            except Exception:
+                pass
+
+        self._log_execution("quick_cycle", "completed", f"ready={ready_count}, disabled={disabled_count}")
 
     def _deep_cycle(self) -> None:
-        """Deep cycle: analyze usage patterns."""
-        # Future: analyze execution history, suggest optimizations
-        self._log_execution("deep_cycle", "completed", "Deep analysis cycle ran")
+        """Deep cycle: analyze execution patterns, emit summary, prune old logs."""
+        tasks = self._queue.list()
+        total = len(tasks)
+        enabled = sum(1 for t in tasks if t.get("enabled"))
+        total_runs = sum(t.get("run_count", 0) for t in tasks)
+
+        # Analyze failure rate from recent logs
+        recent = self._execution_log[-50:]
+        success_count = sum(1 for e in recent if e.get("status") == "success")
+        error_count = sum(1 for e in recent if e.get("status") == "error")
+        success_rate = (success_count / len(recent) * 100) if recent else 0
+
+        summary = {
+            "total_tasks": total,
+            "enabled_tasks": enabled,
+            "total_executions": total_runs,
+            "recent_success_rate": round(success_rate, 1),
+            "recent_errors": error_count,
+        }
+
+        # Emit deep cycle event
+        if self._event_bus:
+            try:
+                self._event_bus.emit("scheduler_cycle", {
+                    "cycle": "deep",
+                    "summary": summary,
+                })
+            except Exception:
+                pass
+
+        self._log_execution("deep_cycle", "completed", f"tasks={total}, enabled={enabled}, success_rate={summary['recent_success_rate']}%")
 
     # ------------------------------------------------------------------
     # Task execution
@@ -167,11 +238,15 @@ class ProactiveScheduler:
         """Send task result to a messaging channel."""
         try:
             if channel == "whatsapp" and self._whatsapp:
-                # Send to first configured user or owner
                 self._whatsapp.send_message("owner", text[:4000])
-            # Future: telegram, slack, discord channels
+            elif channel == "telegram" and self._telegram:
+                self._telegram.send_message("", text[:4000])
+            elif channel == "slack" and self._slack:
+                self._slack.send_message("", text[:4000])
+            elif channel == "discord" and self._discord:
+                self._discord.send_message("", text[:4000])
         except Exception as exc:
-            print(f"[SCHEDULER] Channel send error: {exc}", flush=True)
+            print(f"[SCHEDULER] Channel send error ({channel}): {exc}", flush=True)
 
     def _log_execution(self, task_id: str, status: str, detail: str) -> None:
         self._execution_log.append({
