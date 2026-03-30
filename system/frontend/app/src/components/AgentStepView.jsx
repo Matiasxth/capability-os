@@ -10,7 +10,7 @@ export default function AgentStepView({ events }) {
   const cx = {
     container: { marginTop: 8 },
     step: {
-      background: "#080c18", border: "1px solid #141e38", borderRadius: 6,
+      background: "var(--glass-bg)", border: "1px solid var(--glass-border-light)", borderRadius: 8,
       padding: "8px 10px", marginBottom: 6, fontSize: 11,
     },
     thinking: { color: "#4a6fa5", fontStyle: "italic", display: "flex", alignItems: "center", gap: 6 },
@@ -29,12 +29,12 @@ export default function AgentStepView({ events }) {
     }),
     params: {
       color: "#5a6f8a", fontFamily: "monospace", fontSize: 10,
-      background: "#060a14", borderRadius: 4, padding: "4px 6px",
+      background: "rgba(0,0,0,0.2)", borderRadius: 6, padding: "6px 8px",
       maxHeight: 60, overflow: "auto", marginTop: 4,
     },
     result: {
       color: "#6a9f6a", fontFamily: "monospace", fontSize: 10,
-      background: "#060a14", borderRadius: 4, padding: "4px 6px",
+      background: "rgba(0,0,0,0.2)", borderRadius: 6, padding: "6px 8px",
       maxHeight: 100, overflow: "auto", marginTop: 4,
     },
     error: { color: "#ff6666" },

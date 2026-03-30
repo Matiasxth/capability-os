@@ -18,9 +18,10 @@ export default function ConfirmationModal({ confirmation, onConfirm, onDeny }) {
       display: "flex", alignItems: "center", justifyContent: "center",
     },
     modal: {
-      background: "linear-gradient(135deg, #0a0e1a, #0d1225)", border: "1px solid #1a2444",
-      borderRadius: 12, padding: 20, width: 420, maxWidth: "90vw", position: "relative",
-      overflow: "hidden",
+      background: "rgba(14, 14, 22, 0.75)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)",
+      border: "1px solid rgba(255,255,255,0.12)",
+      borderRadius: 16, padding: 24, width: 420, maxWidth: "90vw", position: "relative",
+      overflow: "hidden", boxShadow: "0 16px 48px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)",
     },
     glow: {
       position: "absolute", top: 0, left: 0, right: 0, height: 2,
@@ -31,7 +32,7 @@ export default function ConfirmationModal({ confirmation, onConfirm, onDeny }) {
     title: { fontSize: 14, fontWeight: 700, marginBottom: 12, color: isLevel3 ? "#ff4444" : "#ffaa00" },
     desc: { fontSize: 11, color: "#8a9fc5", marginBottom: 12 },
     tool: {
-      background: "#080c18", border: "1px solid #141e38", borderRadius: 6,
+      background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8,
       padding: 10, marginBottom: 12, fontSize: 11,
     },
     toolName: { color: "#4a8af5", fontWeight: 600, marginBottom: 4 },

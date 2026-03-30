@@ -554,10 +554,11 @@ export function browseWorkspace(wsId, relativePath) {
 
 // ── Agent API ──
 
-export function runAgent(message, sessionId, history) {
+export function runAgent(message, sessionId, history, agentId) {
   const body = { message };
   if (sessionId) body.session_id = sessionId;
   if (history) body.history = history;
+  if (agentId) body.agent_id = agentId;
   return request("/agent", { method: "POST", body: JSON.stringify(body) });
 }
 
@@ -571,6 +572,14 @@ export function confirmAgentAction(sessionId, confirmationId, approved, password
 export function getAgentSession(sessionId) {
   return request(`/agent/${sessionId}`);
 }
+
+// ── Agent Registry API ──
+
+export function listAgents() { return request("/agents"); }
+export function createAgent(config) { return request("/agents", { method: "POST", body: JSON.stringify(config) }); }
+export function getAgentDef(agentId) { return request(`/agents/${agentId}`); }
+export function updateAgentDef(agentId, fields) { return request(`/agents/${agentId}`, { method: "POST", body: JSON.stringify(fields) }); }
+export function deleteAgentDef(agentId) { return request(`/agents/${agentId}`, { method: "DELETE" }); }
 
 export function updateWorkspaceStatus(wsId, status) {
   return request(`/workspaces/${wsId}/status`, {

@@ -12,6 +12,7 @@ import {
   getSlackStatus, configureSlack, testSlack, startSlackPolling, stopSlackPolling, getSlackPollingStatus,
   getDiscordStatus, configureDiscord, testDiscord, startDiscordPolling, stopDiscordPolling, getDiscordPollingStatus,
   whatsappBridgeCheck, whatsappBridgeClose, whatsappSwitchBackend, whatsappConfigure, whatsappListBackends,
+  listAgents, createAgent, updateAgentDef, deleteAgentDef,
 } from "../api";
 import CCLayout from "../components/control-center/CCLayout";
 import KPIBar from "../components/control-center/KPIBar";
@@ -238,52 +239,52 @@ export default function ControlCenter() {
   function renderIntegrations(){const wsp=wspSession||{};const tg=tgStatus||{};return(<div style={{display:"flex",flexDirection:"column",gap:8}}>
     <h2>Integrations</h2>
 
-    {/* ── WhatsApp Hub ── */}
-    {(()=>{const wb=settings?.whatsapp?.backend||"browser";const isOfficial=wb==="official";const cx={card:{background:"linear-gradient(135deg,#0a0e1a 0%,#0d1225 100%)",border:"1px solid #1a2444",borderRadius:10,overflow:"hidden",position:"relative"},glow:{position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,transparent,#25d366,#00a884,transparent)"},head:{padding:"12px 14px 10px",display:"flex",alignItems:"center",gap:8},icon:{fontSize:18},title:{fontSize:13,fontWeight:700,letterSpacing:1,flex:1},dot:{width:9,height:9,borderRadius:"50%",background:wsp.active?"#25d366":"#444",boxShadow:wsp.active?"0 0 8px #25d36688":"none"},stLabel:{fontSize:10,color:wsp.active?"#25d366":"#666",fontWeight:600,textTransform:"uppercase",letterSpacing:1},body:{padding:"0 14px 14px"},sec:{background:"#080c18",border:"1px solid #141e38",borderRadius:8,padding:10,marginBottom:8},secTitle:{fontSize:9,textTransform:"uppercase",letterSpacing:2,color:"#4a6fa5",marginBottom:6,fontWeight:600},field:{display:"block",fontSize:10,color:"#6a7fa5",marginBottom:2},input:{width:"100%",height:24,fontSize:11,background:"#0a0f1e",border:"1px solid #1a2848",borderRadius:4,color:"#c8d4e8",padding:"0 6px"},btn:{width:"100%",height:32,border:"none",borderRadius:6,fontWeight:600,fontSize:11,letterSpacing:1,cursor:"pointer",textTransform:"uppercase",transition:"all 0.2s"},btnConnect:{background:"linear-gradient(135deg,#0d3320,#0a2a1c)",color:"#25d366",border:"1px solid #25d36644"},btnDisconnect:{background:"linear-gradient(135deg,#2a0a0a,#200c0c)",color:"#ff4444",border:"1px solid #ff444444"},qrBox:{padding:12,background:"#ffffff",borderRadius:8,textAlign:"center",marginBottom:8}};return<div style={cx.card}>
-      <div style={cx.glow}/>
-      <div style={cx.head}>
-        <span style={cx.icon}>&#128172;</span>
-        <span style={cx.title}>WhatsApp</span>
-        <span style={cx.dot}/>
-        <span style={cx.stLabel}>{wsp.active?"Online":"Offline"}</span>
+    {/* ── WhatsApp Hub (collapsible) ── */}
+    {(()=>{const wb=settings?.whatsapp?.backend||"browser";const isOfficial=wb==="official";const wspExp=expandedIntegration==="whatsapp";return<div className="card" style={{padding:0,overflow:"hidden"}}>
+      <div className="item-row" style={{padding:"10px 14px",cursor:"pointer"}} onClick={()=>setExpandedIntegration(wspExp?null:"whatsapp")}>
+        <span style={{fontSize:10,color:"var(--text-muted)",marginRight:4}}>{wspExp?"\u25BC":"\u25B6"}</span>
+        <span style={{fontSize:16,marginRight:4}}>&#128172;</span>
+        <span style={{fontSize:13,fontWeight:700,flex:1}}>WhatsApp</span>
+        <span className={`dot ${wsp.active?"dot-success":"dot-neutral"}`} style={{marginRight:4}}/>
+        <span style={{fontSize:10,color:wsp.active?"var(--success)":"var(--text-muted)",fontWeight:600}}>{wsp.active?"Online":"Offline"}</span>
       </div>
-      <div style={cx.body}>
+      {wspExp&&<div style={{padding:"0 14px 14px"}}>
         {/* Backend selector */}
-        <div style={cx.sec}>
-          <div style={cx.secTitle}>Backend</div>
+        <div style={{background:"var(--bg-input)",border:"1px solid var(--border)",borderRadius:8,padding:10,marginBottom:8}}>
+          <div style={{fontSize:9,textTransform:"uppercase",letterSpacing:2,color:"var(--accent)",marginBottom:6,fontWeight:600}}>Backend</div>
           <div style={{display:"flex",gap:4}}>
-            {[{id:"browser",label:"Browser",desc:"Puppeteer"},{id:"baileys",label:"Baileys",desc:"Node.js"},{id:"official",label:"Official",desc:"Cloud API"}].map(b=><button key={b.id} onClick={async()=>{try{await whatsappSwitchBackend(b.id);const s=await getSettings();setSettings(s.settings||s);setWspSession({active:false});setWspQR(null);toast("Backend: "+b.label)}catch(err){toast(err.message,"error")}}} style={{flex:1,height:36,border:wb===b.id?"1px solid #25d366":"1px solid #1a2848",borderRadius:6,background:wb===b.id?"#0d2a1a":"#080c18",color:wb===b.id?"#25d366":"#6a7fa5",fontSize:10,fontWeight:wb===b.id?700:500,cursor:"pointer",transition:"all 0.2s",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:1,padding:2}}><span>{b.label}</span><span style={{fontSize:8,opacity:0.6}}>{b.desc}</span></button>)}
+            {[{id:"browser",label:"Browser",desc:"Puppeteer"},{id:"baileys",label:"Baileys",desc:"Node.js"},{id:"official",label:"Official",desc:"Cloud API"}].map(b=><button key={b.id} onClick={async()=>{try{await whatsappSwitchBackend(b.id);const s=await getSettings();setSettings(s.settings||s);setWspSession({active:false});setWspQR(null);toast("Backend: "+b.label)}catch(err){toast(err.message,"error")}}} style={{flex:1,height:36,border:wb===b.id?"1px solid var(--accent)":"1px solid var(--border)",borderRadius:6,background:wb===b.id?"var(--accent-dim)":"var(--bg-input)",color:wb===b.id?"var(--accent)":"var(--text-dim)",fontSize:10,fontWeight:wb===b.id?700:500,cursor:"pointer",transition:"all 0.2s",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:1,padding:2}}><span>{b.label}</span><span style={{fontSize:8,opacity:0.6}}>{b.desc}</span></button>)}
           </div>
         </div>
 
         {/* Official API config */}
-        {isOfficial&&<div style={cx.sec}>
-          <div style={cx.secTitle}>API Configuration</div>
-          <label style={cx.field}>Access Token</label>
-          <input type="password" defaultValue={settings?.whatsapp?.official?.access_token||""} style={{...cx.input,marginBottom:6}} onBlur={e=>whatsappConfigure({official:{...(settings?.whatsapp?.official||{}),access_token:e.target.value}}).then(()=>toast("Saved")).catch(()=>{})} placeholder="EAA..."/>
-          <label style={cx.field}>Phone Number ID</label>
-          <input defaultValue={settings?.whatsapp?.official?.phone_number_id||""} style={{...cx.input,marginBottom:6}} onBlur={e=>whatsappConfigure({official:{...(settings?.whatsapp?.official||{}),phone_number_id:e.target.value}}).then(()=>toast("Saved")).catch(()=>{})} placeholder="1234567890"/>
-          <label style={cx.field}>Verify Token</label>
-          <input defaultValue={settings?.whatsapp?.official?.verify_token||""} style={{...cx.input,marginBottom:6}} onBlur={e=>whatsappConfigure({official:{...(settings?.whatsapp?.official||{}),verify_token:e.target.value}}).then(()=>toast("Saved")).catch(()=>{})} placeholder="my_secret_token"/>
-          <div style={{fontSize:9,color:"#3a5a8a",marginTop:2,padding:"4px 6px",background:"#060a14",borderRadius:4,fontFamily:"monospace"}}>webhook: http://localhost:5001/webhook</div>
+        {isOfficial&&<div style={{background:"var(--bg-input)",border:"1px solid var(--border)",borderRadius:8,padding:10,marginBottom:8}}>
+          <div style={{fontSize:9,textTransform:"uppercase",letterSpacing:2,color:"var(--accent)",marginBottom:6,fontWeight:600}}>API Configuration</div>
+          <label style={{display:"block",fontSize:10,color:"var(--text-dim)",marginBottom:2}}>Access Token</label>
+          <input type="password" defaultValue={settings?.whatsapp?.official?.access_token||""} style={{width:"100%",height:28,fontSize:11,background:"var(--bg-elevated)",border:"1px solid var(--border)",borderRadius:4,color:"var(--text)",padding:"0 8px",marginBottom:6}} onBlur={e=>whatsappConfigure({official:{...(settings?.whatsapp?.official||{}),access_token:e.target.value}}).then(()=>toast("Saved")).catch(()=>{})} placeholder="EAA..."/>
+          <label style={{display:"block",fontSize:10,color:"var(--text-dim)",marginBottom:2}}>Phone Number ID</label>
+          <input defaultValue={settings?.whatsapp?.official?.phone_number_id||""} style={{width:"100%",height:28,fontSize:11,background:"var(--bg-elevated)",border:"1px solid var(--border)",borderRadius:4,color:"var(--text)",padding:"0 8px",marginBottom:6}} onBlur={e=>whatsappConfigure({official:{...(settings?.whatsapp?.official||{}),phone_number_id:e.target.value}}).then(()=>toast("Saved")).catch(()=>{})} placeholder="1234567890"/>
+          <label style={{display:"block",fontSize:10,color:"var(--text-dim)",marginBottom:2}}>Verify Token</label>
+          <input defaultValue={settings?.whatsapp?.official?.verify_token||""} style={{width:"100%",height:28,fontSize:11,background:"var(--bg-elevated)",border:"1px solid var(--border)",borderRadius:4,color:"var(--text)",padding:"0 8px",marginBottom:6}} onBlur={e=>whatsappConfigure({official:{...(settings?.whatsapp?.official||{}),verify_token:e.target.value}}).then(()=>toast("Saved")).catch(()=>{})} placeholder="my_secret_token"/>
+          <div style={{fontSize:9,color:"var(--text-muted)",marginTop:2,padding:"4px 6px",background:"var(--bg-elevated)",borderRadius:4,fontFamily:"var(--font-mono)"}}>webhook: http://localhost:5001/webhook</div>
         </div>}
 
         {/* QR display */}
-        {wspQR&&<div style={cx.sec}>
-          <div style={cx.secTitle}>Scan QR Code</div>
-          <div style={cx.qrBox}><img src={wspQR} alt="QR" style={{width:180,height:180,imageRendering:"pixelated"}}/><div style={{fontSize:10,color:"#333",marginTop:6}}>Open WhatsApp &gt; Linked Devices &gt; Scan</div></div>
+        {wspQR&&<div style={{background:"var(--bg-input)",border:"1px solid var(--border)",borderRadius:8,padding:10,marginBottom:8}}>
+          <div style={{fontSize:9,textTransform:"uppercase",letterSpacing:2,color:"var(--accent)",marginBottom:6,fontWeight:600}}>Scan QR Code</div>
+          <div style={{padding:12,background:"#ffffff",borderRadius:8,textAlign:"center",marginBottom:8}}><img src={wspQR} alt="QR" style={{width:180,height:180,imageRendering:"pixelated"}}/><div style={{fontSize:10,color:"#333",marginTop:6}}>Open WhatsApp &gt; Linked Devices &gt; Scan</div></div>
           <div style={{display:"flex",gap:4}}>
-            <button onClick={async()=>{try{const r=await whatsappBridgeCheck();const c=r.connected||r.active||r.status==="connected";if(c){setWspQR(null);setWspSession({active:true});toast("Connected")}else if(r.qr_image)setWspQR(r.qr_image)}catch{}}} style={{...cx.btn,flex:1,background:"#0a1428",color:"#4a8af5",border:"1px solid #2a4a7a",height:28,fontSize:10}}>Check Status</button>
-            <button onClick={async()=>{await whatsappBridgeClose();setWspQR(null)}} style={{...cx.btn,flex:1,background:"#1a0a0a",color:"#aa4444",border:"1px solid #442a2a",height:28,fontSize:10}}>Cancel</button>
+            <button style={{flex:1,height:28,fontSize:10}} onClick={async()=>{try{const r=await whatsappBridgeCheck();const c=r.connected||r.active||r.status==="connected";if(c){setWspQR(null);setWspSession({active:true});toast("Connected")}else if(r.qr_image)setWspQR(r.qr_image)}catch{}}}>Check Status</button>
+            <button style={{flex:1,height:28,fontSize:10}} onClick={async()=>{await whatsappBridgeClose();setWspQR(null)}}>Cancel</button>
           </div>
         </div>}
 
         {/* Connect / Disconnect */}
         {!wspQR&&<div style={{display:"flex",gap:6}}>
-          {!wsp.active?<button disabled={wspConnecting} onClick={async()=>{setWspConnecting(true);try{const r=await startWhatsApp();const c=r.connected||r.status==="connected";setWspSession({...wsp,...r,active:c});if(r.status==="error")toast(r.error||"Connection failed","error");else if(r.qr_image)setWspQR(r.qr_image);if(c){toast("WhatsApp connected");setWspQR(null)}}catch(e){toast(e.message,"error")}finally{setWspConnecting(false)}}} style={{...cx.btn,...cx.btnConnect,flex:1,opacity:wspConnecting?0.5:1}}>{wspConnecting?"Connecting...":"Connect"}</button>
-          :<button onClick={()=>act(async()=>{await whatsappBridgeClose();setWspSession({active:false});setWspQR(null)},"Disconnected")} style={{...cx.btn,...cx.btnDisconnect,flex:1}}>Disconnect</button>}
+          {!wsp.active?<button className="btn-primary" disabled={wspConnecting} onClick={async()=>{setWspConnecting(true);try{const r=await startWhatsApp();const c=r.connected||r.status==="connected";setWspSession({...wsp,...r,active:c});if(r.status==="error")toast(r.error||"Connection failed","error");else if(r.qr_image)setWspQR(r.qr_image);if(c){toast("WhatsApp connected");setWspQR(null)}}catch(e){toast(e.message,"error")}finally{setWspConnecting(false)}}} style={{flex:1,height:32,fontSize:11}}>{wspConnecting?"Connecting...":"Connect"}</button>
+          :<button className="btn-danger" onClick={()=>act(async()=>{await whatsappBridgeClose();setWspSession({active:false});setWspQR(null)},"Disconnected")} style={{flex:1,height:32,fontSize:11}}>Disconnect</button>}
         </div>}
-      </div>
+      </div>}
     </div>})()}
 
     {/* Other integrations (non-WhatsApp) */}
@@ -462,7 +463,91 @@ export default function ControlCenter() {
     </div>
   </div>)}
 
-  const R={system:renderSystem,workspaces:renderWorkspaces,llm:renderLLM,metrics:renderMetrics,"self-improvement":renderSI,"auto-growth":renderAutoGrowth,mcp:renderMCP,a2a:renderA2A,memory:renderMemory,integrations:renderIntegrations,browser:renderBrowser,skills:renderSkills,"project-states":renderProjectStates};
+  // ── Agents section ──
+  const [agents,setAgents]=useState([]);
+  const [editAgent,setEditAgent]=useState(null);
+  const [agentForm,setAgentForm]=useState({name:"",emoji:"\U0001f916",description:"",system_prompt:"",tool_ids:[],llm_model:"",language:"auto",max_iterations:10});
+  const refreshAgents=()=>listAgents().then(r=>setAgents(r.agents||[])).catch(()=>{});
+  useEffect(()=>{if(activeSection==="agents")refreshAgents()},[activeSection]);
+
+  const TOOL_CATS={
+    "Filesystem":["filesystem_read_file","filesystem_write_file","filesystem_list_directory","filesystem_create_directory","filesystem_delete_file","filesystem_copy_file","filesystem_move_file","filesystem_edit_file"],
+    "Execution":["execution_run_command","execution_run_script"],
+    "Network":["network_http_get","network_extract_text","network_extract_links"],
+    "Browser":["browser_navigate","browser_read_text","browser_screenshot","browser_click_element","browser_type_text"],
+    "System":["system_get_os_info","system_get_workspace_info","system_get_env_var"],
+  };
+
+  function renderAgents(){return(<div style={{display:"flex",flexDirection:"column",gap:10}}>
+    <h2>Agents</h2>
+    <p style={{fontSize:11,color:"var(--text-muted)",margin:0}}>Create custom AI agents with unique personalities, tools, and behaviors. Assign them to projects or select them in conversations.</p>
+
+    {agents.map(a=>(<div key={a.id} className="card" style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
+      <span style={{fontSize:22}}>{a.emoji}</span>
+      <div style={{flex:1}}>
+        <div style={{fontSize:13,fontWeight:600,color:"var(--text)"}}>{a.name} {a.id==="agt_default"&&<span className="badge badge-info" style={{fontSize:8,marginLeft:4}}>default</span>}</div>
+        <div style={{fontSize:10,color:"var(--text-dim)"}}>{a.description||"No description"}</div>
+        {a.tool_ids?.length>0&&<div style={{fontSize:9,color:"var(--text-muted)",marginTop:2}}>{a.tool_ids.length} tools</div>}
+      </div>
+      {a.id!=="agt_default"&&<>
+        <button style={{fontSize:10,height:24}} onClick={()=>{setEditAgent(a.id);setAgentForm({name:a.name,emoji:a.emoji,description:a.description,system_prompt:a.system_prompt||"",tool_ids:a.tool_ids||[],llm_model:a.llm_model||"",language:a.language||"auto",max_iterations:a.max_iterations||10})}}>Edit</button>
+        <button style={{fontSize:10,height:24,color:"var(--error)"}} onClick={()=>act(async()=>{await deleteAgentDef(a.id);refreshAgents()},"Agent deleted")}>Del</button>
+      </>}
+    </div>))}
+
+    <div className="card" style={{padding:14}}>
+      <h4 style={{margin:"0 0 10px"}}>{editAgent?"Edit Agent":"Create Agent"}</h4>
+      <div style={{display:"flex",gap:8,marginBottom:8}}>
+        <input value={agentForm.emoji} onChange={e=>setAgentForm({...agentForm,emoji:e.target.value})} style={{width:40,height:32,fontSize:18,textAlign:"center"}} title="Emoji"/>
+        <input value={agentForm.name} onChange={e=>setAgentForm({...agentForm,name:e.target.value})} style={{flex:1,height:32,fontSize:13}} placeholder="Agent name"/>
+      </div>
+      <input value={agentForm.description} onChange={e=>setAgentForm({...agentForm,description:e.target.value})} style={{width:"100%",height:28,fontSize:11,marginBottom:8}} placeholder="Description (what this agent does)"/>
+      <label style={{fontSize:10,color:"var(--text-dim)",display:"block",marginBottom:2}}>System Prompt</label>
+      <textarea value={agentForm.system_prompt} onChange={e=>setAgentForm({...agentForm,system_prompt:e.target.value})} style={{width:"100%",height:100,fontSize:11,background:"var(--bg-input)",border:"1px solid var(--border)",borderRadius:6,color:"var(--text)",padding:8,resize:"vertical",fontFamily:"var(--font-mono)"}} placeholder="You are an expert in..."/>
+
+      <label style={{fontSize:10,color:"var(--text-dim)",display:"block",margin:"8px 0 4px"}}>Tools</label>
+      <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:8}}>
+        {Object.entries(TOOL_CATS).map(([cat,tools])=>(<div key={cat}>
+          <div style={{fontSize:9,color:"var(--accent)",fontWeight:600,marginBottom:2}}>{cat}</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
+            {tools.map(t=>{const on=agentForm.tool_ids.includes(t);return<button key={t} onClick={()=>{const ids=on?agentForm.tool_ids.filter(x=>x!==t):[...agentForm.tool_ids,t];setAgentForm({...agentForm,tool_ids:ids})}} style={{fontSize:9,height:22,padding:"0 6px",background:on?"var(--accent-dim)":"var(--bg-input)",color:on?"var(--accent)":"var(--text-muted)",border:on?"1px solid var(--accent)":"1px solid var(--border)"}}>{t.replace("filesystem_","").replace("execution_","").replace("network_","").replace("browser_","").replace("system_","")}</button>})}
+          </div>
+        </div>))}
+        <button style={{fontSize:9,height:22,marginTop:2}} onClick={()=>{const all=Object.values(TOOL_CATS).flat();setAgentForm({...agentForm,tool_ids:agentForm.tool_ids.length===all.length?[]:all})}}>
+          {agentForm.tool_ids.length===Object.values(TOOL_CATS).flat().length?"Deselect all":"Select all"}
+        </button>
+      </div>
+
+      <div style={{display:"flex",gap:8,marginBottom:8}}>
+        <div style={{flex:1}}>
+          <label style={{fontSize:10,color:"var(--text-dim)"}}>LLM Model (empty = system default)</label>
+          <input value={agentForm.llm_model} onChange={e=>setAgentForm({...agentForm,llm_model:e.target.value})} style={{width:"100%",height:28,fontSize:11}} placeholder="e.g. gpt-4o"/>
+        </div>
+        <div>
+          <label style={{fontSize:10,color:"var(--text-dim)"}}>Language</label>
+          <input value={agentForm.language} onChange={e=>setAgentForm({...agentForm,language:e.target.value})} style={{width:80,height:28,fontSize:11}} placeholder="auto"/>
+        </div>
+        <div>
+          <label style={{fontSize:10,color:"var(--text-dim)"}}>Max iter</label>
+          <input type="number" value={agentForm.max_iterations} onChange={e=>setAgentForm({...agentForm,max_iterations:parseInt(e.target.value)||10})} style={{width:50,height:28,fontSize:11}} min={1} max={50}/>
+        </div>
+      </div>
+
+      <div style={{display:"flex",gap:6}}>
+        <button className="btn-primary" style={{flex:1,height:32,fontSize:12}} onClick={async()=>{
+          if(!agentForm.name.trim())return;
+          try{
+            if(editAgent){await updateAgentDef(editAgent,agentForm);toast("Agent updated")}
+            else{await createAgent(agentForm);toast("Agent created")}
+            refreshAgents();setEditAgent(null);setAgentForm({name:"",emoji:"\U0001f916",description:"",system_prompt:"",tool_ids:[],llm_model:"",language:"auto",max_iterations:10});
+          }catch(e){toast(e.message||"Failed","error")}
+        }}>{editAgent?"Save":"Create"}</button>
+        {editAgent&&<button style={{height:32,fontSize:12,padding:"0 16px"}} onClick={()=>{setEditAgent(null);setAgentForm({name:"",emoji:"\U0001f916",description:"",system_prompt:"",tool_ids:[],llm_model:"",language:"auto",max_iterations:10})}}>Cancel</button>}
+      </div>
+    </div>
+  </div>)}
+
+  const R={system:renderSystem,workspaces:renderWorkspaces,llm:renderLLM,metrics:renderMetrics,"self-improvement":renderSI,"auto-growth":renderAutoGrowth,mcp:renderMCP,a2a:renderA2A,memory:renderMemory,integrations:renderIntegrations,browser:renderBrowser,skills:renderSkills,agents:renderAgents,"project-states":renderProjectStates};
 
   return (<>
     <CCLayout activeSection={activeSection} onSelectSection={setActiveSection} wsConnected={wsConnected} highlightSection={highlightSection}>

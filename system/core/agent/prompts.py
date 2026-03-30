@@ -30,9 +30,30 @@ AGENT_SYSTEM_PROMPT = """You are CapOS, an AI assistant with direct access to sy
 def build_agent_system_prompt(
     workspace_path: str = "",
     extra_context: str = "",
+    agent_config: dict | None = None,
 ) -> str:
-    """Build the full system prompt with workspace context."""
-    parts = [AGENT_SYSTEM_PROMPT]
+    """Build the full system prompt with workspace context and agent personality."""
+    # Use custom prompt if agent has one, otherwise use default
+    if agent_config and agent_config.get("system_prompt"):
+        base = agent_config["system_prompt"]
+        # Always append safety rules
+        base += "\n\n## Safety Rules\n- Before deleting files or running destructive commands, explain what will happen.\n- Never execute commands that could damage the operating system without explicit confirmation."
+    else:
+        base = AGENT_SYSTEM_PROMPT
+
+    parts = [base]
+
+    # Agent identity
+    if agent_config:
+        name = agent_config.get("name", "")
+        desc = agent_config.get("description", "")
+        lang = agent_config.get("language", "auto")
+        if name:
+            parts.append(f"\n## Identity\nYour name is {name}.")
+        if desc:
+            parts.append(f"Description: {desc}")
+        if lang and lang != "auto":
+            parts.append(f"Respond in: {lang}")
 
     if workspace_path:
         parts.append(f"\n## Workspace\nYour default workspace is: {workspace_path}\nPrefer using paths within this workspace.")

@@ -277,6 +277,14 @@ class CapabilityOSUIBridgeService:
         except Exception as exc:
             print(f"  WhatsApp auto-reply: failed ({exc})")
 
+        # Agent registry (custom agent definitions)
+        try:
+            from system.core.agent.agent_registry import AgentRegistry
+            self.agent_registry = AgentRegistry(data_path=self.workspace_root / "agents.json")
+            print(f"  Agent Registry: {len(self.agent_registry.list())} agents", flush=True)
+        except Exception as exc:
+            print(f"  Agent Registry: failed ({exc})", flush=True)
+
         # Agent Loop (autonomous agent with tool use)
         try:
             from system.core.agent import AgentLoop
@@ -512,6 +520,12 @@ class CapabilityOSUIBridgeService:
         r.add("POST", "/agent", agent_handlers.start_agent)
         r.add("POST", "/agent/confirm", agent_handlers.confirm_action)
         r.add("GET", "/agent/{session_id}", agent_handlers.get_session)
+        # Agent registry CRUD
+        r.add("GET", "/agents", agent_handlers.list_agents)
+        r.add("POST", "/agents", agent_handlers.create_agent)
+        r.add("GET", "/agents/{agent_id}", agent_handlers.get_agent_def)
+        r.add("POST", "/agents/{agent_id}", agent_handlers.update_agent)
+        r.add("DELETE", "/agents/{agent_id}", agent_handlers.delete_agent)
         r.add("GET", "/executions/{execution_id}", capability_handlers.get_execution)
         r.add("GET", "/executions/{execution_id}/events", capability_handlers.get_execution_events)
         # Growth

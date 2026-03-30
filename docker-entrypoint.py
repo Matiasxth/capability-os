@@ -31,7 +31,7 @@ API_PREFIXES = (
     "/llm/", "/browser/", "/metrics", "/gaps/", "/optimizations/",
     "/proposals/", "/integrations", "/interpret", "/plan",
     "/executions/", "/mcp/", "/a2a/", "/memory", "/chat",
-    "/workspaces", "/.well-known", "/skills",
+    "/workspaces", "/.well-known", "/skills", "/agents", "/agent",
 )
 
 
@@ -100,9 +100,11 @@ class UnifiedHandler(BaseHTTPRequestHandler):
         self._cors_headers()
         self.send_header("Content-Type", content_type or "application/octet-stream")
         self.send_header("Content-Length", str(len(content)))
-        # Prevent stale cache for HTML and service worker
-        if file_path.suffix in (".html", ".js") and "/assets/" not in str(file_path):
-            self.send_header("Cache-Control", "no-cache, must-revalidate")
+        # Hashed assets can cache; everything else must revalidate
+        if "/assets/" in str(file_path).replace("\\", "/"):
+            self.send_header("Cache-Control", "public, max-age=31536000, immutable")
+        else:
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
         self.end_headers()
         self.wfile.write(content)
 

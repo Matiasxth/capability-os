@@ -12,8 +12,10 @@ export default function NewProjectModal({ states, onCreate, onClose }) {
       display: "flex", alignItems: "center", justifyContent: "center",
     },
     modal: {
-      background: "linear-gradient(135deg, #0a0e1a, #0d1225)", border: "1px solid #1a2444",
-      borderRadius: 12, padding: 20, width: 400, maxWidth: "90vw", position: "relative",
+      background: "rgba(14, 14, 22, 0.75)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)",
+      border: "1px solid rgba(255,255,255,0.12)",
+      borderRadius: 16, padding: 24, width: 420, maxWidth: "90vw", position: "relative",
+      boxShadow: "0 16px 48px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)",
     },
     glow: {
       position: "absolute", top: 0, left: 0, right: 0, height: 2,
@@ -22,15 +24,15 @@ export default function NewProjectModal({ states, onCreate, onClose }) {
     title: { fontSize: 15, fontWeight: 700, marginBottom: 16, color: "#c8d4e8" },
     label: { fontSize: 10, color: "#6a7fa5", display: "block", marginBottom: 3, textTransform: "uppercase", letterSpacing: 1 },
     input: {
-      width: "100%", height: 32, background: "#080c18", border: "1px solid #1a2848",
-      borderRadius: 6, color: "#c8d4e8", padding: "0 10px", fontSize: 12, marginBottom: 12,
+      width: "100%", height: 36, background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.10)",
+      borderRadius: 8, color: "#c8d4e8", padding: "0 12px", fontSize: 13, marginBottom: 14,
     },
     stateGrid: { display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 12 },
     stateBtn: (active) => ({
-      display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6,
-      border: active ? "1px solid #4a8af5" : "1px solid #1a2848",
-      background: active ? "rgba(74,138,245,0.1)" : "#080c18",
-      color: active ? "#fff" : "#6a7fa5", fontSize: 11, cursor: "pointer",
+      display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 8,
+      border: active ? "1px solid rgba(74,138,245,0.4)" : "1px solid rgba(255,255,255,0.08)",
+      background: active ? "rgba(74,138,245,0.15)" : "rgba(0,0,0,0.2)",
+      color: active ? "#fff" : "var(--text-dim)", fontSize: 12, cursor: "pointer", transition: "all 0.15s",
     }),
     btns: { display: "flex", gap: 8, marginTop: 4 },
     btnCreate: {

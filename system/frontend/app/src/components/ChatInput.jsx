@@ -4,6 +4,7 @@ export default function ChatInput({
   intent, setIntent, onSubmit, loadingPlan, hasConv,
   autoExecute, setAutoExecute,
   agentMode, setAgentMode,
+  agents, activeAgentId, setActiveAgentId,
   voice,
 }) {
   const handleMic = () => {
@@ -36,7 +37,16 @@ export default function ChatInput({
               {voice.isRecording ? "\u23F9" : "\u{1F3A4}"}
             </button>
           )}
-          <div style={{position:"absolute",right:90,top:"50%",transform:"translateY(-50%)",display:"flex",alignItems:"center",gap:10}}>
+          <div style={{position:"absolute",right:90,top:"50%",transform:"translateY(-50%)",display:"flex",alignItems:"center",gap:8}}>
+            {agentMode && agents && agents.length > 1 && (
+              <select
+                value={activeAgentId || ""}
+                onChange={e => setActiveAgentId(e.target.value || null)}
+                style={{height:22,fontSize:10,background:"var(--bg-input)",border:"1px solid var(--border)",borderRadius:4,color:"var(--text-dim)",padding:"0 4px",maxWidth:100}}
+              >
+                {agents.map(a => <option key={a.id} value={a.id}>{a.emoji} {a.name}</option>)}
+              </select>
+            )}
             <div
               style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:agentMode?"#4a8af5":"#444",cursor:"pointer",userSelect:"none"}}
               onClick={() => { const v = !agentMode; setAgentMode(v); localStorage.setItem("capos_agentmode", String(v)); }}

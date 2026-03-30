@@ -5,6 +5,7 @@ import {
   listCapabilities, planIntent, saveChatSession, streamChat,
   runAgent, confirmAgentAction,
   listWorkspaces, addWorkspace, updateWorkspaceStatus, removeWorkspace, getSettings,
+  listAgents,
 } from "../api";
 import ChatInput from "../components/ChatInput";
 import ChatThread from "../components/ChatThread";
@@ -54,6 +55,8 @@ export default function Workspace({ activeWorkspace, userName }) {
   const [activeProjectId,setActiveProjectId]=useState(null);
   const [projectStates,setProjectStates]=useState([]);
   const [showNewProject,setShowNewProject]=useState(false);
+  const [agents,setAgents]=useState([]);
+  const [activeAgentId,setActiveAgentId]=useState(null);
   const autoExecTimerRef=useRef(null);
   const sessionDirtyRef=useRef(false);
   const messagesRef=useRef(messages);
@@ -63,6 +66,7 @@ export default function Workspace({ activeWorkspace, userName }) {
   useEffect(()=>{
     listWorkspaces().then(r=>{setWorkspaces(r.workspaces||[]);if(!activeProjectId&&r.default_id)setActiveProjectId(r.default_id)}).catch(()=>{});
     getSettings().then(r=>{const s=r.settings||r;setProjectStates(s.project_states||[])}).catch(()=>{});
+    listAgents().then(r=>{const a=r.agents||[];setAgents(a);if(!activeAgentId&&a.length)setActiveAgentId(a[0].id)}).catch(()=>{});
   },[]);
 
   // ── History loading ──
@@ -196,7 +200,7 @@ export default function Workspace({ activeWorkspace, userName }) {
       addMsg("system","Thinking...",{loading:true});
       try{
         const hist=getConversationHistory(messages);
-        const r=await runAgent(q,agentSessionId,hist);
+        const r=await runAgent(q,agentSessionId,hist,activeAgentId);
         setAgentSessionId(r.session_id||null);
         setAgentEvents(r.events||[]);
         // Check if needs confirmation
@@ -370,6 +374,7 @@ export default function Workspace({ activeWorkspace, userName }) {
           loadingPlan={loadingPlan} hasConv={messages.length>0}
           autoExecute={autoExecute} setAutoExecute={setAutoExecute}
           agentMode={agentMode} setAgentMode={setAgentMode}
+          agents={agents} activeAgentId={activeAgentId} setActiveAgentId={setActiveAgentId}
           voice={voice}
         />
       </div>

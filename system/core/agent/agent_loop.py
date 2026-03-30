@@ -76,8 +76,8 @@ class AgentLoop:
         self._tool_registry = tool_registry
         self._workspace_root = workspace_root
         self._max_iterations = max_iterations
-        all_tools = build_tool_definitions(tool_registry)
-        # Limit to most useful tools to stay within token limits for smaller models
+        self._all_tools = build_tool_definitions(tool_registry)
+        # Default tool set for when no agent config is provided
         priority_tools = {
             "filesystem_read_file", "filesystem_write_file", "filesystem_list_directory",
             "filesystem_create_directory", "filesystem_delete_file", "filesystem_copy_file",
@@ -87,8 +87,16 @@ class AgentLoop:
             "browser_navigate", "browser_read_text", "browser_screenshot",
             "system_get_os_info", "system_get_workspace_info",
         }
-        self._tools = [t for t in all_tools if t["name"] in priority_tools] or all_tools[:20]
+        self._default_tools = [t for t in self._all_tools if t["name"] in priority_tools] or self._all_tools[:20]
         self._sessions: dict[str, AgentSession] = {}
+
+    def _resolve_tools(self, agent_config: dict[str, Any] | None) -> list[dict[str, Any]]:
+        """Get the tool list for this agent. If agent has tool_ids, filter to those."""
+        if agent_config and agent_config.get("tool_ids"):
+            allowed = set(agent_config["tool_ids"])
+            filtered = [t for t in self._all_tools if t["name"] in allowed]
+            return filtered if filtered else self._default_tools
+        return self._default_tools
 
     def get_session(self, session_id: str) -> AgentSession | None:
         return self._sessions.get(session_id)
@@ -98,6 +106,7 @@ class AgentLoop:
         user_message: str,
         session_id: str | None = None,
         conversation_history: list[dict[str, Any]] | None = None,
+        agent_config: dict[str, Any] | None = None,
     ) -> Generator[dict[str, Any], None, AgentResult]:
         """Run the agent loop as a generator that yields events.
 
@@ -112,12 +121,18 @@ class AgentLoop:
         session.add_user_message(user_message)
         session.status = "running"
 
-        system_prompt = build_agent_system_prompt(workspace_path=self._workspace_root)
+        # Build prompt and tools based on agent config
+        system_prompt = build_agent_system_prompt(
+            workspace_path=self._workspace_root,
+            agent_config=agent_config,
+        )
+        tools = self._resolve_tools(agent_config)
+        max_iter = (agent_config or {}).get("max_iterations") or self._max_iterations
         result = AgentResult(session_id=session.session_id)
 
-        yield {"event": "agent_start", "session_id": session.session_id}
+        yield {"event": "agent_start", "session_id": session.session_id, "agent": (agent_config or {}).get("name", "CapOS")}
 
-        for iteration in range(self._max_iterations):
+        for iteration in range(max_iter):
             session.iteration = iteration + 1
 
             yield {"event": "agent_thinking", "iteration": session.iteration}
@@ -126,7 +141,7 @@ class AgentLoop:
             try:
                 response = self._adapter.run_agent_turn(
                     messages=session.messages,
-                    tools=self._tools,
+                    tools=tools,
                     system_prompt=system_prompt,
                 )
             except Exception as exc:
@@ -233,8 +248,10 @@ class AgentLoop:
         session_id: str,
         confirmation_id: str,
         approved: bool,
+        agent_config: dict[str, Any] | None = None,
     ) -> Generator[dict[str, Any], None, AgentResult]:
         """Resume agent loop after user confirms/denies an action."""
+        tools = self._resolve_tools(agent_config)
         session = self._sessions.get(session_id)
         if session is None:
             result = AgentResult(session_id=session_id, status="error", final_text="Session not found")
@@ -269,7 +286,7 @@ class AgentLoop:
             try:
                 response = self._adapter.run_agent_turn(
                     messages=session.messages,
-                    tools=self._tools,
+                    tools=tools,
                     system_prompt=system_prompt,
                 )
             except Exception as exc:
