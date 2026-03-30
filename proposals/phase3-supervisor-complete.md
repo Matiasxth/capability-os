@@ -5,13 +5,13 @@
 Estas 4 features se integran en un solo sistema: **Claude Code como cerebro operativo de CapOS** que no solo responde, sino que vigila, repara, evoluciona, y trabaja proactivamente — todo sin reiniciar el servidor.
 
 ```
-┌─────────────────────────────────────────────────────────┐
+┌──────────────────────────────────────────────────────────┐
 │                   SUPERVISOR CLAUDE                      │
 │                                                          │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────┐│
-│  │ Health   │  │ Security │  │ Error    │  │ Gap     ││
-│  │ Monitor  │  │ Auditor  │  │ Intercept│  │ Detector││
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬────┘│
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────┐   │
+│  │ Health   │  │ Security │  │ Error    │  │ Gap     │   │
+│  │ Monitor  │  │ Auditor  │  │ Intercept│  │ Detector│   │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬────┘   │
 │       │              │              │              │     │
 │       └──────────────┴──────┬───────┴──────────────┘     │
 │                             │                            │
@@ -20,23 +20,23 @@ Estas 4 features se integran en un solo sistema: **Claude Code como cerebro oper
 │                    │  (claude -p)    │                   │
 │                    └────────┬────────┘                   │
 │                             │                            │
-│          ┌──────────────────┼──────────────────┐        │
-│          │                  │                  │        │
-│  ┌───────▼──────┐  ┌───────▼──────┐  ┌───────▼──────┐ │
-│  │ Skill Creator│  │ Code Fixer   │  │ Config      │ │
-│  │ + Hot Reload │  │ (patches)    │  │ Optimizer   │ │
-│  └──────────────┘  └──────────────┘  └──────────────┘ │
+│          ┌──────────────────┼──────────────────┐         │
+│          │                  │                  │         │
+│  ┌───────▼──────┐  ┌───────▼──────┐  ┌───────▼──────┐    │
+│  │ Skill Creator│  │ Code Fixer   │  │ Config       │    │
+│  │ + Hot Reload │  │ (patches)    │  │ Optimizer    │    │
+│  └──────────────┘  └──────────────┘  └──────────────┘    │
 │                                                          │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │              PROACTIVE SCHEDULER                  │   │
-│  │  Queue → Timer → Execute → Report → Learn        │   │
-│  └──────────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────────────┐    │
+│  │              PROACTIVE SCHEDULER                 │    │
+│  │  Queue → Timer → Execute → Report → Learn        │    │
+│  └──────────────────────────────────────────────────┘    │
 │                                                          │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │          NATIVE FUNCTION CALLING                  │   │
-│  │  OpenAI/Groq → native tools API (no text parse)  │   │
-│  └──────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────┘
+│  ┌──────────────────────────────────────────────────┐    │
+│  │          NATIVE FUNCTION CALLING                 │    │
+│  │  OpenAI/Groq → native tools API (no text parse)  │    │
+│  └──────────────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────────────┘
 ```
 
 ---
