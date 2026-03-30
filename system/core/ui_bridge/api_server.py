@@ -160,133 +160,49 @@ class CapabilityOSUIBridgeService:
         for err in start_errors:
             print(f"  START ERROR: {err}", flush=True)
 
-        # ── Backward-compatible attribute aliases ──
-        # Handlers access service.xxx — these aliases map to container services/plugins
-        from system.sdk.contracts import (
-            SettingsProvider, ToolRegistryContract, ToolRuntimeContract,
-            CapabilityRegistryContract, SecurityServiceContract, HealthServiceContract,
-            MetricsCollectorContract, ExecutionHistoryContract, MemoryManagerContract,
-            SemanticMemoryContract, MarkdownMemoryContract, IntentInterpreterContract,
-            LLMClientContract, CapabilityEngineContract, AgentLoopContract,
-            AgentRegistryContract, WorkspaceRegistryContract,
-        )
+        # ── Dynamic service resolution via __getattr__ ──
+        # Handlers access service.xxx which resolves dynamically via
+        # system/core/ui_bridge/service_resolver.py maps (CONTRACT_MAP + PLUGIN_ATTR_MAP).
+        # Results are cached on the instance for O(1) subsequent access.
+        # The settings_service is eagerly set since it was created before the container.
+        from system.sdk.contracts import SettingsProvider
+        self.settings_service = self.container.get_optional(SettingsProvider) or self.settings_service
 
-        def _get(ct):
-            return self.container.get_optional(ct)
-
-        self.settings_service = _get(SettingsProvider) or self.settings_service
-        self.capability_registry = _get(CapabilityRegistryContract)
-        self.tool_registry = _get(ToolRegistryContract)
-        self.tool_runtime = _get(ToolRuntimeContract)
-        self.security_service = _get(SecurityServiceContract)
-        self.health_service = _get(HealthServiceContract)
-        self.metrics_collector = _get(MetricsCollectorContract)
-        self.execution_history = _get(ExecutionHistoryContract)
-        self.memory_manager = _get(MemoryManagerContract)
-        self.semantic_memory = _get(SemanticMemoryContract)
-        self.markdown_memory = _get(MarkdownMemoryContract)
-        self.intent_interpreter = _get(IntentInterpreterContract)
-        self.engine = _get(CapabilityEngineContract)
-        self.agent_loop = _get(AgentLoopContract)
-        self.agent_registry = _get(AgentRegistryContract)
-        self.workspace_registry = _get(WorkspaceRegistryContract)
-
-        # Auth plugin alias
-        _auth = self.container.get_plugin("capos.core.auth")
-        self.user_registry = getattr(_auth, "user_registry", None) if _auth else None
-        self.jwt_service = getattr(_auth, "jwt_service", None) if _auth else None
-        self.auth_middleware = getattr(_auth, "auth_middleware", None) if _auth else None
-
-        # Plugin-specific aliases for handlers that access deep attributes
-        _core = self.container.get_plugin("capos.core.settings")
-        _mem = self.container.get_plugin("capos.core.memory")
-        _cap = self.container.get_plugin("capos.core.capabilities")
-        _ws = self.container.get_plugin("capos.core.workspace")
-        _agent = self.container.get_plugin("capos.core.agent")
-        _skills = self.container.get_plugin("capos.core.skills")
-        _browser = self.container.get_plugin("capos.core.browser")
-        _voice = self.container.get_plugin("capos.core.voice")
-        _mcp = self.container.get_plugin("capos.core.mcp")
-        _a2a = self.container.get_plugin("capos.core.a2a")
-        _growth = self.container.get_plugin("capos.core.growth")
-        _seq = self.container.get_plugin("capos.core.sequences")
-        _sv = self.container.get_plugin("capos.core.supervisor")
-        _sched = self.container.get_plugin("capos.core.scheduler")
-        _tg = self.container.get_plugin("capos.channels.telegram")
-        _slack = self.container.get_plugin("capos.channels.slack")
-        _discord = self.container.get_plugin("capos.channels.discord")
-        _wsp = self.container.get_plugin("capos.channels.whatsapp")
-
-        self.user_context = getattr(_mem, "user_context", None) if _mem else None
-        self.memory_compactor = getattr(_mem, "compactor", None) if _mem else None
-        self.embeddings_engine = getattr(_mem, "embeddings_engine", None) if _mem else None
-        self.vector_store = getattr(_mem, "vector_store", None) if _mem else None
-        self.phase7_executor = getattr(_cap, "phase7_executor", None) if _cap else None
-        self.phase10_whatsapp_executor = getattr(_wsp, "executor", None) if _wsp else None
-        self.plan_builder = getattr(_cap, "plan_builder", None) if _cap else None
-        self.plan_validator = getattr(_cap, "plan_validator", None) if _cap else None
-        self.path_validator = getattr(_ws, "path_validator", None) if _ws else None
-        self.workspace_context = getattr(_ws, "workspace_context", None) if _ws else None
-        self.file_browser = getattr(_ws, "file_browser", None) if _ws else None
-        self.browser_session_manager = getattr(_browser, "browser_session_manager", None) if _browser else None
-        self.skill_registry = getattr(_skills, "skill_registry", None) if _skills else None
-        self.skill_creator = getattr(_sv, "skill_creator", None) if _sv else None
-        self.supervisor = getattr(_sv, "supervisor", None) if _sv else None
-        self.task_queue = getattr(_sched, "task_queue", None) if _sched else None
-        self.scheduler = getattr(_sched, "scheduler", None) if _sched else None
-        self.stt_service = getattr(_voice, "stt_service", None) if _voice else None
-        self.tts_service = getattr(_voice, "tts_service", None) if _voice else None
-        self.mcp_client_manager = getattr(_mcp, "mcp_client_manager", None) if _mcp else None
-        self.mcp_tool_bridge = getattr(_mcp, "mcp_tool_bridge", None) if _mcp else None
-        self.mcp_capability_generator = getattr(_mcp, "mcp_capability_generator", None) if _mcp else None
-        self.agent_card_builder = getattr(_a2a, "agent_card_builder", None) if _a2a else None
-        self.a2a_server = getattr(_a2a, "a2a_server", None) if _a2a else None
-        self.telegram_connector = getattr(_tg, "connector", None) if _tg else None
-        self.telegram_executor = getattr(_tg, "executor", None) if _tg else None
-        self.telegram_polling_worker = getattr(_tg, "polling_worker", None) if _tg else None
-        self.slack_connector = getattr(_slack, "connector", None) if _slack else None
-        self.slack_executor = getattr(_slack, "executor", None) if _slack else None
-        self.slack_polling_worker = getattr(_slack, "polling_worker", None) if _slack else None
-        self.discord_connector = getattr(_discord, "connector", None) if _discord else None
-        self.discord_executor = getattr(_discord, "executor", None) if _discord else None
-        self.discord_polling_worker = getattr(_discord, "polling_worker", None) if _discord else None
-        self.whatsapp_manager = getattr(_wsp, "backend_manager", None) if _wsp else None
-        self.whatsapp_reply_worker = getattr(_wsp, "reply_worker", None) if _wsp else None
-        self.capability_generator = getattr(_growth, "capability_generator", None) if _growth else None
-        self.auto_install_pipeline = getattr(_growth, "auto_install_pipeline", None) if _growth else None
-        self.gap_analyzer = getattr(_growth, "gap_analyzer", None) if _growth else None
-        self.performance_monitor = getattr(_growth, "performance_monitor", None) if _growth else None
-        self.strategy_optimizer = getattr(_growth, "strategy_optimizer", None) if _growth else None
-        self.integration_detector = getattr(_growth, "integration_detector", None) if _growth else None
-        self.capability_bridge = getattr(_growth, "capability_bridge", None) if _growth else None
-        self.sequence_storage = getattr(_seq, "sequence_storage", None) if _seq else None
-        self.sequence_registry = getattr(_seq, "sequence_registry", None) if _seq else None
-        self.sequence_runner = getattr(_seq, "sequence_runner", None) if _seq else None
-
-        _wf = self.container.get_plugin("capos.core.workflows")
-        self.workflow_registry = getattr(_wf, "workflow_registry", None) if _wf else None
-        self.workflow_executor = getattr(_wf, "workflow_executor", None) if _wf else None
-
-        _sbx = self.container.get_plugin("capos.core.sandbox")
-        self.sandbox_manager = getattr(_sbx, "sandbox_manager", None) if _sbx else None
-
-        # Integration registry — prefer plugin, fallback to direct instantiation
-        _integ = self.container.get_plugin("capos.core.integrations")
-        if _integ and getattr(_integ, "integration_registry", None):
-            self.integration_registry = _integ.integration_registry
-            self.integration_loader = _integ.integration_loader
-            self.integration_validator = _integ.integration_validator
-        else:
-            self.integration_registry = IntegrationRegistry(self.integration_registry_data_path)
-            self.integration_loader = IntegrationLoader(
-                self.integrations_root, self.integration_manifest_schema_path, self.integration_registry,
-            )
-            self.integration_validator = IntegrationValidator(
-                self.capability_registry, self.integration_manifest_schema_path,
-            )
         self._refresh_integrations()
+        self._apply_late_bindings(runtime_settings)
 
-        # Late bindings — wire channel connectors to scheduler for multi-channel delivery
+        self._executions: dict[str, dict[str, Any]] = {}
+        self._lock = Lock()
+        self._router = self._build_router()
+
+    # ------------------------------------------------------------------
+    # Dynamic attribute resolution (replaces ~80 static aliases)
+    # ------------------------------------------------------------------
+
+    def __getattr__(self, name: str) -> Any:
+        # Only called when normal attribute lookup fails (not in __dict__)
+        from system.core.ui_bridge.service_resolver import resolve_attribute
+        found, value = resolve_attribute(self.container, name)
+        if found:
+            # Cache on instance so __getattr__ won't fire again for this name
+            object.__setattr__(self, name, value)
+            return value
+        raise AttributeError(f"'{type(self).__name__}' has no attribute '{name}'")
+
+    def invalidate_alias_cache(self, plugin_id: str) -> None:
+        """Clear cached attributes for a plugin after hot-reload."""
+        from system.core.ui_bridge.service_resolver import PLUGIN_ATTR_MAP, CONTRACT_MAP
+        for attr_name, (pid, _) in PLUGIN_ATTR_MAP.items():
+            if pid == plugin_id and attr_name in self.__dict__:
+                del self.__dict__[attr_name]
+        # Also invalidate contract-based attrs since the impl may have changed
+        for attr_name in CONTRACT_MAP:
+            if attr_name in self.__dict__:
+                del self.__dict__[attr_name]
+
+    def _apply_late_bindings(self, runtime_settings: dict[str, Any]) -> None:
+        """Wire cross-plugin dependencies that can't be resolved via DI."""
+        # Scheduler multi-channel delivery
         if self.scheduler:
             if self.telegram_connector:
                 self.scheduler._telegram = self.telegram_connector
@@ -297,8 +213,11 @@ class CapabilityOSUIBridgeService:
             if self.whatsapp_manager:
                 self.scheduler._whatsapp = self.whatsapp_manager
 
+        # Interpreter needs workspace registry for context
         if self.intent_interpreter and self.workspace_registry:
             self.intent_interpreter._workspace_registry = self.workspace_registry
+
+        # Path validator for filesystem tools
         try:
             from system.tools.implementations.phase3_tools import set_path_validator
             if self.path_validator:
@@ -306,6 +225,7 @@ class CapabilityOSUIBridgeService:
         except Exception:
             pass
 
+        # A2A known agents + delegate tool
         self._a2a_known_agents: list[dict[str, Any]] = list(
             runtime_settings.get("a2a", {}).get("known_agents", [])
         )
@@ -313,10 +233,6 @@ class CapabilityOSUIBridgeService:
             register_a2a_delegate_tool(self.tool_registry, self.tool_runtime)
         except Exception:
             pass
-
-        self._executions: dict[str, dict[str, Any]] = {}
-        self._lock = Lock()
-        self._router = self._build_router()
 
     def _build_router(self):
         from system.core.ui_bridge.router import Router

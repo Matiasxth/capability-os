@@ -50,9 +50,9 @@ def reload_plugin(service: Any, payload: Any, plugin_id: str = "", **kw: Any):
     if err:
         return _resp(HTTPStatus.INTERNAL_SERVER_ERROR, {"status": "error", "error": err})
 
-    # Refresh aliases on service
-    plugin = service.container.get_plugin(plugin_id)
-    _refresh_aliases(service, plugin_id, plugin)
+    # Invalidate cached aliases so __getattr__ re-resolves from new plugin
+    if hasattr(service, "invalidate_alias_cache"):
+        service.invalidate_alias_cache(plugin_id)
 
     return _resp(HTTPStatus.OK, {"status": "success", "plugin_id": plugin_id})
 
@@ -75,20 +75,4 @@ def install_plugin(service: Any, payload: Any, **kw: Any):
     return _resp(HTTPStatus.OK, {"status": "success", "plugin_id": pid})
 
 
-def _refresh_aliases(service: Any, plugin_id: str, plugin: Any) -> None:
-    """Update backward-compatible aliases on the service after reload."""
-    if plugin is None:
-        return
-    # Map known plugin IDs to their service attribute names
-    ATTR_MAP = {
-        "capos.channels.telegram": [("connector", "telegram_connector"), ("executor", "telegram_executor"), ("polling_worker", "telegram_polling_worker")],
-        "capos.channels.slack": [("connector", "slack_connector"), ("executor", "slack_executor"), ("polling_worker", "slack_polling_worker")],
-        "capos.channels.discord": [("connector", "discord_connector"), ("executor", "discord_executor"), ("polling_worker", "discord_polling_worker")],
-        "capos.channels.whatsapp": [("backend_manager", "whatsapp_manager"), ("reply_worker", "whatsapp_reply_worker")],
-        "capos.core.supervisor": [("supervisor", "supervisor"), ("skill_creator", "skill_creator")],
-        "capos.core.scheduler": [("task_queue", "task_queue"), ("scheduler", "scheduler")],
-    }
-    for plugin_attr, service_attr in ATTR_MAP.get(plugin_id, []):
-        val = getattr(plugin, plugin_attr, None)
-        if val is not None:
-            setattr(service, service_attr, val)
+    # _refresh_aliases removed — replaced by invalidate_alias_cache + __getattr__
