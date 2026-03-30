@@ -14,6 +14,9 @@ import {
   whatsappBridgeCheck, whatsappBridgeClose, whatsappSwitchBackend, whatsappConfigure, whatsappListBackends,
   listAgents, createAgent, updateAgentDef, deleteAgentDef, designAgent,
   getSupervisorStatus, getSupervisorLog, invokeSupervisorClaude, runHealthCheck, supervisorApprove, supervisorDiscard,
+  analyzeWorkspace, autoCleanWorkspace, generateReadme,
+  getSchedulerStatus, listSchedulerTasks, createSchedulerTask, deleteSchedulerTask, runSchedulerTaskNow, getSchedulerLog,
+  listAutoSkills,
 } from "../api";
 import CCLayout from "../components/control-center/CCLayout";
 import KPIBar from "../components/control-center/KPIBar";
@@ -676,7 +679,72 @@ export default function ControlCenter() {
     </div>
   </div>)}
 
-  const R={system:renderSystem,workspaces:renderWorkspaces,llm:renderLLM,metrics:renderMetrics,"self-improvement":renderSI,"auto-growth":renderAutoGrowth,mcp:renderMCP,a2a:renderA2A,memory:renderMemory,integrations:renderIntegrations,browser:renderBrowser,skills:renderSkills,supervisor:renderSupervisor,agents:renderAgents,"project-states":renderProjectStates};
+  // ── Scheduler section ──
+  const [schTasks,setSchTasks]=useState([]);
+  const [schStatus,setSchStatus]=useState({});
+  const [schLog,setSchLog]=useState([]);
+  const [schForm,setSchForm]=useState({description:"",schedule:"daily_09:00",action_message:"",agent_id:"",channel:""});
+  useEffect(()=>{if(activeSection==="scheduler"){listSchedulerTasks().then(r=>setSchTasks(r.tasks||[])).catch(()=>{});getSchedulerStatus().then(setSchStatus).catch(()=>{});getSchedulerLog().then(r=>setSchLog(r.log||[])).catch(()=>{})}},[activeSection]);
+
+  function renderScheduler(){return(<div style={{display:"flex",flexDirection:"column",gap:12}}>
+    <h2>Scheduler</h2>
+    <div className="kpi-grid" style={{gridTemplateColumns:"1fr 1fr 1fr"}}>
+      <div className="kpi-card"><div className="kpi-label">Status</div><div style={{fontSize:13,fontWeight:600}}>{schStatus.running?"Active":"Off"}</div></div>
+      <div className="kpi-card"><div className="kpi-label">Tasks</div><div style={{fontSize:13,fontWeight:600}}>{schStatus.queue_size||0}</div></div>
+      <div className="kpi-card"><div className="kpi-label">Executions</div><div style={{fontSize:13,fontWeight:600}}>{schStatus.total_executions||0}</div></div>
+    </div>
+
+    {schTasks.map(t=>(<div key={t.id} className="card" style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}>
+      <span className={`dot ${t.enabled?"dot-success":"dot-neutral"}`}/>
+      <div style={{flex:1}}>
+        <div style={{fontSize:12,fontWeight:600}}>{t.description}</div>
+        <div style={{fontSize:10,color:"var(--text-muted)"}}>{t.schedule} {t.channel?`→ ${t.channel}`:""} {t.last_run?`| Last: ${t.last_run.slice(11,19)}`:""}</div>
+      </div>
+      <button style={{fontSize:10,height:24}} onClick={()=>act(async()=>{const r=await runSchedulerTaskNow(t.id);toast(r.status==="success"?"Executed":"Error")},"Executed")}>Run</button>
+      <button style={{fontSize:10,height:24,color:"var(--error)"}} onClick={()=>act(async()=>{await deleteSchedulerTask(t.id);setSchTasks(s=>s.filter(x=>x.id!==t.id))},"Deleted")}>Del</button>
+    </div>))}
+
+    <div className="card" style={{padding:14}}>
+      <h4 style={{margin:"0 0 8px"}}>Create Task</h4>
+      <input value={schForm.description} onChange={e=>setSchForm({...schForm,description:e.target.value})} style={{width:"100%",height:28,fontSize:12,marginBottom:6}} placeholder="Task description"/>
+      <div style={{display:"flex",gap:6,marginBottom:6}}>
+        <select value={schForm.schedule} onChange={e=>setSchForm({...schForm,schedule:e.target.value})} style={{flex:1,height:28,fontSize:11}}>
+          <option value="every_30min">Every 30 min</option>
+          <option value="every_hour">Every hour</option>
+          <option value="every_4hours">Every 4 hours</option>
+          <option value="daily_09:00">Daily 09:00</option>
+          <option value="daily_18:00">Daily 18:00</option>
+          <option value="daily_21:00">Daily 21:00</option>
+        </select>
+        <select value={schForm.channel} onChange={e=>setSchForm({...schForm,channel:e.target.value})} style={{flex:1,height:28,fontSize:11}}>
+          <option value="">No channel</option>
+          <option value="whatsapp">WhatsApp</option>
+          <option value="telegram">Telegram</option>
+        </select>
+      </div>
+      <textarea value={schForm.action_message} onChange={e=>setSchForm({...schForm,action_message:e.target.value})} style={{width:"100%",height:50,fontSize:11,resize:"vertical",marginBottom:6}} placeholder="Message for the agent (what to do)"/>
+      <button className="btn-primary" style={{width:"100%",height:30,fontSize:12}} onClick={async()=>{if(!schForm.description.trim())return;try{await createSchedulerTask(schForm);toast("Task created");setSchForm({description:"",schedule:"daily_09:00",action_message:"",agent_id:"",channel:""});listSchedulerTasks().then(r=>setSchTasks(r.tasks||[]))}catch(e){toast(e.message,"error")}}}>Create Task</button>
+    </div>
+
+    {schLog.length>0&&<div className="card" style={{padding:14}}>
+      <h4 style={{margin:"0 0 8px"}}>Recent Executions</h4>
+      {schLog.slice(-10).reverse().map((l,i)=><div key={i} style={{fontSize:11,padding:"3px 0",borderBottom:"1px solid var(--border)",display:"flex",gap:6}}>
+        <span style={{color:"var(--text-muted)"}}>{(l.timestamp||"").slice(11,19)}</span>
+        <span style={{color:l.status==="success"?"var(--success)":"var(--error)"}}>{l.status}</span>
+        <span style={{flex:1,color:"var(--text-dim)"}}>{l.detail?.slice(0,80)}</span>
+      </div>)}
+    </div>}
+  </div>)}
+
+  // ── Workspace analysis state ──
+  const [wsAnalysis,setWsAnalysis]=useState({});
+  const [wsCleanPreview,setWsCleanPreview]=useState(null);
+
+  // ── Auto-generated skills ──
+  const [autoSkills,setAutoSkills]=useState([]);
+  useEffect(()=>{if(activeSection==="skills")listAutoSkills().then(r=>setAutoSkills(r.skills||[])).catch(()=>{})},[activeSection]);
+
+  const R={system:renderSystem,workspaces:renderWorkspaces,llm:renderLLM,metrics:renderMetrics,"self-improvement":renderSI,"auto-growth":renderAutoGrowth,mcp:renderMCP,a2a:renderA2A,memory:renderMemory,integrations:renderIntegrations,browser:renderBrowser,skills:renderSkills,supervisor:renderSupervisor,scheduler:renderScheduler,agents:renderAgents,"project-states":renderProjectStates};
 
   return (<>
     <CCLayout activeSection={activeSection} onSelectSection={setActiveSection} wsConnected={wsConnected} highlightSection={highlightSection}>

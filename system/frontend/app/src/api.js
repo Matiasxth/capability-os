@@ -621,6 +621,22 @@ export function runHealthCheck() { return request("/supervisor/health-check", { 
 export function supervisorApprove(previewId) { return request("/supervisor/approve", { method: "POST", body: JSON.stringify({ preview_id: previewId }) }); }
 export function supervisorDiscard(previewId) { return request("/supervisor/discard", { method: "POST", body: JSON.stringify({ preview_id: previewId }) }); }
 
+// ── Workspace Analysis ──
+export function analyzeWorkspace(wsId) { return request(`/files/analyze/${wsId}`); }
+export function autoCleanWorkspace(wsId, dryRun = true) { return request(`/files/auto-clean/${wsId}`, { method: "POST", body: JSON.stringify({ dry_run: dryRun }) }); }
+export function generateReadme(wsId) { return request(`/files/generate-readme/${wsId}`, { method: "POST", body: "{}" }); }
+
+// ── Scheduler ──
+export function getSchedulerStatus() { return request("/scheduler/status"); }
+export function getSchedulerLog() { return request("/scheduler/log"); }
+export function listSchedulerTasks() { return request("/scheduler/tasks"); }
+export function createSchedulerTask(task) { return request("/scheduler/tasks", { method: "POST", body: JSON.stringify(task) }); }
+export function deleteSchedulerTask(taskId) { return request(`/scheduler/tasks/${taskId}`, { method: "DELETE" }); }
+export function runSchedulerTaskNow(taskId) { return request(`/scheduler/tasks/${taskId}/run`, { method: "POST", body: "{}" }); }
+
+// ── Skill Domains ──
+export function listAutoSkills() { return request("/skills/auto-generated"); }
+
 export function updateWorkspaceStatus(wsId, status) {
   return request(`/workspaces/${wsId}/status`, {
     method: "POST",
