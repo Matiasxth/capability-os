@@ -109,58 +109,57 @@ Cada tipo de acción se renderiza diferente en el chat del Supervisor:
 
 **Skill Preview Card**:
 ```
-┌─────────────────────────────────────┐
-│ 🔧 Nueva Skill: pdf_tools           │
-│ Convierte y manipula archivos PDF    │
-│                                      │
-│ Tools: pdf_to_text, pdf_merge        │
-│ Dependencies: PyPDF2                 │
-│                                      │
-│ ┌─ handler.py ─────────────────────┐│
-│ │ def handle_pdf_to_text(params):  ││
-│ │   path = params.get("path")      ││
-│ │   ...                            ││
-│ └──────────────────────────────────┘│
-│                                      │
+┌───────────────────────────────────────┐
+│ Convierte y manipula archivos PDF     │
+│                                       │
+│ Tools: pdf_to_text, pdf_merge         │
+│ Dependencies: PyPDF2                  │
+│                                       │
+│ ┌─ handler.py ─────────────────────┐  │
+│ │ def handle_pdf_to_text(params):  │  │
+│ │   path = params.get("path")      │  │
+│ │   ...                            │  │
+│ └──────────────────────────────────┘  │
+│                                       │
 │ ✅ Syntax valid | 📦 1 dependency    │
-│                                      │
-│ [Install]  [Edit Code]  [Discard]    │
-└─────────────────────────────────────┘
+│                                       │
+│ [Install]  [Edit Code]  [Discard]     │
+└───────────────────────────────────────┘
 ```
 
 **Agent Preview Card**:
 ```
 ┌─────────────────────────────────────┐
 │ 🤖 Nuevo Agente: DataBot            │
-│ Experto en análisis de datos         │
-│                                      │
-│ Prompt: "You are DataBot..."         │
+│ Experto en análisis de datos        │
+│                                     │
+│ Prompt: "You are DataBot..."        │
 │ Tools: 5 seleccionados              │
-│ Model: default | Lang: es            │
-│                                      │
-│ [Create]  [Edit]  [Discard]          │
+│ Model: default | Lang: es           │
+│                                     │
+│ [Create]  [Edit]  [Discard]         │
 └─────────────────────────────────────┘
 ```
 
 **File Edit Preview**:
 ```
 ┌─────────────────────────────────────┐
-│ 📝 Edit: system/tools/impl/x.py     │
-│                                      │
-│ - old line                           │
-│ + new line                           │
-│                                      │
-│ [Apply]  [View Full]  [Discard]      │
+│ 📝 Edit: system/tools/impl/x.py    │
+│                                     │
+│ - old line                          │
+│ + new line                          │
+│                                     │
+│ [Apply]  [View Full]  [Discard]     │
 └─────────────────────────────────────┘
 ```
 
 **Command Preview**:
 ```
 ┌─────────────────────────────────────┐
-│ ⚡ Command: pip install pandas       │
-│ Security: Level 2 (confirmation)     │
-│                                      │
-│ [Run]  [Cancel]                      │
+│ ⚡ Command: pip install pandas     │
+│ Security: Level 2 (confirmation)    │
+│                                     │
+│ [Run]  [Cancel]                     │
 └─────────────────────────────────────┘
 ```
 
@@ -321,7 +320,7 @@ Nueva ruta `/workspace/files` o tab en el Workspace:
 │  📄 test │  5 │   print(hello())     │              │
 │          │                           │              │
 │          │───────────────────────────│──────────────│
-│          │ Terminal                   │              │
+│          │ Terminal                  │              │
 │          │ $ python app.py           │              │
 │          │ > world                   │              │
 │          │ $                         │              │
