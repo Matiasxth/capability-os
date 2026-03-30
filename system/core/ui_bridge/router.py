@@ -76,6 +76,9 @@ class Router:
 
         return None
 
+    # Alias for ASGI server compatibility
+    match = dispatch
+
     @property
     def route_count(self) -> int:
         return len(self._exact) + len(self._patterns)

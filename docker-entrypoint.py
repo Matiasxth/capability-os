@@ -32,6 +32,7 @@ API_PREFIXES = (
     "/proposals/", "/integrations", "/interpret", "/plan",
     "/executions/", "/mcp/", "/a2a/", "/memory", "/chat",
     "/workspaces", "/.well-known", "/skills", "/agents", "/agent", "/logs", "/voice", "/supervisor", "/scheduler", "/files",
+    "/plugins", "/workflows", "/auth/",
 )
 
 

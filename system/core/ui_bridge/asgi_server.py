@@ -94,13 +94,12 @@ class CapOSASGI:
         """Run the existing router dispatch synchronously."""
         from system.core.ui_bridge.api_server import APIResponse, APIRequestError
 
-        match = self._router.match(method, path)
+        match = self._router.dispatch(method, path)
         if match is None:
             return APIResponse(404, {"error": "Not found", "path": path})
 
-        handler, path_params = match
         try:
-            return handler(self.service, payload, _raw_path=raw_path, **path_params)
+            return match.handler(self.service, payload, _raw_path=raw_path, **match.params)
         except APIRequestError as exc:
             return APIResponse(exc.status_code, {
                 "error_code": exc.error_code,
@@ -347,7 +346,9 @@ class CapOSASGI:
             "/workspaces", "/files/", "/llm/", "/system/",
             "/mcp/", "/a2a/", "/memory", "/metrics",
             "/agents", "/agent/", "/supervisor/", "/scheduler/",
-            "/skills", "/voice/",
+            "/skills", "/voice/", "/plugins", "/workflows",
+            "/auth/", "/logs", "/optimizations/", "/executions/",
+            "/.well-known",
         )
         return any(path == p.rstrip("/") or path.startswith(p) for p in API_PREFIXES)
 
