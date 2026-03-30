@@ -3,7 +3,7 @@ import {
   chatMessage, clearAllMemory, deleteHistoryEntry, executeCapability,
   getExecution, getExecutionEvents, getMemoryContext, getMemoryHistory,
   listCapabilities, planIntent, saveChatSession, streamChat,
-  runAgent, confirmAgentAction,
+  runAgent, confirmAgentAction, streamAgent,
   listWorkspaces, addWorkspace, updateWorkspace, updateWorkspaceStatus, removeWorkspace, getSettings,
   listAgents,
 } from "../api";
@@ -14,6 +14,7 @@ import ConfirmationModal from "../components/ConfirmationModal";
 import FileDropZone from "../components/workspace/FileDropZone";
 import QuickActionsBar from "../components/workspace/QuickActionsBar";
 import { useVoice } from "../hooks/useVoice";
+import { useTTS } from "../hooks/useTTS";
 import { useCollapsible } from "../hooks/useCollapsible";
 import ProjectSidebar from "../components/ProjectSidebar";
 import NewProjectModal from "../components/NewProjectModal";
@@ -30,6 +31,7 @@ function resolve(v,c){if(typeof v==="string"){const m=v.match(TMPL);if(!m)return
 export default function Workspace({ activeWorkspace, userName }) {
   const {intent,setIntent,plan,setPlan,planValidationErrors,setPlanValidationErrors,execution,setExecution,logs,setLogs}=useWorkspaceState();
   const voice=useVoice();
+  const tts=useTTS();
   const {isCollapsed:sidebarCollapsed,toggle:toggleSidebar}=useCollapsible("capos_sidebar_collapsed");
   const [capabilities,setCapabilities]=useState([]);
   const [freqCaps,setFreqCaps]=useState([]);
@@ -195,31 +197,44 @@ export default function Workspace({ activeWorkspace, userName }) {
     if(!text?.trim())return;
     const q=text.trim();setIntent("");addMsg("user",q);setLoadingPlan(true);setErrorMessage("");
 
-    // Agent Mode: direct tool-use loop
+    // Agent Mode: streaming tool-use loop
     if(agentMode){
-      addMsg("system","Thinking...",{loading:true});
+      addMsg("system","",{loading:true});
       try{
         const hist=getConversationHistory(messages);
-        const r=await runAgent(q,agentSessionId,hist,activeAgentId);
-        setAgentSessionId(r.session_id||null);
-        setAgentEvents(r.events||[]);
-        // Check if needs confirmation
-        if(r.status==="awaiting_confirmation"&&r.confirmation){
-          setPendingConfirmation({...r.confirmation,session_id:r.session_id});
-          // Show events so far + waiting message
-          setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now(),role:"system",content:"agent_steps",meta:{agentEvents:r.events,awaiting:true},ts:new Date()};return c});
-        }else{
-          // Complete — show agent events + final text
-          const finalText=r.final_text||"Done.";
-          const hasToolCalls=(r.events||[]).some(e=>e.event==="tool_call");
-          if(hasToolCalls){
-            setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now(),role:"system",content:"agent_steps",meta:{agentEvents:r.events,finalText},ts:new Date()};return c});
-          }else{
-            setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now(),role:"system",content:finalText,meta:{},ts:new Date()};return c});
+        const events=[];
+        let finalText="";
+        let sid=null;
+        for await(const ev of streamAgent(q,agentSessionId,hist,activeAgentId)){
+          events.push(ev);
+          if(ev.session_id)sid=ev.session_id;
+          // Update UI in real-time
+          if(ev.event==="agent_response"){
+            finalText=ev.text||"";
+          }
+          if(ev.event==="awaiting_confirmation"){
+            setPendingConfirmation({...ev,session_id:sid||agentSessionId});
+            setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now(),role:"system",content:"agent_steps",meta:{agentEvents:events,awaiting:true},ts:new Date()};return c});
+            setAgentSessionId(sid);setLoadingPlan(false);return;
+          }
+          // Live update: show steps as they arrive
+          const stepsOnly=events.filter(e=>e.event!=="agent_start");
+          if(stepsOnly.length>0){
+            setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now(),role:"system",content:"agent_steps",meta:{agentEvents:stepsOnly,finalText:finalText||undefined},ts:new Date()};return c});
           }
         }
+        setAgentSessionId(sid);
+        // Final render
+        const hasToolCalls=events.some(e=>e.event==="tool_call");
+        if(hasToolCalls){
+          const stepsOnly=events.filter(e=>e.event!=="agent_start");
+          setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now(),role:"system",content:"agent_steps",meta:{agentEvents:stepsOnly,finalText:finalText||"Done."},ts:new Date()};return c});
+          if(tts.autoSpeak&&finalText)tts.speak(finalText);
+        }else{
+          setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now(),role:"system",content:finalText||"Done.",meta:{},ts:new Date()};return c});
+          if(tts.autoSpeak&&finalText)tts.speak(finalText);
+        }
         sessionDirtyRef.current=true;
-        // Flush session immediately so agent responses are saved
         setTimeout(()=>flushSession(),500);
       }catch(e){
         const msg=e.payload?.error_message||e.message||"Agent error.";
@@ -376,7 +391,7 @@ export default function Workspace({ activeWorkspace, userName }) {
           autoExecute={autoExecute} setAutoExecute={setAutoExecute}
           agentMode={agentMode} setAgentMode={setAgentMode}
           agents={agents} activeAgentId={activeAgentId} setActiveAgentId={setActiveAgentId}
-          voice={voice}
+          voice={voice} tts={tts}
         />
       </div>
       </FileDropZone>

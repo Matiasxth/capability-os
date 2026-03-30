@@ -38,6 +38,22 @@ class OpenAIAPIAdapter:
         }
         return _http_post_json(url, payload, headers, timeout_sec, "openai")
 
+    def complete_with_tools(self, messages: list[dict], tools: list[dict], timeout_sec: float = 30.0) -> dict:
+        """Function calling nativo — retorna response completa con tool_calls."""
+        url = f"{self.base_url.rstrip('/')}/chat/completions"
+        payload: dict[str, Any] = {
+            "model": self.model,
+            "temperature": 0,
+            "messages": messages,
+        }
+        if tools:
+            payload["tools"] = [{"type": "function", "function": t} for t in tools]
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        return _http_post_json_raw(url, payload, headers, timeout_sec)
+
 
 @dataclass
 class OllamaAdapter:
@@ -168,6 +184,30 @@ def _read_setting(payload: dict[str, Any], field_name: str) -> str:
     return value.strip()
 
 
+def _http_post_json_raw(
+    url: str,
+    payload: dict,
+    headers: dict[str, str],
+    timeout_sec: float,
+) -> dict:
+    """POST JSON and return parsed response dict (not just text content)."""
+    merged = {
+        "Content-Type": "application/json",
+        "User-Agent": "CapabilityOS/1.0",
+        "Accept": "application/json",
+    }
+    merged.update(headers)
+    req = Request(url, data=json.dumps(payload).encode("utf-8"), headers=merged, method="POST")
+    try:
+        with urlopen(req, timeout=max(1.0, timeout_sec)) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise LLMClientError(f"HTTP error {exc.code}: {detail}") from exc
+    except URLError as exc:
+        raise LLMClientError(f"Connection error: {exc.reason}") from exc
+
+
 def _http_post_json(
     url: str,
     payload: dict,
@@ -190,7 +230,12 @@ def _http_post_json(
     )
     try:
         with urlopen(req, timeout=max(1.0, timeout_sec)) as resp:
-            body = resp.read().decode("utf-8")
+            raw = resp.read()
+            # Ensure proper UTF-8 decoding (some providers return latin-1 headers)
+            try:
+                body = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                body = raw.decode("latin-1").encode("latin-1").decode("utf-8", errors="replace")
     except HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
         raise LLMClientError(f"{provider} HTTP error {exc.code}: {detail}") from exc

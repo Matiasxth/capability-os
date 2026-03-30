@@ -1,0 +1,48 @@
+{
+  "id": "mcp_filesystem_create_directory",
+  "name": "filesystem: create_directory",
+  "domain": "integraciones",
+  "type": "integration",
+  "description": "Create a new directory or ensure a directory exists. Can create multiple nested directories in one operation. If the directory already exists, this operation will succeed silently. Perfect for setting up directory structures for projects or ensuring required paths exist. Only works within allowed directories.",
+  "inputs": {
+    "path": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "outputs": {
+    "content": {
+      "type": "array",
+      "description": "MCP response content blocks."
+    }
+  },
+  "requirements": {
+    "tools": [
+      "mcp_filesystem_create_directory"
+    ],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "call_mcp",
+        "action": "mcp_filesystem_create_directory",
+        "params": {
+          "path": "{{inputs.path}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": [
+      "mcp filesystem create directory"
+    ]
+  },
+  "lifecycle": {
+    "version": "1.0.0",
+    "status": "experimental"
+  }
+}

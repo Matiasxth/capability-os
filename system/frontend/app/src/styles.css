@@ -411,7 +411,7 @@ pre{background:#060608;border:1px solid var(--border);border-radius:var(--radius
    ================================================================ */
 .conv-layout{display:flex;flex:1;min-height:0;overflow:hidden;position:relative;transition:all 200ms var(--ease)}
 .conv-layout.sidebar-collapsed .conv-sidebar{display:none}
-.conv-sidebar{width:380px;min-width:320px;flex-shrink:0;background:#0a0c1e;border-right:1px solid #1a1e48;display:flex;flex-direction:column;height:100%;overflow:hidden}
+.conv-sidebar{width:480px;min-width:400px;flex-shrink:0;background:#0a0c1e;border-right:1px solid #1a1e48;display:flex;flex-direction:column;height:100%;overflow:hidden}
 .conv-sidebar-header{padding:16px 18px 12px;flex-shrink:0;display:flex;flex-direction:column;gap:10px}
 .conv-sidebar-list{flex:1;overflow-y:auto;min-height:0;padding:4px 10px 10px}
 .conv-sidebar-footer{flex-shrink:0;padding:12px 18px;border-top:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;gap:6px}
@@ -427,14 +427,14 @@ pre{background:#060608;border:1px solid var(--border);border-radius:var(--radius
 
 .conv-main-col{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
 .conv-messages{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column}
-.conv-messages-inner{max-width:720px;width:100%;margin:0 auto;padding:0 24px;display:flex;flex-direction:column;flex:1}
-.conv-input-area{flex-shrink:0;padding:0 24px 16px;max-width:720px;width:100%;margin:0 auto}
+.conv-messages-inner{max-width:900px;width:100%;margin:0 auto;padding:0 24px;display:flex;flex-direction:column;flex:1}
+.conv-input-area{flex-shrink:0;padding:0 24px 16px;max-width:900px;width:100%;margin:0 auto}
 .conv-greeting{padding:48px 0 8px;font-size:24px;font-weight:300;color:#e8e8e8;letter-spacing:-0.02em;animation:msg-in .4s var(--ease)}
 .conv-sub{font-size:14px;color:#666;margin-bottom:16px}
 
 /* Chat input */
 .conv-input-wrap{position:relative;margin-bottom:16px}
-.conv-input{width:100%;font-family:var(--font-sans);font-size:16px;padding:16px 120px 16px 20px;background:var(--glass-bg);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid var(--glass-border);border-radius:14px;color:var(--text);outline:none;transition:border-color .2s var(--ease),box-shadow .2s var(--ease);resize:none;min-height:56px}
+.conv-input{width:100%;font-family:var(--font-sans);font-size:15px;padding:12px 16px;background:var(--bg-input);border:1px solid var(--border);border-radius:12px;color:var(--text);outline:none;transition:border-color .2s var(--ease),box-shadow .2s var(--ease);resize:none;min-height:44px}
 .conv-input:focus{border-color:rgba(0,255,136,0.3);box-shadow:0 0 0 3px rgba(0,255,136,0.06)}
 .conv-input::placeholder{color:#444}
 .conv-input-btn{position:absolute;right:10px;top:50%;transform:translateY(-50%);height:36px;padding:0 16px;font-size:13px;font-weight:600;background:var(--accent);color:#0a0a0a;border:none;border-radius:10px;cursor:pointer;transition:all .15s var(--ease)}
@@ -448,7 +448,7 @@ pre{background:#060608;border:1px solid var(--border);border-radius:var(--radius
 
 /* Chat bubbles */
 .conv-thread{display:flex;flex-direction:column;gap:8px;padding-bottom:40px}
-.conv-msg{max-width:92%;padding:14px 18px;border-radius:14px;font-size:14px;line-height:1.55;animation:msg-in .25s var(--ease)}
+.conv-msg{max-width:95%;padding:14px 18px;border-radius:14px;font-size:14px;line-height:1.6;animation:msg-in .25s var(--ease)}
 .conv-msg-user{align-self:flex-end;background:linear-gradient(135deg,rgba(0,240,255,0.1),rgba(123,45,223,0.08));border:1px solid rgba(0,240,255,0.15);color:var(--text);border-bottom-right-radius:4px}
 .conv-msg-system{align-self:flex-start;background:var(--glass-bg-light);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid var(--glass-border-light);color:var(--text);border-bottom-left-radius:4px}
 

@@ -1,0 +1,54 @@
+{
+  "id": "mcp_filesystem_list_directory_with_sizes",
+  "name": "filesystem: list_directory_with_sizes",
+  "domain": "integraciones",
+  "type": "integration",
+  "description": "Get a detailed listing of all files and directories in a specified path, including sizes. Results clearly distinguish between files and directories with [FILE] and [DIR] prefixes. This tool is useful for understanding directory structure and finding specific files within a directory. Only works within allowed directories.",
+  "inputs": {
+    "path": {
+      "type": "string",
+      "required": true
+    },
+    "sortBy": {
+      "type": "string",
+      "required": false,
+      "description": "Sort entries by name or size"
+    }
+  },
+  "outputs": {
+    "content": {
+      "type": "array",
+      "description": "MCP response content blocks."
+    }
+  },
+  "requirements": {
+    "tools": [
+      "mcp_filesystem_list_directory_with_sizes"
+    ],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "call_mcp",
+        "action": "mcp_filesystem_list_directory_with_sizes",
+        "params": {
+          "path": "{{inputs.path}}",
+          "sortBy": "{{inputs.sortBy}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": [
+      "mcp filesystem list directory with sizes"
+    ]
+  },
+  "lifecycle": {
+    "version": "1.0.0",
+    "status": "experimental"
+  }
+}

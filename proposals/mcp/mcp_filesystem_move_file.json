@@ -1,0 +1,53 @@
+{
+  "id": "mcp_filesystem_move_file",
+  "name": "filesystem: move_file",
+  "domain": "integraciones",
+  "type": "integration",
+  "description": "Move or rename files and directories. Can move files between directories and rename them in a single operation. If the destination exists, the operation will fail. Works across different directories and can be used for simple renaming within the same directory. Both source and destination must be within allowed directories.",
+  "inputs": {
+    "source": {
+      "type": "string",
+      "required": true
+    },
+    "destination": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "outputs": {
+    "content": {
+      "type": "array",
+      "description": "MCP response content blocks."
+    }
+  },
+  "requirements": {
+    "tools": [
+      "mcp_filesystem_move_file"
+    ],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "call_mcp",
+        "action": "mcp_filesystem_move_file",
+        "params": {
+          "source": "{{inputs.source}}",
+          "destination": "{{inputs.destination}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": [
+      "mcp filesystem move file"
+    ]
+  },
+  "lifecycle": {
+    "version": "1.0.0",
+    "status": "experimental"
+  }
+}

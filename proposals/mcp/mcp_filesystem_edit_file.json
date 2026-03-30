@@ -1,0 +1,59 @@
+{
+  "id": "mcp_filesystem_edit_file",
+  "name": "filesystem: edit_file",
+  "domain": "integraciones",
+  "type": "integration",
+  "description": "Make line-based edits to a text file. Each edit replaces exact line sequences with new content. Returns a git-style diff showing the changes made. Only works within allowed directories.",
+  "inputs": {
+    "path": {
+      "type": "string",
+      "required": true
+    },
+    "edits": {
+      "type": "array",
+      "required": true
+    },
+    "dryRun": {
+      "type": "boolean",
+      "required": false,
+      "description": "Preview changes using git-style diff format"
+    }
+  },
+  "outputs": {
+    "content": {
+      "type": "array",
+      "description": "MCP response content blocks."
+    }
+  },
+  "requirements": {
+    "tools": [
+      "mcp_filesystem_edit_file"
+    ],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "call_mcp",
+        "action": "mcp_filesystem_edit_file",
+        "params": {
+          "path": "{{inputs.path}}",
+          "edits": "{{inputs.edits}}",
+          "dryRun": "{{inputs.dryRun}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": [
+      "mcp filesystem edit file"
+    ]
+  },
+  "lifecycle": {
+    "version": "1.0.0",
+    "status": "experimental"
+  }
+}

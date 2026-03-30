@@ -31,7 +31,7 @@ API_PREFIXES = (
     "/llm/", "/browser/", "/metrics", "/gaps/", "/optimizations/",
     "/proposals/", "/integrations", "/interpret", "/plan",
     "/executions/", "/mcp/", "/a2a/", "/memory", "/chat",
-    "/workspaces", "/.well-known", "/skills", "/agents", "/agent",
+    "/workspaces", "/.well-known", "/skills", "/agents", "/agent", "/logs", "/voice", "/supervisor", "/scheduler",
 )
 
 
@@ -128,6 +128,14 @@ class UnifiedHandler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
+    # Initialize logging
+    try:
+        from system.core.logging_config import setup_logging
+        logger = setup_logging(workspace_root=WORKSPACE_ROOT)
+        logger.info("Capability OS starting...")
+    except Exception:
+        pass
+
     host = os.environ.get("HOST", "0.0.0.0")
     port = int(os.environ.get("PORT", "8000"))
 

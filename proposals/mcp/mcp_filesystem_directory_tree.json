@@ -1,0 +1,53 @@
+{
+  "id": "mcp_filesystem_directory_tree",
+  "name": "filesystem: directory_tree",
+  "domain": "integraciones",
+  "type": "integration",
+  "description": "Get a recursive tree view of files and directories as a JSON structure. Each entry includes 'name', 'type' (file/directory), and 'children' for directories. Files have no children array, while directories always have a children array (which may be empty). The output is formatted with 2-space indentation for readability. Only works within allowed directories.",
+  "inputs": {
+    "path": {
+      "type": "string",
+      "required": true
+    },
+    "excludePatterns": {
+      "type": "array",
+      "required": false
+    }
+  },
+  "outputs": {
+    "content": {
+      "type": "array",
+      "description": "MCP response content blocks."
+    }
+  },
+  "requirements": {
+    "tools": [
+      "mcp_filesystem_directory_tree"
+    ],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "call_mcp",
+        "action": "mcp_filesystem_directory_tree",
+        "params": {
+          "path": "{{inputs.path}}",
+          "excludePatterns": "{{inputs.excludePatterns}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": [
+      "mcp filesystem directory tree"
+    ]
+  },
+  "lifecycle": {
+    "version": "1.0.0",
+    "status": "experimental"
+  }
+}

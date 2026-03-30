@@ -56,3 +56,29 @@ def uninstall_skill(service: Any, payload: Any, skill_id: str = "", **kw: Any):
     except Exception:
         pass
     return _resp(HTTPStatus.OK, {"status": "success", "removed": skill_id})
+
+
+def hot_load(service: Any, payload: Any, **kw: Any):
+    """Hot-load a new tool into the running system without restart."""
+    if not hasattr(service, "skill_creator"):
+        return _resp(HTTPStatus.SERVICE_UNAVAILABLE, {"status": "error", "error": "Skill creator not available"})
+
+    p = payload or {}
+    result = service.skill_creator.create_and_load(
+        tool_id=p.get("tool_id", ""),
+        name=p.get("name", ""),
+        description=p.get("description", ""),
+        inputs=p.get("inputs", {}),
+        outputs=p.get("outputs", {}),
+        handler_code=p.get("handler_code", ""),
+        handler_name=p.get("handler_name", ""),
+        dependencies=p.get("dependencies"),
+    )
+    return _resp(HTTPStatus.OK if result.get("status") == "success" else HTTPStatus.BAD_REQUEST, result)
+
+
+def list_created_skills(service: Any, payload: Any, **kw: Any):
+    """List auto-generated skills."""
+    if not hasattr(service, "skill_creator"):
+        return _resp(HTTPStatus.OK, {"skills": []})
+    return _resp(HTTPStatus.OK, {"skills": service.skill_creator.created_skills})

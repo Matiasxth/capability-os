@@ -163,6 +163,8 @@ class ErrorNotifier:
                     cwd=str(self._project_root),
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=300,
                 )
                 log.write(result.stdout or "")

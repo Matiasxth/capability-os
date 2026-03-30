@@ -277,6 +277,27 @@ class CapabilityOSUIBridgeService:
         except Exception as exc:
             print(f"  WhatsApp auto-reply: failed ({exc})")
 
+        # Voice services (STT + TTS)
+        try:
+            from system.core.voice import STTService, TTSService
+            voice_settings = runtime_settings.get("voice", {})
+            llm_key = runtime_settings.get("llm", {}).get("api_key", "")
+            self.stt_service = STTService(
+                provider=voice_settings.get("stt_provider", "whisper_api"),
+                api_key=voice_settings.get("stt_api_key") or llm_key,
+                language=voice_settings.get("language", "es"),
+            )
+            self.tts_service = TTSService(
+                provider=voice_settings.get("tts_provider", "web_speech"),
+                api_key=voice_settings.get("tts_api_key") or llm_key,
+                voice=voice_settings.get("tts_voice", "nova"),
+                speed=voice_settings.get("tts_speed", 1.0),
+                output_dir=self.workspace_root / "artifacts" / "voice",
+            )
+            print(f"  Voice: STT={self.stt_service._provider}, TTS={self.tts_service._provider}", flush=True)
+        except Exception as exc:
+            print(f"  Voice: failed ({exc})", flush=True)
+
         # Agent registry (custom agent definitions)
         try:
             from system.core.agent.agent_registry import AgentRegistry
@@ -300,9 +321,51 @@ class CapabilityOSUIBridgeService:
                 tool_registry=self.tool_registry,
                 workspace_root=str(self.workspace_root),
                 max_iterations=runtime_settings.get("agent", {}).get("max_iterations", 10) if isinstance(runtime_settings.get("agent"), dict) else 10,
+                execution_history=self.execution_history,
             )
             self.security_service = security_svc
+
+            # Skill Creator (hot-reload)
+            from system.core.supervisor.skill_creator import SkillCreator
+            self.skill_creator = SkillCreator(
+                tool_registry=self.tool_registry,
+                tool_runtime=self.tool_runtime,
+                agent_loop=self.agent_loop,
+                security_service=security_svc,
+                project_root=self.project_root,
+            )
             print(f"  Agent Loop: active (max_iterations={self.agent_loop._max_iterations})", flush=True)
+
+            # Supervisor Daemon
+            try:
+                from system.core.supervisor.supervisor_daemon import SupervisorDaemon
+                sv_cfg = runtime_settings.get("supervisor", {}) if isinstance(runtime_settings.get("supervisor"), dict) else {}
+                self.supervisor = SupervisorDaemon(
+                    project_root=self.project_root,
+                    skill_creator=getattr(self, "skill_creator", None),
+                    max_claude_per_hour=sv_cfg.get("max_claude_per_hour", 10),
+                    health_interval_s=sv_cfg.get("health_interval_s", 60),
+                )
+                from system.core.ui_bridge.event_bus import event_bus as _sv_eb
+                self.supervisor.start(_sv_eb)
+                print(f"  Supervisor: active (claude={'yes' if self.supervisor.claude_bridge.available else 'no'})", flush=True)
+            except Exception as sv_exc:
+                print(f"  Supervisor: failed ({sv_exc})", flush=True)
+
+            # Proactive Scheduler
+            try:
+                from system.core.scheduler import TaskQueue, ProactiveScheduler
+                self.task_queue = TaskQueue(data_path=self.workspace_root / "queue.json")
+                self.scheduler = ProactiveScheduler(
+                    task_queue=self.task_queue,
+                    agent_loop=self.agent_loop,
+                    agent_registry=getattr(self, "agent_registry", None),
+                    whatsapp_manager=getattr(self, "whatsapp_manager", None),
+                )
+                self.scheduler.start()
+                print(f"  Scheduler: active ({len(self.task_queue.list())} tasks)", flush=True)
+            except Exception as sc_exc:
+                print(f"  Scheduler: failed ({sc_exc})", flush=True)
         except Exception as exc:
             import traceback
             traceback.print_exc()
@@ -527,6 +590,13 @@ class CapabilityOSUIBridgeService:
         r.add("POST", "/agents/{agent_id}", agent_handlers.update_agent)
         r.add("DELETE", "/agents/{agent_id}", agent_handlers.delete_agent)
         r.add("POST", "/agents/design", agent_handlers.design_agent)
+        # Logs
+        r.add("GET", "/logs", system_handlers.get_logs)
+        # Voice
+        from system.core.ui_bridge.handlers import voice_handlers
+        r.add("POST", "/voice/transcribe", voice_handlers.transcribe)
+        r.add("POST", "/voice/synthesize", voice_handlers.synthesize)
+        r.add("GET", "/voice/config", voice_handlers.voice_config)
         r.add("GET", "/executions/{execution_id}", capability_handlers.get_execution)
         r.add("GET", "/executions/{execution_id}/events", capability_handlers.get_execution_events)
         # Growth
@@ -602,6 +672,23 @@ class CapabilityOSUIBridgeService:
         r.add("POST", "/skills/install", skill_handlers.install_skill)
         r.add("GET", "/skills/{skill_id}", skill_handlers.get_skill)
         r.add("DELETE", "/skills/{skill_id}", skill_handlers.uninstall_skill)
+        r.add("POST", "/skills/hot-load", skill_handlers.hot_load)
+        r.add("GET", "/skills/auto-generated", skill_handlers.list_created_skills)
+        # Supervisor
+        from system.core.ui_bridge.handlers import supervisor_handlers
+        r.add("GET", "/supervisor/status", supervisor_handlers.supervisor_status)
+        r.add("GET", "/supervisor/log", supervisor_handlers.supervisor_log)
+        r.add("POST", "/supervisor/claude", supervisor_handlers.supervisor_invoke_claude)
+        r.add("POST", "/supervisor/health-check", supervisor_handlers.health_check_now)
+        # Scheduler
+        from system.core.ui_bridge.handlers import scheduler_handlers
+        r.add("GET", "/scheduler/tasks", scheduler_handlers.list_tasks)
+        r.add("POST", "/scheduler/tasks", scheduler_handlers.create_task)
+        r.add("POST", "/scheduler/tasks/{task_id}", scheduler_handlers.update_task)
+        r.add("DELETE", "/scheduler/tasks/{task_id}", scheduler_handlers.delete_task)
+        r.add("POST", "/scheduler/tasks/{task_id}/run", scheduler_handlers.run_task_now)
+        r.add("GET", "/scheduler/status", scheduler_handlers.scheduler_status)
+        r.add("GET", "/scheduler/log", scheduler_handlers.scheduler_log)
         return r
 
     def _load_registries(self) -> None:
@@ -1852,6 +1939,9 @@ class CapabilityOSRequestHandler(BaseHTTPRequestHandler):
         if method == "POST" and self.path.split("?")[0] == "/execute/stream":
             self._handle_execute_stream()
             return
+        if method == "POST" and self.path.split("?")[0] == "/agent/stream":
+            self._handle_agent_stream()
+            return
 
         service: CapabilityOSUIBridgeService = self.server.service  # type: ignore[attr-defined]
         try:
@@ -2025,6 +2115,71 @@ class CapabilityOSRequestHandler(BaseHTTPRequestHandler):
         else:
             done_payload = {"done": True, "result": {"status": "error", "error_message": "Execution failed"}}
         self.wfile.write(f"data: {json.dumps(done_payload, default=str)}\n\n".encode("utf-8"))
+        self.wfile.flush()
+
+    def _handle_agent_stream(self) -> None:
+        """SSE endpoint for streaming agent loop events in real-time."""
+        import threading
+
+        service: CapabilityOSUIBridgeService = self.server.service  # type: ignore[attr-defined]
+        try:
+            body = self._read_json_payload() or {}
+        except Exception:
+            body = {}
+
+        if not hasattr(service, "agent_loop"):
+            self.send_response(HTTPStatus.SERVICE_UNAVAILABLE)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": "Agent not available"}).encode())
+            return
+
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+
+        message = body.get("message", "")
+        session_id = body.get("session_id")
+        history = body.get("history", [])
+        agent_id = body.get("agent_id")
+
+        agent_config = None
+        if agent_id and hasattr(service, "agent_registry"):
+            agent_config = service.agent_registry.get(agent_id)
+
+        import queue as _queue
+        event_queue: _queue.Queue[dict[str, Any] | None] = _queue.Queue()
+
+        def _run() -> None:
+            try:
+                gen = service.agent_loop.run(message, session_id=session_id, conversation_history=history, agent_config=agent_config)
+                for event in gen:
+                    event_queue.put(event)
+            except StopIteration:
+                pass
+            except Exception as exc:
+                event_queue.put({"event": "agent_error", "error": str(exc)[:300]})
+            finally:
+                event_queue.put(None)
+
+        worker = threading.Thread(target=_run, daemon=True)
+        worker.start()
+
+        try:
+            while True:
+                event = event_queue.get(timeout=120)
+                if event is None:
+                    break
+                sse_line = f"data: {json.dumps(event, default=str)}\n\n"
+                self.wfile.write(sse_line.encode("utf-8"))
+                self.wfile.flush()
+        except Exception:
+            pass
+
+        self.wfile.write(b"data: {\"done\": true}\n\n")
         self.wfile.flush()
 
 

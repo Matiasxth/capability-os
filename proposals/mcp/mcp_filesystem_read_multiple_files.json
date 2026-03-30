@@ -1,0 +1,49 @@
+{
+  "id": "mcp_filesystem_read_multiple_files",
+  "name": "filesystem: read_multiple_files",
+  "domain": "integraciones",
+  "type": "integration",
+  "description": "Read the contents of multiple files simultaneously. This is more efficient than reading files one by one when you need to analyze or compare multiple files. Each file's content is returned with its path as a reference. Failed reads for individual files won't stop the entire operation. Only works within allowed directories.",
+  "inputs": {
+    "paths": {
+      "type": "array",
+      "required": true,
+      "description": "Array of file paths to read. Each path must be a string pointing to a valid file within allowed directories."
+    }
+  },
+  "outputs": {
+    "content": {
+      "type": "array",
+      "description": "MCP response content blocks."
+    }
+  },
+  "requirements": {
+    "tools": [
+      "mcp_filesystem_read_multiple_files"
+    ],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "call_mcp",
+        "action": "mcp_filesystem_read_multiple_files",
+        "params": {
+          "paths": "{{inputs.paths}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": [
+      "mcp filesystem read multiple files"
+    ]
+  },
+  "lifecycle": {
+    "version": "1.0.0",
+    "status": "experimental"
+  }
+}

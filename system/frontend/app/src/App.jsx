@@ -11,7 +11,7 @@ export default function App() {
   const [apiOnline, setApiOnline] = useState(true);
   const [workspaces, setWorkspaces] = useState([]);
   const [defaultWsId, setDefaultWsId] = useState(null);
-  const [userName, setUserName] = useState(null);
+  const [userName, setUserName] = useState(() => localStorage.getItem("capos_username") || null);
   const [booting, setBooting] = useState(true);
 
   useEffect(() => {
@@ -34,7 +34,9 @@ export default function App() {
     (async () => {
       try {
         const [prefs, ws] = await Promise.all([getMemoryPreferences(), listWorkspaces()]);
-        setUserName((prefs.preferences || {}).name || "");
+        const name = (prefs.preferences || {}).name || localStorage.getItem("capos_username") || "";
+        setUserName(name);
+        if (name) localStorage.setItem("capos_username", name);
         setWorkspaces(ws.workspaces || []);
         setDefaultWsId(ws.default_id || null);
       } catch { setUserName(""); }
@@ -48,7 +50,7 @@ export default function App() {
   }
 
   if (booting) return <div style={{ minHeight: "100vh", background: "#0a0a0a" }} />;
-  if (!userName) return <Onboarding onComplete={name => setUserName(name)} />;
+  if (!userName) return <Onboarding onComplete={name => { localStorage.setItem("capos_username", name); setUserName(name); }} />;
 
   const activeWs = workspaces.find(w => w.id === defaultWsId) || workspaces[0] || null;
 

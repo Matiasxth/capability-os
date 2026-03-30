@@ -1,0 +1,60 @@
+{
+  "id": "mcp_filesystem_read_text_file",
+  "name": "filesystem: read_text_file",
+  "domain": "integraciones",
+  "type": "integration",
+  "description": "Read the complete contents of a file from the file system as text. Handles various text encodings and provides detailed error messages if the file cannot be read. Use this tool when you need to examine the contents of a single file. Use the 'head' parameter to read only the first N lines of a file, or the 'tail' parameter to read only the last N lines of a file. Operates on the file as text regardless of extension. Only works within allowed directories.",
+  "inputs": {
+    "path": {
+      "type": "string",
+      "required": true
+    },
+    "tail": {
+      "type": "number",
+      "required": false,
+      "description": "If provided, returns only the last N lines of the file"
+    },
+    "head": {
+      "type": "number",
+      "required": false,
+      "description": "If provided, returns only the first N lines of the file"
+    }
+  },
+  "outputs": {
+    "content": {
+      "type": "array",
+      "description": "MCP response content blocks."
+    }
+  },
+  "requirements": {
+    "tools": [
+      "mcp_filesystem_read_text_file"
+    ],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "call_mcp",
+        "action": "mcp_filesystem_read_text_file",
+        "params": {
+          "path": "{{inputs.path}}",
+          "tail": "{{inputs.tail}}",
+          "head": "{{inputs.head}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": [
+      "mcp filesystem read text file"
+    ]
+  },
+  "lifecycle": {
+    "version": "1.0.0",
+    "status": "experimental"
+  }
+}

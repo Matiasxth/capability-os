@@ -15,6 +15,7 @@ export const SECTION_REGISTRY = [
   { id: "integrations",     label: "Integrations", keywords: ["telegram", "whatsapp", "slack", "discord", "channel"] },
   { id: "browser",          label: "Browser",      keywords: ["cdp", "chrome", "worker", "session"] },
   { id: "skills",           label: "Skills",       keywords: ["install", "uninstall", "package", "skill"] },
+  { id: "supervisor",         label: "Supervisor",     keywords: ["supervisor", "monitor", "health", "claude", "auto-fix"] },
   { id: "agents",            label: "Agents",         keywords: ["agent", "bot", "assistant", "create", "personality"] },
   { id: "project-states",   label: "Project States", keywords: ["status", "icon", "label", "state", "project"] },
 ];

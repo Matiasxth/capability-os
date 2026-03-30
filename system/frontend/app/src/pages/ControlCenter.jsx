@@ -13,6 +13,7 @@ import {
   getDiscordStatus, configureDiscord, testDiscord, startDiscordPolling, stopDiscordPolling, getDiscordPollingStatus,
   whatsappBridgeCheck, whatsappBridgeClose, whatsappSwitchBackend, whatsappConfigure, whatsappListBackends,
   listAgents, createAgent, updateAgentDef, deleteAgentDef, designAgent,
+  getSupervisorStatus, getSupervisorLog, invokeSupervisorClaude, runHealthCheck,
 } from "../api";
 import CCLayout from "../components/control-center/CCLayout";
 import KPIBar from "../components/control-center/KPIBar";
@@ -569,7 +570,71 @@ export default function ControlCenter() {
     </div>
   </div>)}
 
-  const R={system:renderSystem,workspaces:renderWorkspaces,llm:renderLLM,metrics:renderMetrics,"self-improvement":renderSI,"auto-growth":renderAutoGrowth,mcp:renderMCP,a2a:renderA2A,memory:renderMemory,integrations:renderIntegrations,browser:renderBrowser,skills:renderSkills,agents:renderAgents,"project-states":renderProjectStates};
+  // ── Supervisor section ──
+  const [svStatus,setSvStatus]=useState(null);
+  const [svLog,setSvLog]=useState([]);
+  const [svPrompt,setSvPrompt]=useState("");
+  const [svResponse,setSvResponse]=useState("");
+  useEffect(()=>{if(activeSection==="supervisor"){getSupervisorStatus().then(setSvStatus).catch(()=>{});getSupervisorLog().then(r=>setSvLog(r.log||[])).catch(()=>{})}},[activeSection]);
+
+  const [svChat,setSvChat]=useState([]);
+  const [svAsking,setSvAsking]=useState(false);
+
+  function renderSupervisor(){const sv=svStatus||{};const h=sv.health||{};const cl=sv.claude||{};const errs=sv.errors||{};return(<div style={{display:"flex",flexDirection:"column",gap:12}}>
+    <h2>Supervisor</h2>
+
+    <div className="kpi-grid" style={{gridTemplateColumns:"1fr 1fr 1fr 1fr"}}>
+      <div className="kpi-card"><div className="kpi-label">Status</div><div style={{display:"flex",alignItems:"center",gap:4}}><span className={`dot ${sv.running?"dot-success":"dot-error"}`}/><span style={{fontSize:13,fontWeight:600}}>{sv.running?"Active":"Off"}</span></div></div>
+      <div className="kpi-card"><div className="kpi-label">Health</div><div style={{display:"flex",alignItems:"center",gap:4}}><span className={`dot ${h.status==="healthy"?"dot-success":h.status==="degraded"?"dot-warning":"dot-error"}`}/><span style={{fontSize:13,fontWeight:600}}>{h.status||"unknown"}</span></div></div>
+      <div className="kpi-card"><div className="kpi-label">Claude</div><div style={{fontSize:13,fontWeight:600}}>{cl.available?`Ready (${cl.invocations||0}/hr)`:"Not found"}</div></div>
+      <div className="kpi-card"><div className="kpi-label">Errors</div><div style={{fontSize:13,fontWeight:600}}>{Object.values(errs.summary||{}).reduce((a,b)=>a+b,0)||0} total</div></div>
+    </div>
+
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+      <div className="card" style={{padding:14}}>
+        <h4 style={{margin:"0 0 10px",fontSize:13}}>Health Checks</h4>
+        {(h.checks||[]).map((c,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:8,fontSize:13,padding:"6px 0",borderBottom:"1px solid var(--border)"}}>
+          <span className={`dot ${c.ok?"dot-success":"dot-error"}`}/>
+          <span style={{flex:1,fontWeight:500}}>{c.check.replace(/_/g," ")}</span>
+          <span style={{fontSize:11,color:c.ok?"var(--success)":"var(--error)"}}>{c.ok?"OK":"FAIL"}</span>
+        </div>)}
+        <button style={{marginTop:10,height:32,fontSize:12,width:"100%"}} onClick={()=>runHealthCheck().then(r=>{setSvStatus(s=>({...s,health:{...s?.health,checks:r.checks,status:r.status}}));toast("Health: "+r.status)}).catch(()=>{})}>Run Health Check Now</button>
+      </div>
+
+      <div className="card" style={{padding:14}}>
+        <h4 style={{margin:"0 0 10px",fontSize:13}}>Recent Interventions</h4>
+        <div style={{maxHeight:250,overflowY:"auto"}}>
+          {svLog.length===0&&<div style={{color:"var(--text-muted)",padding:16,textAlign:"center",fontSize:13}}>No interventions yet</div>}
+          {svLog.map((e,i)=><div key={i} style={{padding:"6px 0",borderBottom:"1px solid var(--border)",fontSize:12,display:"flex",gap:8}}>
+            <span style={{color:"var(--text-muted)",flexShrink:0,fontSize:11}}>{(e.timestamp||"").slice(11,19)}</span>
+            <span style={{color:e.severity==="high"?"var(--error)":e.severity==="medium"?"var(--warning)":"var(--text-dim)",fontWeight:600,flexShrink:0}}>{(e.severity||e.action||"info").toUpperCase()}</span>
+            <span style={{flex:1,color:"var(--text)"}}>{(e.message||e.diagnosis||e.context||"").slice(0,120)}</span>
+          </div>)}
+        </div>
+      </div>
+    </div>
+
+    <div className="card" style={{padding:16}}>
+      <h4 style={{margin:"0 0 12px",fontSize:14}}>Chat with Claude Supervisor</h4>
+      <div style={{background:"var(--bg-root)",borderRadius:10,border:"1px solid var(--border)",minHeight:300,maxHeight:450,overflowY:"auto",padding:14,marginBottom:12,display:"flex",flexDirection:"column",gap:8}}>
+        {svChat.length===0&&<div style={{color:"var(--text-muted)",textAlign:"center",padding:40,fontSize:13}}>Ask Claude to analyze your system, diagnose issues, or suggest improvements.</div>}
+        {svChat.map((m,i)=><div key={i} style={{alignSelf:m.role==="user"?"flex-end":"flex-start",maxWidth:"85%",padding:"10px 14px",borderRadius:12,fontSize:13,lineHeight:1.6,whiteSpace:"pre-wrap",
+          background:m.role==="user"?"var(--accent-dim)":"var(--bg-elevated)",
+          border:m.role==="user"?"1px solid var(--accent)":"1px solid var(--border)",
+          color:"var(--text)",
+          borderBottomRightRadius:m.role==="user"?4:12,
+          borderBottomLeftRadius:m.role==="user"?12:4,
+        }}>{m.content}</div>)}
+        {svAsking&&<div style={{alignSelf:"flex-start",padding:"10px 14px",borderRadius:12,background:"var(--bg-elevated)",border:"1px solid var(--border)",fontSize:13,color:"var(--text-muted)",animation:"pulse 1.5s infinite"}}>Thinking...</div>}
+      </div>
+      <form onSubmit={async e=>{e.preventDefault();if(!svPrompt.trim()||svAsking)return;const q=svPrompt;setSvPrompt("");setSvChat(c=>[...c,{role:"user",content:q}]);setSvAsking(true);try{const r=await invokeSupervisorClaude(q);const resp=r.response||r.error||"No response";setSvChat(c=>[...c,{role:"assistant",content:resp}])}catch(err){setSvChat(c=>[...c,{role:"assistant",content:"Error: "+err.message}])}finally{setSvAsking(false)}}} style={{display:"flex",gap:8}}>
+        <input value={svPrompt} onChange={e=>setSvPrompt(e.target.value)} style={{flex:1,height:40,fontSize:14,padding:"0 14px",borderRadius:10,background:"var(--bg-input)",border:"1px solid var(--border)",color:"var(--text)",outline:"none"}} placeholder="Ask Claude about the system..." autoComplete="off"/>
+        <button type="submit" disabled={svAsking||!svPrompt.trim()} style={{height:40,padding:"0 20px",fontSize:13,fontWeight:600,borderRadius:10,background:svPrompt.trim()?"var(--accent)":"var(--bg-elevated)",color:svPrompt.trim()?"var(--bg-root)":"var(--text-muted)",border:"none",cursor:svPrompt.trim()?"pointer":"not-allowed"}}>Send</button>
+      </form>
+    </div>
+  </div>)}
+
+  const R={system:renderSystem,workspaces:renderWorkspaces,llm:renderLLM,metrics:renderMetrics,"self-improvement":renderSI,"auto-growth":renderAutoGrowth,mcp:renderMCP,a2a:renderA2A,memory:renderMemory,integrations:renderIntegrations,browser:renderBrowser,skills:renderSkills,supervisor:renderSupervisor,agents:renderAgents,"project-states":renderProjectStates};
 
   return (<>
     <CCLayout activeSection={activeSection} onSelectSection={setActiveSection} wsConnected={wsConnected} highlightSection={highlightSection}>

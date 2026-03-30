@@ -8,8 +8,37 @@ from __future__ import annotations
 
 import json
 import re
+import threading
+import time
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Any
+
+
+class LLMRateLimiter:
+    """Sliding window rate limiter for LLM API calls."""
+
+    def __init__(self, max_rpm: int = 30) -> None:
+        self._max_rpm = max_rpm
+        self._timestamps: deque[float] = deque()
+        self._lock = threading.Lock()
+
+    def check(self) -> tuple[bool, float]:
+        """Returns (allowed, wait_seconds). If not allowed, wait_seconds > 0."""
+        now = time.monotonic()
+        with self._lock:
+            # Remove timestamps older than 60s
+            while self._timestamps and now - self._timestamps[0] > 60:
+                self._timestamps.popleft()
+            if len(self._timestamps) >= self._max_rpm:
+                wait = 60 - (now - self._timestamps[0])
+                return False, max(0.1, wait)
+            self._timestamps.append(now)
+            return True, 0
+
+    def configure(self, max_rpm: int) -> None:
+        with self._lock:
+            self._max_rpm = max(1, max_rpm)
 
 
 @dataclass
@@ -79,8 +108,9 @@ def _map_type(t: str) -> str:
 class ToolUseAdapter:
     """Calls the LLM with tool definitions and parses tool_calls from the response."""
 
-    def __init__(self, llm_client: Any) -> None:
+    def __init__(self, llm_client: Any, max_rpm: int = 30) -> None:
         self._client = llm_client
+        self._rate_limiter = LLMRateLimiter(max_rpm=max_rpm)
 
     def run_agent_turn(
         self,
@@ -91,12 +121,15 @@ class ToolUseAdapter:
         """Send conversation + tools to LLM, return text and/or tool_calls."""
         provider = self._detect_provider()
 
-        # For now, always use text-based tool calling which works through the
-        # existing LLMClient.complete() method. This is compatible with ALL
-        # providers (Groq, OpenAI, Ollama, Anthropic, etc.) without needing
-        # direct HTTP access (which Cloudflare blocks for some providers).
-        # TODO: Add native function calling for providers that support it
-        # when we can bypass Cloudflare (e.g., via the provider's SDK).
+        # Try native function calling first (uses adapter's own HTTP method which bypasses Cloudflare)
+        adapter = getattr(self._client, "adapter", None)
+        if adapter and hasattr(adapter, "complete_with_tools"):
+            try:
+                return self._native_turn(adapter, messages, tools, system_prompt)
+            except Exception:
+                pass  # Fall through to text mode
+
+        # Fallback: text-based tool calling (works with all providers)
         return self._text_turn(messages, tools, system_prompt)
 
     def _detect_provider(self) -> str:
@@ -270,6 +303,63 @@ class ToolUseAdapter:
     # Text-based fallback (Ollama, Gemini, any provider)
     # ------------------------------------------------------------------
 
+    def _native_turn(
+        self, adapter: Any, messages: list[dict], tools: list[dict], system_prompt: str,
+    ) -> AgentResponse:
+        """Use the adapter's native function calling (bypasses Cloudflare)."""
+        # Build OpenAI-format messages
+        oai_messages = [{"role": "system", "content": system_prompt}]
+        for m in messages:
+            role = m.get("role", "user")
+            if role == "tool_result":
+                oai_messages.append({
+                    "role": "tool",
+                    "tool_call_id": m.get("tool_call_id", ""),
+                    "content": json.dumps(m.get("content", {}), ensure_ascii=False)[:2000],
+                })
+            elif role == "assistant" and m.get("tool_calls"):
+                tc_list = []
+                for tc in m["tool_calls"]:
+                    tc_list.append({
+                        "id": tc.get("call_id", ""),
+                        "type": "function",
+                        "function": {"name": tc.get("tool_id", ""), "arguments": json.dumps(tc.get("params", {}))},
+                    })
+                oai_messages.append({"role": "assistant", "content": m.get("content", ""), "tool_calls": tc_list})
+            else:
+                oai_messages.append({"role": role, "content": m.get("content", "")})
+
+        # Rate limit check
+        allowed, wait_s = self._rate_limiter.check()
+        if not allowed:
+            return AgentResponse(text=f"Rate limit: espera {int(wait_s)} segundos.", stop_reason="end_turn")
+
+        data = adapter.complete_with_tools(oai_messages, tools)
+        choice = data.get("choices", [{}])[0]
+        msg = choice.get("message", {})
+
+        raw_tool_calls = msg.get("tool_calls")
+        if raw_tool_calls:
+            calls = []
+            for tc in raw_tool_calls:
+                fn = tc.get("function", {})
+                try:
+                    params = json.loads(fn.get("arguments", "{}"))
+                except json.JSONDecodeError:
+                    params = {}
+                calls.append(ToolCall(
+                    tool_id=fn.get("name", ""),
+                    params=params,
+                    call_id=tc.get("id", ""),
+                ))
+            return AgentResponse(
+                text=msg.get("content"),
+                tool_calls=calls,
+                stop_reason="tool_use",
+            )
+
+        return AgentResponse(text=msg.get("content", ""), stop_reason="end_turn")
+
     def _text_turn(
         self, messages: list[dict], tools: list[dict], system_prompt: str,
     ) -> AgentResponse:
@@ -304,6 +394,11 @@ CRITICAL RULES:
                 conv += f"\nTool result ({m.get('tool_id', '')}):\n{json.dumps(m.get('content', {}), ensure_ascii=False)[:1000]}\n"
             else:
                 conv += f"\n{role}: {m.get('content', '')}\n"
+
+        # Rate limit check
+        allowed, wait_s = self._rate_limiter.check()
+        if not allowed:
+            return AgentResponse(text=f"Rate limit: demasiadas solicitudes. Espera {int(wait_s)} segundos.", stop_reason="end_turn")
 
         try:
             response_text = self._client.complete(system_prompt=full_prompt, user_prompt=conv)

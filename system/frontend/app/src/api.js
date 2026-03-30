@@ -554,6 +554,37 @@ export function browseWorkspace(wsId, relativePath) {
 
 // ── Agent API ──
 
+export async function* streamAgent(message, sessionId, history, agentId) {
+  const body = { message };
+  if (sessionId) body.session_id = sessionId;
+  if (history) body.history = history;
+  if (agentId) body.agent_id = agentId;
+  const resp = await fetch(`${API_BASE_URL}/agent/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    while (buffer.includes("\n\n")) {
+      const idx = buffer.indexOf("\n\n");
+      const line = buffer.slice(0, idx).trim();
+      buffer = buffer.slice(idx + 2);
+      if (!line.startsWith("data:")) continue;
+      try {
+        const data = JSON.parse(line.slice(5).trim());
+        if (data.done) return;
+        yield data;
+      } catch {}
+    }
+  }
+}
+
 export function runAgent(message, sessionId, history, agentId) {
   const body = { message };
   if (sessionId) body.session_id = sessionId;
@@ -581,6 +612,12 @@ export function getAgentDef(agentId) { return request(`/agents/${agentId}`); }
 export function updateAgentDef(agentId, fields) { return request(`/agents/${agentId}`, { method: "POST", body: JSON.stringify(fields) }); }
 export function deleteAgentDef(agentId) { return request(`/agents/${agentId}`, { method: "DELETE" }); }
 export function designAgent(description) { return request("/agents/design", { method: "POST", body: JSON.stringify({ description }) }); }
+
+// ── Supervisor API ──
+export function getSupervisorStatus() { return request("/supervisor/status"); }
+export function getSupervisorLog() { return request("/supervisor/log"); }
+export function invokeSupervisorClaude(prompt) { return request("/supervisor/claude", { method: "POST", body: JSON.stringify({ prompt }) }); }
+export function runHealthCheck() { return request("/supervisor/health-check", { method: "POST", body: "{}" }); }
 
 export function updateWorkspaceStatus(wsId, status) {
   return request(`/workspaces/${wsId}/status`, {

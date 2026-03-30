@@ -85,3 +85,32 @@ class AgentSession:
             ],
             "final_text": self.final_text,
         }
+
+    def to_persistable(self) -> list[dict[str, Any]]:
+        """Compact message list for persistence. Last 20 messages."""
+        compact = []
+        for m in self.messages[-20:]:
+            role = m.get("role", "user")
+            if role == "tool_result":
+                content = m.get("content", {})
+                # Truncate large results
+                if isinstance(content, dict):
+                    text = str(content)[:300]
+                else:
+                    text = str(content)[:300]
+                compact.append({"role": "assistant", "content": f"[Tool: {m.get('tool_id', '?')}] {text}", "type": "tool_result"})
+            elif m.get("tool_calls"):
+                tools = ", ".join(tc.get("tool_id", "?") for tc in m["tool_calls"])
+                compact.append({"role": "assistant", "content": f"[Called: {tools}]", "type": "tool_call"})
+            else:
+                compact.append({"role": role, "content": str(m.get("content", ""))[:500], "type": "chat"})
+        return compact
+
+    @classmethod
+    def from_persisted(cls, session_id: str, messages: list[dict[str, Any]]) -> "AgentSession":
+        """Reconstruct session from persisted messages."""
+        session = cls(session_id=session_id)
+        for m in messages:
+            session.messages.append({"role": m.get("role", "user"), "content": m.get("content", "")})
+        session.status = "complete"
+        return session

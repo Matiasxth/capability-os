@@ -69,6 +69,7 @@ class AgentLoop:
         tool_registry: Any,
         workspace_root: str = "",
         max_iterations: int = 10,
+        execution_history: Any = None,
     ) -> None:
         self._adapter = tool_use_adapter
         self._tool_runtime = tool_runtime
@@ -89,6 +90,7 @@ class AgentLoop:
         }
         self._default_tools = [t for t in self._all_tools if t["name"] in priority_tools] or self._all_tools[:20]
         self._sessions: dict[str, AgentSession] = {}
+        self._execution_history = execution_history
 
     def _resolve_tools(self, agent_config: dict[str, Any] | None) -> list[dict[str, Any]]:
         """Get the tool list for this agent. If agent has tool_ids, filter to those."""
@@ -162,6 +164,7 @@ class AgentLoop:
                 result.iteration_count = session.iteration
 
                 yield {"event": "agent_response", "text": text}
+                self._auto_save(session, text)
                 return result
 
             # Handle error from LLM
@@ -356,6 +359,26 @@ class AgentLoop:
             oldest_key = next(iter(self._sessions))
             del self._sessions[oldest_key]
         return session
+
+    def _auto_save(self, session: AgentSession, final_text: str) -> None:
+        """Persist the session to execution history."""
+        if self._execution_history is None:
+            return
+        try:
+            messages = session.to_persistable()
+            first_user = ""
+            for m in messages:
+                if m.get("role") == "user":
+                    first_user = m.get("content", "")[:100]
+                    break
+            self._execution_history.upsert_chat(
+                session_id=session.session_id,
+                intent=first_user or "Agent session",
+                messages=messages,
+                duration_ms=int((time.time() - session.created_at) * 1000),
+            )
+        except Exception:
+            pass
 
     def _execute_tool(self, tool_id: str, params: dict[str, Any]) -> dict[str, Any]:
         """Execute a tool via the ToolRuntime and return the result."""

@@ -303,6 +303,14 @@ def _defaults_from_env(workspace_root: Path) -> dict[str, Any]:
             "enabled": True,
             "max_iterations": 10,
         },
+        "voice": {
+            "stt_provider": "whisper_api",
+            "tts_provider": "web_speech",
+            "tts_voice": "nova",
+            "tts_speed": 1.0,
+            "auto_speak": False,
+            "language": "es",
+        },
         "project_states": [
             {"name": "Idea", "color": "#a855f7", "icon": "\U0001f4a1"},
             {"name": "En construccion", "color": "#ffaa00", "icon": "\U0001f3d7\ufe0f"},
