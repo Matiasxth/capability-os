@@ -31,8 +31,9 @@ def build_agent_system_prompt(
     workspace_path: str = "",
     extra_context: str = "",
     agent_config: dict | None = None,
+    memory_context: str = "",
 ) -> str:
-    """Build the full system prompt with workspace context and agent personality."""
+    """Build the full system prompt with workspace context, agent personality, and memory."""
     # Use custom prompt if agent has one, otherwise use default
     if agent_config and agent_config.get("system_prompt"):
         base = agent_config["system_prompt"]
@@ -57,6 +58,10 @@ def build_agent_system_prompt(
 
     if workspace_path:
         parts.append(f"\n## Workspace\nYour default workspace is: {workspace_path}\nPrefer using paths within this workspace.")
+
+    # Inject memory context (user prefs, decisions, recent activity)
+    if memory_context:
+        parts.append(f"\n## Memory\n{memory_context}")
 
     if extra_context:
         parts.append(f"\n## Additional Context\n{extra_context}")

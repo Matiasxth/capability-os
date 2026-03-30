@@ -74,7 +74,7 @@ export default function Workspace({ activeWorkspace, userName }) {
   // ── History loading ──
   const historyIdsRef=useRef("");
   function loadHistory(force){
-    return getMemoryHistory().then(r=>{
+    return getMemoryHistory(null, activeProjectId).then(r=>{
       const valid=(r.history||[]).filter(h=>h.intent&&h.intent.trim().length>0&&h.intent!=="session"&&h.intent!=="New session");
       const mapped=valid.slice(0,20).map(h=>({id:h.execution_id,intent:h.intent,status:h.status==="ready"?"success":h.status,duration_ms:h.duration_ms,time:h.timestamp,plan_steps:h.plan_steps||null,step_runs:h.step_runs||null,error_message:h.error_message||null,failed_step:h.failed_step||null,final_output:h.key_outputs||{},chat_response:h.chat_response||null,chat_messages:h.chat_messages||null,message_count:h.message_count||0,isChat:h.capability_id==="chat",hasExecution:!!h.has_execution}));
       const newIds=mapped.map(h=>h.id+":"+(h.message_count||0)+":"+(h.time||"")).join(",");
@@ -100,6 +100,9 @@ export default function Workspace({ activeWorkspace, userName }) {
     getMemoryContext().then(r=>{if(!o)setFreqCaps((r.context?.frequent_capabilities||[]).slice(0,6))}).catch(()=>{});
     return()=>{o=true};
   },[]);
+
+  // ── Reload history when active workspace changes ──
+  useEffect(()=>{if(activeProjectId)loadHistory(true)},[activeProjectId]);
 
   // ── WebSocket ──
   const HISTORY_EVENTS=["telegram_message","whatsapp_message","slack_message","discord_message","session_updated","execution_complete","memory_cleared"];
@@ -145,7 +148,7 @@ export default function Workspace({ activeWorkspace, userName }) {
         return{role:m.role==="user"?"user":"assistant",content:typeof m.content==="string"?m.content:JSON.stringify(m.content),type:"chat"};
       });
       const intentText=firstUser.content;const sid=currentSessionId;
-      saveChatSession(sid,intentText,compact,lastDur).then(()=>{
+      saveChatSession(sid,intentText,compact,lastDur,activeProjectId).then(()=>{
         const entry={id:sid,intent:intentText,status:lastStatus,duration_ms:lastDur,time:new Date().toISOString(),isChat:!hasExec,hasExecution:hasExec,chat_messages:compact,message_count:compact.length};
         setHistory(p=>{const idx=p.findIndex(h=>h.id===sid);if(idx>=0){const u=[...p];u[idx]=entry;return u}return[entry,...p].slice(0,10)});
       }).catch(()=>{});
@@ -205,7 +208,7 @@ export default function Workspace({ activeWorkspace, userName }) {
         const events=[];
         let finalText="";
         let sid=null;
-        for await(const ev of streamAgent(q,agentSessionId,hist,activeAgentId)){
+        for await(const ev of streamAgent(q,agentSessionId,hist,activeAgentId,activeProjectId)){
           events.push(ev);
           if(ev.session_id)sid=ev.session_id;
           // Update UI in real-time

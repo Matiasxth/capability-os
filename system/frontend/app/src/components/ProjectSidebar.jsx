@@ -55,16 +55,9 @@ export default function ProjectSidebar({
     },
   };
 
-  const filteredHistory = activeProjectId
-    ? history.filter(h => {
-        // Match by session_id prefix or workspace reference
-        if (h.id?.startsWith?.(`ws_${activeProjectId}`)) return true;
-        // Also show if no project assignment (legacy)
-        const ws = workspaces.find(w => w.id === activeProjectId);
-        if (ws && h.intent) return true; // Show all for now
-        return true;
-      })
-    : history;
+  // History is already filtered by workspace from the API.
+  // Only apply client-side filter for channel sessions (telegram/whatsapp).
+  const filteredHistory = history;
 
   const activeProject = workspaces.find(w => w.id === activeProjectId);
 

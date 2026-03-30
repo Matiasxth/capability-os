@@ -26,10 +26,14 @@ def get_context(service: Any, payload: Any, **kw: Any):
 
 def get_history(service: Any, payload: Any, _raw_path: str = "", **kw: Any):
     cap_filter = None
+    ws_filter = None
     if _raw_path and "?" in _raw_path:
         qs = parse_qs(urlparse(_raw_path).query)
         cap_filter = qs.get("capability_id", [None])[0]
-    if cap_filter:
+        ws_filter = qs.get("workspace_id", [None])[0]
+    if ws_filter:
+        entries = service.execution_history.get_by_workspace(ws_filter)
+    elif cap_filter:
         entries = service.execution_history.get_by_capability(cap_filter)
     else:
         entries = service.execution_history.get_recent(20)
@@ -47,6 +51,7 @@ def save_chat(service: Any, payload: Any, **kw: Any):
         intent=body.get("intent", ""),
         messages=body.get("messages"),
         duration_ms=body.get("duration_ms", 0),
+        workspace_id=body.get("workspace_id"),
     )
     try:
         from system.core.ui_bridge.event_bus import event_bus
@@ -179,3 +184,108 @@ def compact_sessions(service: Any, payload: Any, **kw: Any):
     except Exception:
         pass
     return _resp(HTTPStatus.OK, {"status": "success", "compacted": compacted, "freed_messages": freed})
+
+
+# ------------------------------------------------------------------
+# Markdown Memory endpoints
+# ------------------------------------------------------------------
+
+def get_markdown_memory(service: Any, payload: Any, **kw: Any):
+    """Return MEMORY.md content and parsed sections."""
+    md = getattr(service, "markdown_memory", None)
+    if md is None:
+        return _resp(HTTPStatus.OK, {"content": "", "sections": {}})
+    content = md.load_memory_md()
+    sections = md.load_memory_sections()
+    # Clean section values
+    clean_sections = {}
+    for k, lines in sections.items():
+        clean_sections[k] = [l.strip() for l in lines if l.strip()]
+    return _resp(HTTPStatus.OK, {"content": content, "sections": clean_sections})
+
+
+def save_markdown_memory(service: Any, payload: Any, **kw: Any):
+    """Overwrite MEMORY.md with provided content."""
+    md = getattr(service, "markdown_memory", None)
+    if md is None:
+        _err(HTTPStatus.SERVICE_UNAVAILABLE, "not_available", "Markdown memory not initialized.")
+    body = payload or {}
+    content = body.get("content", "")
+    md.save_memory_md(content)
+    return _resp(HTTPStatus.OK, {"status": "success"})
+
+
+def add_memory_fact(service: Any, payload: Any, **kw: Any):
+    """Add a fact to a section in MEMORY.md."""
+    md = getattr(service, "markdown_memory", None)
+    if md is None:
+        _err(HTTPStatus.SERVICE_UNAVAILABLE, "not_available", "Markdown memory not initialized.")
+    body = payload or {}
+    section = body.get("section", "")
+    fact = body.get("fact", "")
+    if not section or not fact:
+        _err(HTTPStatus.BAD_REQUEST, "missing_fields", "Fields 'section' and 'fact' are required.")
+    md.add_fact(section, fact)
+    return _resp(HTTPStatus.OK, {"status": "success"})
+
+
+def remove_memory_fact(service: Any, payload: Any, **kw: Any):
+    """Remove a fact from MEMORY.md."""
+    md = getattr(service, "markdown_memory", None)
+    if md is None:
+        _err(HTTPStatus.SERVICE_UNAVAILABLE, "not_available", "Markdown memory not initialized.")
+    body = payload or {}
+    section = body.get("section", "")
+    fact_substring = body.get("fact_substring", "")
+    if not section or not fact_substring:
+        _err(HTTPStatus.BAD_REQUEST, "missing_fields", "Fields 'section' and 'fact_substring' are required.")
+    removed = md.remove_fact(section, fact_substring)
+    return _resp(HTTPStatus.OK, {"status": "success", "removed": removed})
+
+
+def get_daily_notes(service: Any, payload: Any, _raw_path: str = "", **kw: Any):
+    """Return daily notes list and optionally a specific date's content."""
+    md = getattr(service, "markdown_memory", None)
+    if md is None:
+        return _resp(HTTPStatus.OK, {"dates": [], "content": ""})
+    qs = parse_qs(urlparse(_raw_path).query) if _raw_path else {}
+    date_str = (qs.get("date") or [""])[0]
+    dates = md.list_daily_dates(limit=14)
+    content = ""
+    if date_str:
+        from datetime import datetime, timezone
+        try:
+            dt = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            content = md.load_daily(dt)
+        except ValueError:
+            pass
+    elif dates:
+        from datetime import datetime, timezone
+        try:
+            dt = datetime.strptime(dates[0], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            content = md.load_daily(dt)
+        except ValueError:
+            pass
+    return _resp(HTTPStatus.OK, {"dates": dates, "content": content})
+
+
+def get_session_summaries(service: Any, payload: Any, **kw: Any):
+    """Return list of compacted session summaries."""
+    md = getattr(service, "markdown_memory", None)
+    if md is None:
+        return _resp(HTTPStatus.OK, {"sessions": []})
+    session_ids = md.list_sessions(limit=20)
+    sessions = []
+    for sid in session_ids:
+        summary = md.load_session_summary(sid)
+        sessions.append({"session_id": sid, "summary": summary[:200] if summary else ""})
+    return _resp(HTTPStatus.OK, {"sessions": sessions})
+
+
+def get_memory_agent_context(service: Any, payload: Any, **kw: Any):
+    """Return the compact memory context that gets injected into agent prompts."""
+    md = getattr(service, "markdown_memory", None)
+    if md is None:
+        return _resp(HTTPStatus.OK, {"context": ""})
+    context = md.build_context(max_tokens=500)
+    return _resp(HTTPStatus.OK, {"context": context})

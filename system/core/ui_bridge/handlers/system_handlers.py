@@ -78,3 +78,33 @@ def import_config(service: Any, payload: Any, **kw: Any):
     except Exception:
         pass
     return APIResponse(HTTPStatus.OK, {"status": "success", "message": "Configuration imported."})
+
+
+def get_logs(service: Any, payload: Any, **kw: Any):
+    """Return last N lines of the current log file."""
+    from system.core.ui_bridge.api_server import APIResponse
+    from pathlib import Path
+    import os
+    from urllib.parse import parse_qs, urlparse
+
+    lines_count = 100
+    raw_path = kw.get("_raw_path", "")
+    if raw_path:
+        qs = parse_qs(urlparse(raw_path).query)
+        try:
+            lines_count = int(qs.get("lines", ["100"])[0])
+        except (ValueError, IndexError):
+            pass
+
+    workspace = getattr(service, "workspace_root", Path(os.environ.get("WORKSPACE_ROOT", "/data/workspace")))
+    log_file = Path(workspace) / "logs" / "capos.log"
+
+    if not log_file.exists():
+        return APIResponse(HTTPStatus.OK, {"lines": [], "file": str(log_file), "exists": False})
+
+    try:
+        all_lines = log_file.read_text(encoding="utf-8", errors="replace").splitlines()
+        tail = all_lines[-lines_count:] if len(all_lines) > lines_count else all_lines
+        return APIResponse(HTTPStatus.OK, {"lines": tail, "total": len(all_lines), "file": str(log_file), "exists": True})
+    except Exception as exc:
+        return APIResponse(HTTPStatus.OK, {"lines": [], "error": str(exc), "exists": True})

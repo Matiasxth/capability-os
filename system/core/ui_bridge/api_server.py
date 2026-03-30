@@ -30,7 +30,7 @@ from system.core.capability_engine import (
 from system.core.health import HealthService
 from system.core.interpretation import IntentInterpreter, IntentInterpreterError, LLMClient
 from system.core.a2a import A2AClient, A2AClientError, A2AServer, AgentCardBuilder, register_a2a_delegate_tool
-from system.core.memory import EmbeddingsEngine, ExecutionHistory, MemoryManager, SemanticMemory, UserContext, VectorStore
+from system.core.memory import EmbeddingsEngine, ExecutionHistory, MarkdownMemory, MemoryCompactor, MemoryManager, SemanticMemory, UserContext, VectorStore
 from system.core.workspace import FileBrowser, PathValidator, WorkspaceContext, WorkspaceRegistry
 from system.core.metrics import MetricsCollector
 from system.core.observation import ObservationLogger
@@ -202,6 +202,22 @@ class CapabilityOSUIBridgeService:
             vector_store=self.vector_store,
             embeddings_engine=self.embeddings_engine,
         )
+        # Markdown-based persistent memory (MEMORY.md, daily notes, session summaries)
+        self.markdown_memory = MarkdownMemory(
+            memory_dir=self.workspace_root / "memory",
+        )
+        # Initialize MEMORY.md with user preferences from existing memory
+        user_prefs = self.memory_manager.recall("user:custom_preferences") or {}
+        self.markdown_memory.init_memory_md(
+            user_name=user_prefs.get("name", ""),
+            language=user_prefs.get("language", "auto"),
+        )
+        self.memory_compactor = MemoryCompactor(
+            markdown_memory=self.markdown_memory,
+            max_context_tokens=runtime_settings.get("agent", {}).get("max_context_tokens", 4000) if isinstance(runtime_settings.get("agent"), dict) else 4000,
+        )
+        print(f"  Markdown Memory: active (MEMORY.md)", flush=True)
+
         self.engine = CapabilityEngine(
             self.capability_registry, self.tool_runtime,
             metrics_collector=self.metrics_collector,
@@ -342,6 +358,8 @@ class CapabilityOSUIBridgeService:
                 workspace_root=str(self.workspace_root),
                 max_iterations=runtime_settings.get("agent", {}).get("max_iterations", 10) if isinstance(runtime_settings.get("agent"), dict) else 10,
                 execution_history=self.execution_history,
+                markdown_memory=self.markdown_memory,
+                memory_compactor=self.memory_compactor,
             )
             self.security_service = security_svc
 
@@ -591,6 +609,14 @@ class CapabilityOSUIBridgeService:
         r.add("DELETE", "/memory/semantic/{mem_id}", memory_handlers.delete_semantic)
         r.add("DELETE", "/memory", memory_handlers.clear_all)
         r.add("POST", "/memory/compact", memory_handlers.compact_sessions)
+        # Markdown memory (MEMORY.md, daily notes, session summaries)
+        r.add("GET", "/memory/markdown", memory_handlers.get_markdown_memory)
+        r.add("POST", "/memory/markdown", memory_handlers.save_markdown_memory)
+        r.add("POST", "/memory/markdown/fact", memory_handlers.add_memory_fact)
+        r.add("DELETE", "/memory/markdown/fact", memory_handlers.remove_memory_fact)
+        r.add("GET", "/memory/daily", memory_handlers.get_daily_notes)
+        r.add("GET", "/memory/summaries", memory_handlers.get_session_summaries)
+        r.add("GET", "/memory/agent-context", memory_handlers.get_memory_agent_context)
         # Capabilities
         r.add("GET", "/capabilities", capability_handlers.list_capabilities)
         r.add("GET", "/capabilities/health", capability_handlers.capabilities_health)
@@ -2181,17 +2207,25 @@ class CapabilityOSRequestHandler(BaseHTTPRequestHandler):
         session_id = body.get("session_id")
         history = body.get("history", [])
         agent_id = body.get("agent_id")
+        workspace_id = body.get("workspace_id")
 
         agent_config = None
         if agent_id and hasattr(service, "agent_registry"):
             agent_config = service.agent_registry.get(agent_id)
+
+        # Resolve workspace path for agent context
+        ws_root = str(service.workspace_root)
+        if workspace_id and hasattr(service, "workspace_registry"):
+            ws = service.workspace_registry.get(workspace_id)
+            if ws and ws.get("path"):
+                ws_root = ws["path"]
 
         import queue as _queue
         event_queue: _queue.Queue[dict[str, Any] | None] = _queue.Queue()
 
         def _run() -> None:
             try:
-                gen = service.agent_loop.run(message, session_id=session_id, conversation_history=history, agent_config=agent_config)
+                gen = service.agent_loop.run(message, session_id=session_id, conversation_history=history, agent_config=agent_config, workspace_id=workspace_id, workspace_path=ws_root)
                 for event in gen:
                     event_queue.put(event)
             except StopIteration:

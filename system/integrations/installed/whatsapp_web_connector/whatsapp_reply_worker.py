@@ -108,6 +108,13 @@ class WhatsAppReplyWorker:
         from_id = msg.get("from", "")
         text = msg.get("text", "").strip()
         push_name = msg.get("pushName", from_id)
+        audio_data = msg.get("audio")  # base64 audio if voice message
+
+        # If audio message: transcribe to text first
+        if audio_data and not text:
+            text = self._transcribe_audio(audio_data)
+            if not text:
+                return
 
         if not text:
             return
@@ -294,6 +301,36 @@ class WhatsAppReplyWorker:
         except Exception as exc:
             print(f"[WHATSAPP-REPLY] Exception: {exc}", flush=True)
             self._reply(channel_id, f"Error del sistema. Intenta mas tarde.")
+
+    # ------------------------------------------------------------------
+    # Voice support
+    # ------------------------------------------------------------------
+
+    def _transcribe_audio(self, audio_b64: str) -> str:
+        """Transcribe base64 audio to text using STT service."""
+        try:
+            import base64
+            from system.core.voice import STTService
+            # Try to get the service from the manager's context
+            stt = STTService(provider="whisper_api")
+            # Get API key from settings
+            try:
+                from system.core.settings.settings_service import SettingsService
+                from pathlib import Path
+                ss = SettingsService(workspace_root=Path("."))
+                settings = ss.load_settings()
+                stt.configure({"api_key": settings.get("llm", {}).get("api_key", "")})
+            except Exception:
+                pass
+            audio_bytes = base64.b64decode(audio_b64)
+            result = stt.transcribe_bytes(audio_bytes, format="ogg")
+            text = result.get("text", "")
+            if text:
+                print(f"[WHATSAPP-REPLY] Transcribed audio: '{text[:50]}'", flush=True)
+            return text
+        except Exception as exc:
+            print(f"[WHATSAPP-REPLY] Audio transcription failed: {exc}", flush=True)
+            return ""
 
     def _reply(self, to: str, text: str) -> None:
         try:

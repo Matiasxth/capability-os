@@ -89,6 +89,7 @@ class ExecutionHistory:
         intent: str,
         messages: list[dict[str, Any]] | None = None,
         duration_ms: int = 0,
+        workspace_id: str | None = None,
     ) -> str | None:
         """Create or update a session (chat, execution, or mixed). Returns the execution_id."""
         try:
@@ -139,6 +140,8 @@ class ExecutionHistory:
                     existing["key_outputs"] = {"response": last_resp[:200]}
                     existing["timestamp"] = _now_iso()
                     existing["duration_ms"] = duration_ms
+                    if workspace_id:
+                        existing["workspace_id"] = workspace_id
                 else:
                     # Create new
                     entry = {
@@ -155,6 +158,7 @@ class ExecutionHistory:
                         "chat_messages": compact,
                         "chat_response": last_resp,
                         "message_count": len(compact),
+                        "workspace_id": workspace_id,
                     }
                     self._entries.insert(0, entry)
                     if len(self._entries) > self._max:
@@ -203,6 +207,17 @@ class ExecutionHistory:
             results: list[dict[str, Any]] = []
             for e in self._entries:
                 if e.get("capability_id") == capability_id:
+                    results.append(deepcopy(e))
+                    if len(results) >= limit:
+                        break
+            return results
+
+    def get_by_workspace(self, workspace_id: str, limit: int = 50) -> list[dict[str, Any]]:
+        """Return entries for a specific workspace."""
+        with self._lock:
+            results: list[dict[str, Any]] = []
+            for e in self._entries:
+                if e.get("workspace_id") == workspace_id:
                     results.append(deepcopy(e))
                     if len(results) >= limit:
                         break

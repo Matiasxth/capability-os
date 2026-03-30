@@ -70,6 +70,8 @@ class AgentLoop:
         workspace_root: str = "",
         max_iterations: int = 10,
         execution_history: Any = None,
+        markdown_memory: Any = None,
+        memory_compactor: Any = None,
     ) -> None:
         self._adapter = tool_use_adapter
         self._tool_runtime = tool_runtime
@@ -91,6 +93,8 @@ class AgentLoop:
         self._default_tools = [t for t in self._all_tools if t["name"] in priority_tools] or self._all_tools[:20]
         self._sessions: dict[str, AgentSession] = {}
         self._execution_history = execution_history
+        self._markdown_memory = markdown_memory
+        self._memory_compactor = memory_compactor
 
     def _resolve_tools(self, agent_config: dict[str, Any] | None) -> list[dict[str, Any]]:
         """Get the tool list for this agent. If agent has tool_ids, filter to those."""
@@ -109,6 +113,8 @@ class AgentLoop:
         session_id: str | None = None,
         conversation_history: list[dict[str, Any]] | None = None,
         agent_config: dict[str, Any] | None = None,
+        workspace_id: str | None = None,
+        workspace_path: str | None = None,
     ) -> Generator[dict[str, Any], None, AgentResult]:
         """Run the agent loop as a generator that yields events.
 
@@ -123,10 +129,26 @@ class AgentLoop:
         session.add_user_message(user_message)
         session.status = "running"
 
+        # Auto-compact if context is too large
+        self._try_compact(session)
+
+        # Load memory context for prompt injection
+        memory_ctx = ""
+        if self._markdown_memory:
+            try:
+                memory_ctx = self._markdown_memory.build_context(max_tokens=500)
+            except Exception:
+                pass
+
+        # Track workspace for this session
+        session._workspace_id = workspace_id
+
         # Build prompt and tools based on agent config
+        effective_ws = workspace_path or self._workspace_root
         system_prompt = build_agent_system_prompt(
-            workspace_path=self._workspace_root,
+            workspace_path=effective_ws,
             agent_config=agent_config,
+            memory_context=memory_ctx,
         )
         tools = self._resolve_tools(agent_config)
         max_iter = (agent_config or {}).get("max_iterations") or self._max_iterations
@@ -361,7 +383,7 @@ class AgentLoop:
         return session
 
     def _auto_save(self, session: AgentSession, final_text: str) -> None:
-        """Persist the session to execution history."""
+        """Persist the session to execution history and daily notes."""
         if self._execution_history is None:
             return
         try:
@@ -376,7 +398,40 @@ class AgentLoop:
                 intent=first_user or "Agent session",
                 messages=messages,
                 duration_ms=int((time.time() - session.created_at) * 1000),
+                workspace_id=getattr(session, "_workspace_id", None),
             )
+        except Exception:
+            pass
+
+        # Log to daily notes
+        if self._markdown_memory and first_user:
+            try:
+                self._markdown_memory.append_daily(
+                    f"{first_user[:80]}",
+                    section="Sessions",
+                )
+            except Exception:
+                pass
+
+    def _try_compact(self, session: AgentSession) -> None:
+        """Auto-compact session messages if they exceed the threshold."""
+        if self._memory_compactor is None:
+            return
+        try:
+            if not self._memory_compactor.should_compact(session.messages):
+                return
+            # Use LLM for summarization if available
+            llm_fn = None
+            try:
+                llm_fn = lambda prompt: self._adapter._llm_client.complete(prompt)
+            except Exception:
+                pass
+            result = self._memory_compactor.compact(
+                messages=session.messages,
+                llm_complete=llm_fn,
+                session_id=session.session_id,
+            )
+            session.messages = result["compacted_messages"]
         except Exception:
             pass
 

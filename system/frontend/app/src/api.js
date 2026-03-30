@@ -425,8 +425,11 @@ export function getMemoryContext() {
   return request("/memory/context");
 }
 
-export function getMemoryHistory(capabilityId) {
-  const qs = capabilityId ? `?capability_id=${capabilityId}` : "";
+export function getMemoryHistory(capabilityId, workspaceId) {
+  const params = [];
+  if (capabilityId) params.push(`capability_id=${capabilityId}`);
+  if (workspaceId) params.push(`workspace_id=${workspaceId}`);
+  const qs = params.length ? `?${params.join("&")}` : "";
   return request(`/memory/history${qs}`);
 }
 
@@ -434,10 +437,10 @@ export function deleteHistoryEntry(executionId) {
   return request(`/memory/history/${executionId}`, { method: "DELETE" });
 }
 
-export function saveChatSession(sessionId, intent, messages, durationMs) {
+export function saveChatSession(sessionId, intent, messages, durationMs, workspaceId) {
   return request("/memory/history/chat", {
     method: "POST",
-    body: JSON.stringify({ session_id: sessionId, intent, messages, duration_ms: durationMs || 0 })
+    body: JSON.stringify({ session_id: sessionId, intent, messages, duration_ms: durationMs || 0, workspace_id: workspaceId || null })
   });
 }
 
@@ -491,6 +494,36 @@ export function addSemanticMemory(text, memoryType, metadata) {
 
 export function deleteSemanticMemory(memId) {
   return request(`/memory/semantic/${memId}`, { method: "DELETE" });
+}
+
+// Markdown Memory (MEMORY.md, daily notes, session summaries)
+export function getMarkdownMemory() {
+  return request("/memory/markdown");
+}
+
+export function saveMarkdownMemory(content) {
+  return request("/memory/markdown", { method: "POST", body: JSON.stringify({ content }) });
+}
+
+export function addMemoryFact(section, fact) {
+  return request("/memory/markdown/fact", { method: "POST", body: JSON.stringify({ section, fact }) });
+}
+
+export function removeMemoryFact(section, factSubstring) {
+  return request("/memory/markdown/fact", { method: "DELETE", body: JSON.stringify({ section, fact_substring: factSubstring }) });
+}
+
+export function getDailyNotes(date) {
+  const qs = date ? `?date=${date}` : "";
+  return request(`/memory/daily${qs}`);
+}
+
+export function getSessionSummaries() {
+  return request("/memory/summaries");
+}
+
+export function getMemoryAgentContext() {
+  return request("/memory/agent-context");
 }
 
 // A2A endpoints
@@ -554,11 +587,12 @@ export function browseWorkspace(wsId, relativePath) {
 
 // ── Agent API ──
 
-export async function* streamAgent(message, sessionId, history, agentId) {
+export async function* streamAgent(message, sessionId, history, agentId, workspaceId) {
   const body = { message };
   if (sessionId) body.session_id = sessionId;
   if (history) body.history = history;
   if (agentId) body.agent_id = agentId;
+  if (workspaceId) body.workspace_id = workspaceId;
   const resp = await fetch(`${API_BASE_URL}/agent/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

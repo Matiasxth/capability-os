@@ -5,8 +5,8 @@ import EditorLayout from "./components/editor/EditorLayout";
 import Onboarding from "./pages/Onboarding";
 import Workspace from "./pages/Workspace";
 
-function EditorPage({ wsId }) {
-  return <div style={{ height: "100%", overflow: "hidden" }}><EditorLayout wsId={wsId} /></div>;
+function EditorPage({ wsId, workspaces }) {
+  return <div style={{ height: "100%", overflow: "hidden" }}><EditorLayout wsId={wsId} workspaces={workspaces} /></div>;
 }
 
 function normalizePath(p) { return p.startsWith("/control-center") ? "/control-center" : p.startsWith("/editor") ? "/editor" : "/"; }
@@ -83,7 +83,7 @@ export default function App() {
         </div>
       </header>
       <main className="app-main">
-        {route === "/control-center" ? <ControlCenter /> : route === "/editor" ? <EditorPage wsId={defaultWsId} /> : <Workspace activeWorkspace={activeWs} userName={userName} />}
+        {route === "/control-center" ? <ControlCenter /> : route === "/editor" ? <EditorPage wsId={defaultWsId} workspaces={workspaces} /> : <Workspace activeWorkspace={activeWs} userName={userName} />}
       </main>
     </div>
   );
