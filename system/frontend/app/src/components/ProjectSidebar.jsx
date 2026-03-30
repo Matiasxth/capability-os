@@ -1,25 +1,28 @@
 import React, { useState } from "react";
 import StatusPicker from "./StatusPicker";
+import AgentAssignModal from "./AgentAssignModal";
 
 export default function ProjectSidebar({
   workspaces, activeProjectId, projectStates,
+  agents, onUpdateAgents,
   history, userName, wsConnected,
   onSelectProject, onNewProject, onUpdateStatus, onDeleteProject,
   onNewSession, onRestoreSession, onDeleteSession, onClearAll,
 }) {
-  const [statusPicker, setStatusPicker] = useState(null); // {wsId, rect}
+  const [statusPicker, setStatusPicker] = useState(null);
+  const [agentModal, setAgentModal] = useState(null); // wsId or null
   const [confirmClear, setConfirmClear] = useState(false);
 
   const cx = {
     container: { display: "flex", flexDirection: "column", height: "100%" },
     section: { padding: "14px 14px" },
     sectionTitle: {
-      fontSize: 11, textTransform: "uppercase", letterSpacing: 3, color: "#00f0ff",
+      fontSize: 11, textTransform: "uppercase", letterSpacing: 3, color: "var(--accent)",
       fontWeight: 700, marginBottom: 10, padding: "0 4px", display: "flex", alignItems: "center", justifyContent: "space-between",
     },
     addBtn: {
-      fontSize: 20, color: "#00f0ff", cursor: "pointer", background: "none", border: "none",
-      padding: 0, lineHeight: 1, transition: "color 0.15s", textShadow: "0 0 8px rgba(0,240,255,0.3)",
+      fontSize: 20, color: "var(--accent)", cursor: "pointer", background: "none", border: "none",
+      padding: 0, lineHeight: 1, transition: "color 0.15s",
     },
     project: (active) => ({
       display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8,
@@ -34,7 +37,7 @@ export default function ProjectSidebar({
     }),
     projectName: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 14, fontWeight: 500 },
     projectIcon: { fontSize: 18, flexShrink: 0 },
-    divider: { height: 1, background: "linear-gradient(90deg, transparent, #1a1e48, transparent)", margin: "8px 12px" },
+    divider: { height: 1, background: "var(--border)", margin: "8px 12px" },
     histTitle: { flex: 1 },
     histItem: {
       display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 6,
@@ -45,7 +48,7 @@ export default function ProjectSidebar({
     histMeta: { fontSize: 11, color: "#6a70a0", flexShrink: 0 },
     histList: { flex: 1, overflowY: "auto", padding: "0 10px" },
     empty: { fontSize: 13, color: "#7a80a0", textAlign: "center", padding: "32px 16px" },
-    footer: { padding: "10px 14px", borderTop: "1px solid #1a1e48", display: "flex", gap: 6 },
+    footer: { padding: "10px 14px", borderTop: "1px solid var(--border)", display: "flex", gap: 6 },
     footerBtn: {
       flex: 1, height: 32, border: "1px solid #1a1e48", borderRadius: 6,
       background: "transparent", color: "#8a90b0", fontSize: 11, cursor: "pointer", transition: "all 0.15s",
@@ -86,6 +89,7 @@ export default function ProjectSidebar({
           >
             <span style={cx.projectIcon}>{ws.status?.icon || ws.icon || "\U0001f4c1"}</span>
             <span style={cx.projectName}>{ws.name}</span>
+            {ws.agent_ids?.length > 0 && <span style={{fontSize:10,opacity:0.7}} title={(ws.agent_ids||[]).map(id=>(agents||[]).find(a=>a.id===id)?.name||id).join(", ")}>{(ws.agent_ids||[]).map(id=>(agents||[]).find(a=>a.id===id)?.emoji||"").join("")}</span>}
             <span style={cx.statusDot(ws.status?.color || ws.color)} title={ws.status?.name || ""} />
           </div>
         ))}
@@ -133,16 +137,38 @@ export default function ProjectSidebar({
         )}
       </div>
 
-      {/* Status picker popup */}
+      {/* Context menu */}
       {statusPicker && (
         <div style={{ position: "fixed", left: statusPicker.x, top: statusPicker.y, zIndex: 9999 }}>
-          <StatusPicker
-            currentStatus={workspaces.find(w => w.id === statusPicker.wsId)?.status}
-            states={projectStates}
-            onSelect={s => onUpdateStatus(statusPicker.wsId, s)}
-            onClose={() => setStatusPicker(null)}
-          />
+          {statusPicker.mode === "status" ? (
+            <StatusPicker
+              currentStatus={workspaces.find(w => w.id === statusPicker.wsId)?.status}
+              states={projectStates}
+              onSelect={s => onUpdateStatus(statusPicker.wsId, s)}
+              onClose={() => setStatusPicker(null)}
+            />
+          ) : (
+            <>
+              <div style={{ position: "fixed", inset: 0, zIndex: 9998 }} onClick={() => setStatusPicker(null)} />
+              <div style={{ position: "relative", zIndex: 9999, background: "var(--bg-elevated)", border: "1px solid var(--border)", borderRadius: 8, padding: 4, minWidth: 160, boxShadow: "0 8px 24px rgba(0,0,0,0.4)" }}>
+                <div style={{ padding: "6px 10px", fontSize: 12, cursor: "pointer", borderRadius: 4, color: "var(--text-dim)" }} onClick={() => { setStatusPicker({ ...statusPicker, mode: "status" }); }}>Change Status</div>
+                <div style={{ padding: "6px 10px", fontSize: 12, cursor: "pointer", borderRadius: 4, color: "var(--text-dim)" }} onClick={() => { setAgentModal(statusPicker.wsId); setStatusPicker(null); }}>Manage Agents</div>
+                <div style={{ height: 1, background: "var(--border)", margin: "2px 0" }} />
+                <div style={{ padding: "6px 10px", fontSize: 12, cursor: "pointer", borderRadius: 4, color: "var(--error)" }} onClick={() => { onDeleteProject(statusPicker.wsId); setStatusPicker(null); }}>Delete Project</div>
+              </div>
+            </>
+          )}
         </div>
+      )}
+
+      {/* Agent assign modal */}
+      {agentModal && (
+        <AgentAssignModal
+          agents={agents || []}
+          assignedIds={workspaces.find(w => w.id === agentModal)?.agent_ids || []}
+          onSave={ids => { onUpdateAgents(agentModal, ids); setAgentModal(null); }}
+          onClose={() => setAgentModal(null)}
+        />
       )}
     </div>
   );

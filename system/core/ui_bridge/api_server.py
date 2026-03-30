@@ -526,6 +526,7 @@ class CapabilityOSUIBridgeService:
         r.add("GET", "/agents/{agent_id}", agent_handlers.get_agent_def)
         r.add("POST", "/agents/{agent_id}", agent_handlers.update_agent)
         r.add("DELETE", "/agents/{agent_id}", agent_handlers.delete_agent)
+        r.add("POST", "/agents/design", agent_handlers.design_agent)
         r.add("GET", "/executions/{execution_id}", capability_handlers.get_execution)
         r.add("GET", "/executions/{execution_id}/events", capability_handlers.get_execution_events)
         # Growth

@@ -263,6 +263,7 @@ class WhatsAppReplyWorker:
     def _handle_message_agent(self, channel_id: str, text: str, user_name: str) -> None:
         """Use the AgentLoop for autonomous processing."""
         t0 = time.monotonic()
+        print(f"[WHATSAPP-REPLY] Agent processing: '{text[:50]}' from {user_name}", flush=True)
         try:
             final_text = ""
             gen = self._agent_loop.run(text)
@@ -270,24 +271,29 @@ class WhatsAppReplyWorker:
                 etype = event.get("event", "")
                 if etype == "agent_response":
                     final_text = event.get("text", "")
+                    print(f"[WHATSAPP-REPLY] Agent response: '{final_text[:80]}'", flush=True)
+                elif etype == "tool_call":
+                    print(f"[WHATSAPP-REPLY] Tool call: {event.get('tool_id')} (L{event.get('security_level')})", flush=True)
                 elif etype == "awaiting_confirmation":
-                    # Messaging channels can't do interactive confirmation for Level 2+
-                    # Auto-deny for safety and inform the user
                     tool_id = event.get("tool_id", "")
                     self._reply(channel_id, f"La accion '{tool_id}' requiere confirmacion que solo se puede dar desde la interfaz web.")
                     return
-                elif etype == "tool_error":
-                    # Let the agent handle it — it will retry or explain
-                    pass
+                elif etype == "agent_error":
+                    err = event.get("error", "")
+                    print(f"[WHATSAPP-REPLY] Agent error: {err}", flush=True)
+                    if "LLM" in err or "401" in err or "api_key" in err.lower():
+                        self._reply(channel_id, "LLM no disponible en este momento. Intenta mas tarde.")
+                        return
 
             if final_text:
                 self._reply(channel_id, final_text)
                 self._record(text, final_text, t0, user_name, channel_id)
             else:
-                self._reply(channel_id, "No pude procesar eso.")
+                self._reply(channel_id, "No pude procesar eso. Intenta de otra forma.")
 
         except Exception as exc:
-            self._reply(channel_id, f"Error: {str(exc)[:200]}")
+            print(f"[WHATSAPP-REPLY] Exception: {exc}", flush=True)
+            self._reply(channel_id, f"Error del sistema. Intenta mas tarde.")
 
     def _reply(self, to: str, text: str) -> None:
         try:

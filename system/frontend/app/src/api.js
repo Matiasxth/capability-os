@@ -580,6 +580,7 @@ export function createAgent(config) { return request("/agents", { method: "POST"
 export function getAgentDef(agentId) { return request(`/agents/${agentId}`); }
 export function updateAgentDef(agentId, fields) { return request(`/agents/${agentId}`, { method: "POST", body: JSON.stringify(fields) }); }
 export function deleteAgentDef(agentId) { return request(`/agents/${agentId}`, { method: "DELETE" }); }
+export function designAgent(description) { return request("/agents/design", { method: "POST", body: JSON.stringify({ description }) }); }
 
 export function updateWorkspaceStatus(wsId, status) {
   return request(`/workspaces/${wsId}/status`, {

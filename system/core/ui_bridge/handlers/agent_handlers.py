@@ -179,6 +179,56 @@ def update_agent(service: Any, payload: Any, agent_id: str = "", **kw: Any):
         return _resp(HTTPStatus.BAD_REQUEST, {"status": "error", "error": str(exc)})
 
 
+def design_agent(service: Any, payload: Any, **kw: Any):
+    """Ask the LLM to design an agent configuration from a description."""
+    if not hasattr(service, "agent_loop"):
+        return _resp(HTTPStatus.SERVICE_UNAVAILABLE, {"status": "error", "error": "Agent not available"})
+
+    description = (payload or {}).get("description", "")
+    if not description.strip():
+        return _resp(HTTPStatus.BAD_REQUEST, {"status": "error", "error": "Field 'description' is required"})
+
+    tool_list = [
+        "filesystem_read_file", "filesystem_write_file", "filesystem_list_directory",
+        "filesystem_create_directory", "filesystem_delete_file", "filesystem_copy_file",
+        "filesystem_move_file", "filesystem_edit_file",
+        "execution_run_command", "execution_run_script",
+        "network_http_get", "network_extract_text", "network_extract_links",
+        "browser_navigate", "browser_read_text", "browser_screenshot",
+        "browser_click_element", "browser_type_text",
+        "system_get_os_info", "system_get_workspace_info", "system_get_env_var",
+    ]
+
+    prompt = (
+        f"Design an AI agent based on this description: {description}\n\n"
+        f"Respond with ONLY a JSON object (no other text):\n"
+        f'{{"name": "AgentName", "emoji": "emoji", "description": "what it does", '
+        f'"system_prompt": "detailed personality and behavior instructions", '
+        f'"tool_ids": ["tool1", "tool2"], "language": "auto", "max_iterations": 10}}\n\n'
+        f"Available tools: {', '.join(tool_list)}\n"
+        f"Choose only the tools relevant to this agent's purpose.\n"
+        f"The system_prompt should be detailed (2-4 sentences) describing the agent's expertise and behavior."
+    )
+
+    try:
+        llm = service.intent_interpreter.llm_client
+        response = llm.complete(system_prompt="You are an agent designer. Return only valid JSON.", user_prompt=prompt)
+
+        # Parse JSON from response
+        import json as _json
+        import re
+        # Find JSON in response
+        match = re.search(r'\{[\s\S]*\}', response)
+        if match:
+            config = _json.loads(match.group(0))
+            # Validate tool_ids
+            config["tool_ids"] = [t for t in (config.get("tool_ids") or []) if t in tool_list]
+            return _resp(HTTPStatus.OK, {"status": "success", "config": config})
+        return _resp(HTTPStatus.OK, {"status": "error", "error": "LLM did not return valid JSON", "raw": response[:500]})
+    except Exception as exc:
+        return _resp(HTTPStatus.OK, {"status": "error", "error": str(exc)})
+
+
 def delete_agent(service: Any, payload: Any, agent_id: str = "", **kw: Any):
     if not hasattr(service, "agent_registry"):
         return _resp(HTTPStatus.SERVICE_UNAVAILABLE, {"status": "error", "error": "Agent registry not available"})

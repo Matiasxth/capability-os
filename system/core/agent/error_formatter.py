@@ -82,6 +82,39 @@ def format_tool_error(tool_id: str, error: str, params: dict[str, Any] | None = 
             "error_type": "capability_not_found",
         }
 
+    # JSON/encoding errors
+    if "json" in error_lower or "decode" in error_lower or "encoding" in error_lower:
+        return {
+            "explanation": "Error procesando datos — formato invalido.",
+            "suggestions": [
+                "Los datos de entrada pueden tener formato incorrecto",
+                "Intenta con una solicitud mas simple",
+            ],
+            "error_type": "parse_error",
+        }
+
+    # Rate limit
+    if "rate" in error_lower or "429" in error_lower or "too many" in error_lower:
+        return {
+            "explanation": "Demasiadas solicitudes — limite de velocidad alcanzado.",
+            "suggestions": [
+                "Espera unos segundos e intenta de nuevo",
+                "Reduce la frecuencia de solicitudes",
+            ],
+            "error_type": "rate_limit",
+        }
+
+    # Auth errors
+    if "401" in error_lower or "api_key" in error_lower or "unauthorized" in error_lower or "invalid key" in error_lower:
+        return {
+            "explanation": "Error de autenticacion — API key invalida o expirada.",
+            "suggestions": [
+                "Revisa tu API key en Control Center > LLM",
+                "La key puede haber expirado, genera una nueva",
+            ],
+            "error_type": "auth_error",
+        }
+
     # Generic fallback
     return {
         "explanation": f"Error en {tool_id}: {error[:200]}",

@@ -4,7 +4,7 @@ import {
   getExecution, getExecutionEvents, getMemoryContext, getMemoryHistory,
   listCapabilities, planIntent, saveChatSession, streamChat,
   runAgent, confirmAgentAction,
-  listWorkspaces, addWorkspace, updateWorkspaceStatus, removeWorkspace, getSettings,
+  listWorkspaces, addWorkspace, updateWorkspace, updateWorkspaceStatus, removeWorkspace, getSettings,
   listAgents,
 } from "../api";
 import ChatInput from "../components/ChatInput";
@@ -346,6 +346,7 @@ export default function Workspace({ activeWorkspace, userName }) {
     <div className={`conv-layout${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
       {!sidebarCollapsed && <ProjectSidebar
         workspaces={workspaces} activeProjectId={activeProjectId} projectStates={projectStates}
+        agents={agents} onUpdateAgents={async(wsId,ids)=>{try{await updateWorkspace(wsId,{agent_ids:ids});setWorkspaces(w=>w.map(ws=>ws.id===wsId?{...ws,agent_ids:ids}:ws))}catch{}}}
         history={history} userName={userName} wsConnected={wsConnected}
         onSelectProject={id=>{setActiveProjectId(id)}}
         onNewProject={()=>setShowNewProject(true)}

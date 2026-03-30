@@ -112,6 +112,19 @@ def check_sw_not_caching():
 
 check("Service worker is safe (no cache-first)", check_sw_not_caching)
 
+def check_cache_headers():
+    try:
+        req = Request(f"{URL}/")
+        with urlopen(req, timeout=5) as r:
+            cc = r.headers.get("Cache-Control", "")
+            if "no-store" not in cc and "no-cache" not in cc:
+                return f"Missing no-store/no-cache in Cache-Control: '{cc}'"
+        return True
+    except Exception as e:
+        return f"Failed: {e}"
+
+check("HTML has no-store cache headers", check_cache_headers)
+
 def check_bundle_contains_features():
     html = get_raw("/")
     import re

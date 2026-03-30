@@ -12,7 +12,7 @@ import {
   getSlackStatus, configureSlack, testSlack, startSlackPolling, stopSlackPolling, getSlackPollingStatus,
   getDiscordStatus, configureDiscord, testDiscord, startDiscordPolling, stopDiscordPolling, getDiscordPollingStatus,
   whatsappBridgeCheck, whatsappBridgeClose, whatsappSwitchBackend, whatsappConfigure, whatsappListBackends,
-  listAgents, createAgent, updateAgentDef, deleteAgentDef,
+  listAgents, createAgent, updateAgentDef, deleteAgentDef, designAgent,
 } from "../api";
 import CCLayout from "../components/control-center/CCLayout";
 import KPIBar from "../components/control-center/KPIBar";
@@ -494,6 +494,28 @@ export default function ControlCenter() {
         <button style={{fontSize:10,height:24,color:"var(--error)"}} onClick={()=>act(async()=>{await deleteAgentDef(a.id);refreshAgents()},"Agent deleted")}>Del</button>
       </>}
     </div>))}
+
+    <div className="card" style={{padding:14,marginBottom:8}}>
+      <h4 style={{margin:"0 0 8px"}}>AI Agent Designer</h4>
+      <p style={{fontSize:10,color:"var(--text-muted)",margin:"0 0 8px"}}>Describe the agent you want and the AI will design it for you.</p>
+      <div style={{display:"flex",gap:6}}>
+        <input id="ai-design-input" style={{flex:1,height:32,fontSize:12}} placeholder="e.g. An expert in Python that helps debug code"/>
+        <button style={{height:32,fontSize:11,padding:"0 14px",whiteSpace:"nowrap"}} onClick={async()=>{
+          const inp=document.getElementById("ai-design-input");
+          const desc=inp?.value?.trim();
+          if(!desc)return;
+          toast("Designing agent...");
+          try{
+            const r=await designAgent(desc);
+            if(r.config){
+              setAgentForm({...agentForm,...r.config,llm_model:r.config.llm_model||""});
+              setEditAgent(null);
+              toast("Agent designed! Review and save below.");
+            }else{toast(r.error||"Design failed","error")}
+          }catch(e){toast(e.message||"Design failed","error")}
+        }}>Design</button>
+      </div>
+    </div>
 
     <div className="card" style={{padding:14}}>
       <h4 style={{margin:"0 0 10px"}}>{editAgent?"Edit Agent":"Create Agent"}</h4>
