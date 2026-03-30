@@ -57,6 +57,8 @@ class SkillsPlugin:
                 logger.exception("Failed to load installed skills")
 
             logger.info("Created SkillRegistry")
+            from system.sdk.contracts import SkillRegistryContract
+            ctx.publish_service(SkillRegistryContract, self.skill_registry)
         except Exception:
             logger.exception("Failed to create SkillRegistry")
 

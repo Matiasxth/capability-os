@@ -60,6 +60,12 @@ class WorkflowsPlugin:
         except Exception:
             logger.exception("Failed to create WorkflowExecutor")
 
+        from system.sdk.contracts import WorkflowRegistryContract, WorkflowExecutorContract
+        if self.workflow_registry:
+            ctx.publish_service(WorkflowRegistryContract, self.workflow_registry)
+        if self.workflow_executor:
+            ctx.publish_service(WorkflowExecutorContract, self.workflow_executor)
+
     def start(self) -> None:
         """Workflows are passive — nothing to start."""
 

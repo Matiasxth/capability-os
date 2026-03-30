@@ -74,6 +74,8 @@ class SupervisorPlugin:
                 execution_history=execution_history,
             )
             logger.info("Created SupervisorDaemon")
+            from system.sdk.contracts import SupervisorDaemonContract
+            ctx.publish_service(SupervisorDaemonContract, self.supervisor)
         except Exception:
             logger.exception("Failed to create SupervisorDaemon")
 

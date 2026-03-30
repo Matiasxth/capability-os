@@ -20,13 +20,20 @@ from system.sdk.contracts import (
     IntentInterpreterContract,
     LLMClientContract,
     MarkdownMemoryContract,
+    MCPClientManagerContract,
     MemoryManagerContract,
     MetricsCollectorContract,
+    SchedulerContract,
     SemanticMemoryContract,
     SecurityServiceContract,
     SettingsProvider,
+    SkillRegistryContract,
+    SupervisorDaemonContract,
+    TaskQueueContract,
     ToolRegistryContract,
     ToolRuntimeContract,
+    WorkflowExecutorContract,
+    WorkflowRegistryContract,
     WorkspaceRegistryContract,
 )
 
@@ -55,6 +62,13 @@ CONTRACT_MAP: dict[str, type] = {
     "workspace_registry": WorkspaceRegistryContract,
     "llm_client": LLMClientContract,
     "integration_registry": IntegrationRegistryContract,
+    "skill_registry": SkillRegistryContract,
+    "workflow_registry": WorkflowRegistryContract,
+    "workflow_executor": WorkflowExecutorContract,
+    "task_queue": TaskQueueContract,
+    "scheduler": SchedulerContract,
+    "mcp_client_manager": MCPClientManagerContract,
+    "supervisor": SupervisorDaemonContract,
 }
 
 
@@ -83,19 +97,12 @@ PLUGIN_ATTR_MAP: dict[str, tuple[str, str]] = {
     "file_browser": ("capos.core.workspace", "file_browser"),
     # Browser
     "browser_session_manager": ("capos.core.browser", "browser_session_manager"),
-    # Skills
-    "skill_registry": ("capos.core.skills", "skill_registry"),
-    # Supervisor
+    # Supervisor (skill_creator has no contract — stays as plugin attr)
     "skill_creator": ("capos.core.supervisor", "skill_creator"),
-    "supervisor": ("capos.core.supervisor", "supervisor"),
-    # Scheduler
-    "task_queue": ("capos.core.scheduler", "task_queue"),
-    "scheduler": ("capos.core.scheduler", "scheduler"),
     # Voice
     "stt_service": ("capos.core.voice", "stt_service"),
     "tts_service": ("capos.core.voice", "tts_service"),
-    # MCP
-    "mcp_client_manager": ("capos.core.mcp", "mcp_client_manager"),
+    # MCP (mcp_client_manager promoted to CONTRACT_MAP)
     "mcp_tool_bridge": ("capos.core.mcp", "mcp_tool_bridge"),
     "mcp_capability_generator": ("capos.core.mcp", "mcp_capability_generator"),
     # A2A
@@ -129,9 +136,7 @@ PLUGIN_ATTR_MAP: dict[str, tuple[str, str]] = {
     "sequence_storage": ("capos.core.sequences", "sequence_storage"),
     "sequence_registry": ("capos.core.sequences", "sequence_registry"),
     "sequence_runner": ("capos.core.sequences", "sequence_runner"),
-    # Workflows
-    "workflow_registry": ("capos.core.workflows", "workflow_registry"),
-    "workflow_executor": ("capos.core.workflows", "workflow_executor"),
+    # Workflows (promoted to CONTRACT_MAP)
     # Sandbox
     "sandbox_manager": ("capos.core.sandbox", "sandbox_manager"),
     # Integrations (loader/validator via plugin)

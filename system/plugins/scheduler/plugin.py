@@ -82,6 +82,12 @@ class SchedulerPlugin:
         except Exception:
             logger.exception("Failed to create ProactiveScheduler")
 
+        from system.sdk.contracts import TaskQueueContract, SchedulerContract
+        if self.task_queue:
+            ctx.publish_service(TaskQueueContract, self.task_queue)
+        if self.scheduler:
+            ctx.publish_service(SchedulerContract, self.scheduler)
+
     def start(self) -> None:
         """Start the proactive scheduler."""
         if self.scheduler is not None:

@@ -43,6 +43,8 @@ class MCPPlugin:
 
             self.mcp_client_manager = MCPClientManager()
             logger.info("Created MCPClientManager")
+            from system.sdk.contracts import MCPClientManagerContract
+            ctx.publish_service(MCPClientManagerContract, self.mcp_client_manager)
         except Exception:
             logger.exception("Failed to create MCPClientManager")
 
