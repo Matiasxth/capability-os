@@ -1,0 +1,44 @@
+{
+  "id": "delete_directory",
+  "name": "Delete directory",
+  "domain": "archivos",
+  "type": "base",
+  "description": "Permanently delete a directory and all its contents. Lists items first for safety.",
+  "inputs": {
+    "path": {
+      "type": "string",
+      "required": true,
+      "description": "Path of the directory to delete."
+    }
+  },
+  "outputs": {
+    "status": {"type": "string"},
+    "path": {"type": "string"},
+    "items_deleted": {"type": "number"}
+  },
+  "requirements": {
+    "tools": ["filesystem_delete_directory"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "rmdir",
+        "action": "filesystem_delete_directory",
+        "params": {
+          "path": "{{inputs.path}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["delete directory", "delete folder", "eliminar carpeta", "borrar carpeta", "remove folder", "remove directory", "borrar directorio"]
+  },
+  "lifecycle": {
+    "version": "1.0.0",
+    "status": "ready"
+  }
+}

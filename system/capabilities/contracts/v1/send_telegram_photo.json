@@ -1,0 +1,55 @@
+{
+  "id": "send_telegram_photo",
+  "name": "Send Telegram photo",
+  "domain": "integraciones",
+  "type": "integration",
+  "description": "Send a photo via Telegram Bot API.",
+  "inputs": {
+    "photo_path": {
+      "type": "string",
+      "required": true,
+      "description": "Path to the image file to send."
+    },
+    "caption": {
+      "type": "string",
+      "required": false,
+      "description": "Optional caption for the photo."
+    },
+    "chat_id": {
+      "type": "string",
+      "required": false,
+      "description": "Telegram chat ID. Uses default if not provided."
+    }
+  },
+  "outputs": {
+    "status": {"type": "string"},
+    "message_id": {"type": "integer"},
+    "chat_id": {"type": "string"}
+  },
+  "requirements": {
+    "tools": ["network_http_post"],
+    "capabilities": [],
+    "integrations": ["telegram_bot_connector"]
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "upload",
+        "action": "network_http_post",
+        "params": {
+          "url": "https://api.telegram.org",
+          "body": {"photo": "{{inputs.photo_path}}"}
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["send telegram photo", "enviar foto telegram"]
+  },
+  "lifecycle": {
+    "version": "1.0.0",
+    "status": "ready"
+  }
+}

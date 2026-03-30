@@ -1,0 +1,31 @@
+{
+  "id": "filesystem_create_directory",
+  "name": "Create directory",
+  "category": "filesystem",
+  "description": "Create a directory (and parents) at the given path.",
+  "inputs": {
+    "path": {
+      "type": "string",
+      "required": true,
+      "description": "Path of the directory to create."
+    }
+  },
+  "outputs": {
+    "status": {"type": "string"},
+    "path": {"type": "string"},
+    "created": {"type": "boolean"}
+  },
+  "constraints": {
+    "timeout_ms": 10000,
+    "allowlist": [],
+    "workspace_only": true
+  },
+  "safety": {
+    "level": "low",
+    "requires_confirmation": false
+  },
+  "lifecycle": {
+    "version": "1.0.0",
+    "status": "ready"
+  }
+}

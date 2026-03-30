@@ -1,0 +1,17 @@
+{
+  "id": "slack_bot_connector",
+  "name": "Slack",
+  "type": "rest_api",
+  "status": "ready",
+  "capabilities": [
+    "send_slack_message"
+  ],
+  "requirements": {
+    "browser": false,
+    "auth": "bot_token",
+    "mode": "api"
+  },
+  "lifecycle": {
+    "version": "1.0.0"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "id": "get_telegram_updates",
+  "name": "Get Telegram updates",
+  "domain": "integraciones",
+  "type": "integration",
+  "description": "Retrieve recent messages received by the Telegram bot.",
+  "inputs": {
+    "limit": {
+      "type": "integer",
+      "required": false,
+      "description": "Maximum number of messages to retrieve (default 10)."
+    }
+  },
+  "outputs": {
+    "status": {"type": "string"},
+    "messages": {"type": "array"},
+    "count": {"type": "integer"}
+  },
+  "requirements": {
+    "tools": ["network_http_get"],
+    "capabilities": [],
+    "integrations": ["telegram_bot_connector"]
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "fetch",
+        "action": "network_http_get",
+        "params": {
+          "url": "https://api.telegram.org"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["get telegram messages", "leer mensajes telegram"]
+  },
+  "lifecycle": {
+    "version": "1.0.0",
+    "status": "ready"
+  }
+}

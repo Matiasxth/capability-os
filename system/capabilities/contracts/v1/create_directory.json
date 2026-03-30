@@ -1,0 +1,44 @@
+{
+  "id": "create_directory",
+  "name": "Create directory",
+  "domain": "archivos",
+  "type": "base",
+  "description": "Create a directory at the given path. Creates parent directories if needed.",
+  "inputs": {
+    "path": {
+      "type": "string",
+      "required": true,
+      "description": "Path of the directory to create."
+    }
+  },
+  "outputs": {
+    "status": {"type": "string"},
+    "path": {"type": "string"},
+    "created": {"type": "boolean"}
+  },
+  "requirements": {
+    "tools": ["filesystem_create_directory"],
+    "capabilities": [],
+    "integrations": []
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "mkdir",
+        "action": "filesystem_create_directory",
+        "params": {
+          "path": "{{inputs.path}}"
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["create directory", "crear carpeta", "make folder", "mkdir"]
+  },
+  "lifecycle": {
+    "version": "1.0.0",
+    "status": "ready"
+  }
+}

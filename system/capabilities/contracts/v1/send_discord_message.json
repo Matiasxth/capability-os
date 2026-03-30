@@ -1,0 +1,39 @@
+{
+  "id": "send_discord_message",
+  "name": "Send Discord message",
+  "domain": "integraciones",
+  "type": "integration",
+  "description": "Send a text message to a Discord channel via Bot API.",
+  "inputs": {
+    "message": {"type": "string", "required": true, "description": "Message text to send."},
+    "channel_id": {"type": "string", "required": false, "description": "Discord channel ID (defaults to configured channel)."}
+  },
+  "outputs": {
+    "status": {"type": "string"},
+    "message_id": {"type": "string"},
+    "channel_id": {"type": "string"}
+  },
+  "requirements": {
+    "tools": ["network_http_post"],
+    "capabilities": [],
+    "integrations": ["discord_bot_connector"]
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "send",
+        "action": "network_http_post",
+        "params": {
+          "url": "https://discord.com/api/v10/channels",
+          "body": {"content": "{{inputs.message}}"}
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["send discord message", "enviar mensaje discord", "message discord", "post to discord"]
+  },
+  "lifecycle": {"version": "1.0.0", "status": "ready"}
+}

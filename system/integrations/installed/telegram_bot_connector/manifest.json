@@ -1,0 +1,19 @@
+{
+  "id": "telegram_bot_connector",
+  "name": "Telegram",
+  "type": "rest_api",
+  "status": "ready",
+  "capabilities": [
+    "send_telegram_message",
+    "send_telegram_photo",
+    "get_telegram_updates"
+  ],
+  "requirements": {
+    "browser": false,
+    "auth": "bot_token",
+    "mode": "api"
+  },
+  "lifecycle": {
+    "version": "1.0.0"
+  }
+}

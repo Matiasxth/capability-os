@@ -1,0 +1,55 @@
+{
+  "id": "send_telegram_message",
+  "name": "Send Telegram message",
+  "domain": "integraciones",
+  "type": "integration",
+  "description": "Send a text message via Telegram Bot API.",
+  "inputs": {
+    "message": {
+      "type": "string",
+      "required": true,
+      "description": "Text message to send."
+    },
+    "chat_id": {
+      "type": "string",
+      "required": false,
+      "description": "Telegram chat ID or @username. Uses default if not provided."
+    },
+    "parse_mode": {
+      "type": "string",
+      "required": false,
+      "description": "Message format: HTML or Markdown."
+    }
+  },
+  "outputs": {
+    "status": {"type": "string"},
+    "message_id": {"type": "integer"},
+    "chat_id": {"type": "string"}
+  },
+  "requirements": {
+    "tools": ["network_http_post"],
+    "capabilities": [],
+    "integrations": ["telegram_bot_connector"]
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "send",
+        "action": "network_http_post",
+        "params": {
+          "url": "https://api.telegram.org",
+          "body": {"text": "{{inputs.message}}"}
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["send telegram message", "enviar mensaje telegram", "telegram"]
+  },
+  "lifecycle": {
+    "version": "1.0.0",
+    "status": "ready"
+  }
+}

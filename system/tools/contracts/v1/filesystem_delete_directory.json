@@ -1,0 +1,28 @@
+{
+  "id": "filesystem_delete_directory",
+  "name": "Delete directory",
+  "category": "filesystem",
+  "description": "Permanently delete a directory and all its contents inside the allowed workspace.",
+  "inputs": {
+    "path": {"type": "string", "required": true, "description": "Directory path to delete."},
+    "max_items": {"type": "number", "required": false, "description": "Safety limit: max items allowed in directory (default 500)."}
+  },
+  "outputs": {
+    "status": {"type": "string"},
+    "path": {"type": "string"},
+    "items_deleted": {"type": "number"}
+  },
+  "constraints": {
+    "timeout_ms": 60000,
+    "allowlist": [],
+    "workspace_only": true
+  },
+  "safety": {
+    "level": "high",
+    "requires_confirmation": true
+  },
+  "lifecycle": {
+    "version": "1.0.0",
+    "status": "ready"
+  }
+}

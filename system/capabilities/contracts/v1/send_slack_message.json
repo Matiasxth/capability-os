@@ -1,0 +1,39 @@
+{
+  "id": "send_slack_message",
+  "name": "Send Slack message",
+  "domain": "integraciones",
+  "type": "integration",
+  "description": "Send a text message to a Slack channel via Bot API.",
+  "inputs": {
+    "message": {"type": "string", "required": true, "description": "Message text to send."},
+    "channel_id": {"type": "string", "required": false, "description": "Slack channel ID (defaults to configured channel)."}
+  },
+  "outputs": {
+    "status": {"type": "string"},
+    "message_id": {"type": "string"},
+    "channel_id": {"type": "string"}
+  },
+  "requirements": {
+    "tools": ["network_http_post"],
+    "capabilities": [],
+    "integrations": ["slack_bot_connector"]
+  },
+  "strategy": {
+    "mode": "sequential",
+    "steps": [
+      {
+        "step_id": "send",
+        "action": "network_http_post",
+        "params": {
+          "url": "https://slack.com/api/chat.postMessage",
+          "body": {"text": "{{inputs.message}}"}
+        }
+      }
+    ]
+  },
+  "exposure": {
+    "visible_to_user": true,
+    "trigger_phrases": ["send slack message", "enviar mensaje slack", "message slack", "post to slack"]
+  },
+  "lifecycle": {"version": "1.0.0", "status": "ready"}
+}
