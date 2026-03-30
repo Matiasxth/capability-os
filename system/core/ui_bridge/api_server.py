@@ -701,6 +701,21 @@ class CapabilityOSUIBridgeService:
         r.add("GET", "/supervisor/log", supervisor_handlers.supervisor_log)
         r.add("POST", "/supervisor/claude", supervisor_handlers.supervisor_invoke_claude)
         r.add("POST", "/supervisor/health-check", supervisor_handlers.health_check_now)
+        # Files / Editor
+        from system.core.ui_bridge.handlers import file_handlers
+        r.add("GET", "/files/tree", file_handlers.file_tree)
+        r.add("GET", "/files/tree/{ws_id}", file_handlers.file_tree)
+        r.add("GET", "/files/read", file_handlers.file_read)
+        r.add("POST", "/files/write", file_handlers.file_write)
+        r.add("POST", "/files/create", file_handlers.file_create)
+        r.add("DELETE", "/files/delete", file_handlers.file_delete)
+        r.add("POST", "/files/terminal", file_handlers.file_terminal)
+        r.add("GET", "/files/analyze/{ws_id}", file_handlers.workspace_analyze)
+        r.add("POST", "/files/auto-clean/{ws_id}", file_handlers.workspace_auto_clean)
+        r.add("POST", "/files/generate-readme/{ws_id}", file_handlers.workspace_generate_readme)
+        r.add("POST", "/files/suggest-structure", file_handlers.workspace_suggest_structure)
+        r.add("POST", "/supervisor/approve", supervisor_handlers.supervisor_approve)
+        r.add("POST", "/supervisor/discard", supervisor_handlers.supervisor_discard)
         # Scheduler
         from system.core.ui_bridge.handlers import scheduler_handlers
         r.add("GET", "/scheduler/tasks", scheduler_handlers.list_tasks)

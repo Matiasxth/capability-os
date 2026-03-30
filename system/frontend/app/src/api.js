@@ -618,6 +618,8 @@ export function getSupervisorStatus() { return request("/supervisor/status"); }
 export function getSupervisorLog() { return request("/supervisor/log"); }
 export function invokeSupervisorClaude(prompt) { return request("/supervisor/claude", { method: "POST", body: JSON.stringify({ prompt }) }); }
 export function runHealthCheck() { return request("/supervisor/health-check", { method: "POST", body: "{}" }); }
+export function supervisorApprove(previewId) { return request("/supervisor/approve", { method: "POST", body: JSON.stringify({ preview_id: previewId }) }); }
+export function supervisorDiscard(previewId) { return request("/supervisor/discard", { method: "POST", body: JSON.stringify({ preview_id: previewId }) }); }
 
 export function updateWorkspaceStatus(wsId, status) {
   return request(`/workspaces/${wsId}/status`, {

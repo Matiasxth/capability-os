@@ -32,6 +32,14 @@ class SkillCreator:
         self._contracts_dir = project_root / "system" / "tools" / "contracts" / "v1"
         self._impl_dir = project_root / "system" / "tools" / "implementations"
         self._created: list[dict[str, Any]] = []
+        # Domain registry for grouping related tools
+        self._domain_registry = None
+        try:
+            from system.core.skills.domain_registry import DomainRegistry
+            skills_dir = project_root / "workspace" / "skills" if (project_root / "workspace").exists() else project_root / "skills"
+            self._domain_registry = DomainRegistry(skills_dir)
+        except Exception:
+            pass
 
     def create_and_load(
         self,
@@ -43,6 +51,7 @@ class SkillCreator:
         handler_code: str,
         handler_name: str = "",
         dependencies: list[str] | None = None,
+        domain: str | None = None,
     ) -> dict[str, Any]:
         """Create a tool contract + handler and hot-load into the system.
 
@@ -108,8 +117,24 @@ class SkillCreator:
         if self._security:
             self._security._confirm_tools.add(tool_id)
 
-        # 9. Track creation
-        record = {"tool_id": tool_id, "name": name, "created_at": _now(), "auto": True}
+        # 9. Group into domain
+        domain_id = domain
+        if self._domain_registry:
+            try:
+                if not domain_id:
+                    domain_id = self._domain_registry.find_domain(description or name)
+                if not domain_id:
+                    domain_id = self._domain_registry.suggest_domain(description or name)
+                # Create domain if it doesn't exist
+                if not self._domain_registry.get_domain(domain_id):
+                    self._domain_registry.create_domain(domain_id, name.split()[0] + " Tools" if name else domain_id, description)
+                # Add tool to domain
+                self._domain_registry.add_tool_to_domain(domain_id, tool_id, name, description, contract, handler_code)
+            except Exception:
+                domain_id = None
+
+        # 10. Track creation
+        record = {"tool_id": tool_id, "name": name, "domain": domain_id, "created_at": _now(), "auto": True}
         self._created.append(record)
 
         # 10. Emit event

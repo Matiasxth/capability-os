@@ -1,10 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { getMemoryPreferences, listWorkspaces } from "./api";
 import ControlCenter from "./pages/ControlCenter";
+import EditorLayout from "./components/editor/EditorLayout";
 import Onboarding from "./pages/Onboarding";
 import Workspace from "./pages/Workspace";
 
-function normalizePath(p) { return p.startsWith("/control-center") ? "/control-center" : "/"; }
+function EditorPage({ wsId }) {
+  return <div style={{ height: "100%", overflow: "hidden" }}><EditorLayout wsId={wsId} /></div>;
+}
+
+function normalizePath(p) { return p.startsWith("/control-center") ? "/control-center" : p.startsWith("/editor") ? "/editor" : "/"; }
 
 export default function App() {
   const [route, setRoute] = useState(normalizePath(window.location.pathname));
@@ -62,6 +67,7 @@ export default function App() {
           <div className="app-logo"><div className="logo-icon" />CapOS</div>
           <nav className="app-nav">
             <button type="button" className={route === "/" ? "is-active" : ""} onClick={() => navigate("/")}>Workspace</button>
+            <button type="button" className={route === "/editor" ? "is-active" : ""} onClick={() => navigate("/editor")}>Editor</button>
             <button type="button" className={route === "/control-center" ? "is-active" : ""} onClick={() => navigate("/control-center")}>Control Center</button>
           </nav>
         </div>
@@ -77,7 +83,7 @@ export default function App() {
         </div>
       </header>
       <main className="app-main">
-        {route === "/control-center" ? <ControlCenter /> : <Workspace activeWorkspace={activeWs} userName={userName} />}
+        {route === "/control-center" ? <ControlCenter /> : route === "/editor" ? <EditorPage wsId={defaultWsId} /> : <Workspace activeWorkspace={activeWs} userName={userName} />}
       </main>
     </div>
   );

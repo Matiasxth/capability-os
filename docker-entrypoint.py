@@ -31,7 +31,7 @@ API_PREFIXES = (
     "/llm/", "/browser/", "/metrics", "/gaps/", "/optimizations/",
     "/proposals/", "/integrations", "/interpret", "/plan",
     "/executions/", "/mcp/", "/a2a/", "/memory", "/chat",
-    "/workspaces", "/.well-known", "/skills", "/agents", "/agent", "/logs", "/voice", "/supervisor", "/scheduler",
+    "/workspaces", "/.well-known", "/skills", "/agents", "/agent", "/logs", "/voice", "/supervisor", "/scheduler", "/files",
 )
 
 
