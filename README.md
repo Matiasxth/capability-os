@@ -2,6 +2,10 @@
 
 **AI-powered personal operating system with autonomous agents, progressive security, and multi-channel messaging.**
 
+<p align="center">
+  <img src=".github/preview.png" alt="Capability OS" width="800"/>
+</p>
+
 An intelligent system that understands natural language, executes real actions through tools, manages projects, and communicates via WhatsApp, Telegram, Slack, and Discord — all from a cyberpunk-styled web interface.
 
 ```
