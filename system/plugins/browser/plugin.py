@@ -65,6 +65,14 @@ class BrowserPlugin:
         except Exception:
             logger.exception("Failed to register browser tools")
 
+    def register_routes(self, router) -> None:
+        from system.core.ui_bridge.handlers import browser_handlers
+        router.add("POST", "/browser/restart", browser_handlers.restart_worker)
+        router.add("GET", "/browser/cdp-status", browser_handlers.cdp_status)
+        router.add("POST", "/browser/launch-chrome", browser_handlers.launch_chrome)
+        router.add("POST", "/browser/open-whatsapp", browser_handlers.open_whatsapp)
+        router.add("POST", "/browser/connect-cdp", browser_handlers.connect_cdp)
+
     def start(self) -> None:
         """Browser tools are registered at init — nothing to start."""
 

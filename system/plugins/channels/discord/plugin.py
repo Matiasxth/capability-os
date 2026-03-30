@@ -46,6 +46,15 @@ class DiscordChannelPlugin:
         # Create executor
         self.executor = DiscordCapabilityExecutor(connector=self.connector)
 
+    def register_routes(self, router) -> None:
+        from system.core.ui_bridge.handlers import integration_handlers
+        router.add("GET", "/integrations/discord/status", integration_handlers.discord_status)
+        router.add("POST", "/integrations/discord/configure", integration_handlers.discord_configure)
+        router.add("POST", "/integrations/discord/test", integration_handlers.discord_test)
+        router.add("POST", "/integrations/discord/polling/start", integration_handlers.discord_polling_start)
+        router.add("POST", "/integrations/discord/polling/stop", integration_handlers.discord_polling_stop)
+        router.add("GET", "/integrations/discord/polling/status", integration_handlers.discord_polling_status)
+
     def start(self) -> None:
         from system.integrations.installed.discord_bot_connector import (
             DiscordPollingWorker,

@@ -47,6 +47,15 @@ class TelegramChannelPlugin:
         # Create executor
         self.executor = TelegramCapabilityExecutor(connector=self.connector)
 
+    def register_routes(self, router) -> None:
+        from system.core.ui_bridge.handlers import integration_handlers
+        router.add("GET", "/integrations/telegram/status", integration_handlers.telegram_status)
+        router.add("POST", "/integrations/telegram/configure", integration_handlers.telegram_configure)
+        router.add("POST", "/integrations/telegram/test", integration_handlers.telegram_test)
+        router.add("POST", "/integrations/telegram/polling/start", integration_handlers.telegram_polling_start)
+        router.add("POST", "/integrations/telegram/polling/stop", integration_handlers.telegram_polling_stop)
+        router.add("GET", "/integrations/telegram/polling/status", integration_handlers.telegram_polling_status)
+
     def start(self) -> None:
         from system.integrations.installed.telegram_bot_connector.connector import (
             TelegramPollingWorker,

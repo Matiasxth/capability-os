@@ -169,6 +169,21 @@ class GrowthPlugin:
         except Exception:
             logger.exception("Failed to create AutoInstallPipeline")
 
+    def register_routes(self, router) -> None:
+        from system.core.ui_bridge.handlers import growth_handlers
+        router.add("GET", "/gaps/pending", growth_handlers.pending_gaps)
+        router.add("POST", "/gaps/{gap_id}/analyze", growth_handlers.analyze_gap)
+        router.add("POST", "/gaps/{gap_id}/generate", growth_handlers.generate_gap)
+        router.add("POST", "/gaps/{gap_id}/approve", growth_handlers.approve_gap)
+        router.add("POST", "/gaps/{gap_id}/reject", growth_handlers.reject_gap)
+        router.add("GET", "/proposals", growth_handlers.list_proposals)
+        router.add("POST", "/proposals/{prop_id}/regenerate", growth_handlers.regenerate_proposal)
+        router.add("POST", "/proposals/{cap_id}/approve", growth_handlers.approve_proposal)
+        router.add("POST", "/proposals/{cap_id}/reject", growth_handlers.reject_proposal)
+        router.add("GET", "/optimizations/pending", growth_handlers.pending_optimizations)
+        router.add("POST", "/optimizations/{opt_id}/approve", growth_handlers.approve_optimization)
+        router.add("POST", "/optimizations/{opt_id}/reject", growth_handlers.reject_optimization)
+
     def start(self) -> None:
         """Growth subsystems are passive — nothing to start."""
 

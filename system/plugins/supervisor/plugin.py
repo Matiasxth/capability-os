@@ -79,6 +79,15 @@ class SupervisorPlugin:
         except Exception:
             logger.exception("Failed to create SupervisorDaemon")
 
+    def register_routes(self, router) -> None:
+        from system.core.ui_bridge.handlers import supervisor_handlers
+        router.add("GET", "/supervisor/status", supervisor_handlers.supervisor_status)
+        router.add("GET", "/supervisor/log", supervisor_handlers.supervisor_log)
+        router.add("POST", "/supervisor/claude", supervisor_handlers.supervisor_invoke_claude)
+        router.add("POST", "/supervisor/health-check", supervisor_handlers.health_check_now)
+        router.add("POST", "/supervisor/approve", supervisor_handlers.supervisor_approve)
+        router.add("POST", "/supervisor/discard", supervisor_handlers.supervisor_discard)
+
     def start(self) -> None:
         """Start the supervisor daemon."""
         if self.supervisor is not None:

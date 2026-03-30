@@ -66,6 +66,16 @@ class WorkflowsPlugin:
         if self.workflow_executor:
             ctx.publish_service(WorkflowExecutorContract, self.workflow_executor)
 
+    def register_routes(self, router) -> None:
+        from system.core.ui_bridge.handlers import workflow_handlers
+        router.add("GET", "/workflows", workflow_handlers.list_workflows)
+        router.add("POST", "/workflows", workflow_handlers.create_workflow)
+        router.add("GET", "/workflows/{wf_id}", workflow_handlers.get_workflow)
+        router.add("PUT", "/workflows/{wf_id}", workflow_handlers.update_workflow)
+        router.add("DELETE", "/workflows/{wf_id}", workflow_handlers.delete_workflow)
+        router.add("POST", "/workflows/{wf_id}/run", workflow_handlers.run_workflow)
+        router.add("POST", "/workflows/{wf_id}/layout", workflow_handlers.save_layout)
+
     def start(self) -> None:
         """Workflows are passive — nothing to start."""
 

@@ -62,6 +62,15 @@ class SkillsPlugin:
         except Exception:
             logger.exception("Failed to create SkillRegistry")
 
+    def register_routes(self, router) -> None:
+        from system.core.ui_bridge.handlers import skill_handlers
+        router.add("GET", "/skills", skill_handlers.list_skills)
+        router.add("POST", "/skills/install", skill_handlers.install_skill)
+        router.add("GET", "/skills/{skill_id}", skill_handlers.get_skill)
+        router.add("DELETE", "/skills/{skill_id}", skill_handlers.uninstall_skill)
+        router.add("POST", "/skills/hot-load", skill_handlers.hot_load)
+        router.add("GET", "/skills/auto-generated", skill_handlers.list_created_skills)
+
     def start(self) -> None:
         """Skills are passive — nothing to start."""
 

@@ -102,6 +102,35 @@ class CoreServicesPlugin:
         ctx.publish_service(MetricsCollectorContract, metrics_collector)
         logger.info("Published MetricsCollectorContract")
 
+    def register_routes(self, router) -> None:
+        from system.core.ui_bridge.handlers import system_handlers, file_handlers, plugin_handlers
+        # System
+        router.add("GET", "/status", system_handlers.get_status)
+        router.add("GET", "/health", system_handlers.get_health)
+        router.add("GET", "/settings", system_handlers.get_settings)
+        router.add("POST", "/settings", system_handlers.save_settings)
+        router.add("POST", "/llm/test", system_handlers.test_llm)
+        router.add("GET", "/system/export-config", system_handlers.export_config)
+        router.add("POST", "/system/import-config", system_handlers.import_config)
+        router.add("GET", "/logs", system_handlers.get_logs)
+        # Files / Editor
+        router.add("GET", "/files/tree", file_handlers.file_tree)
+        router.add("GET", "/files/tree/{ws_id}", file_handlers.file_tree)
+        router.add("GET", "/files/read", file_handlers.file_read)
+        router.add("POST", "/files/write", file_handlers.file_write)
+        router.add("POST", "/files/create", file_handlers.file_create)
+        router.add("DELETE", "/files/delete", file_handlers.file_delete)
+        router.add("POST", "/files/terminal", file_handlers.file_terminal)
+        router.add("GET", "/files/analyze/{ws_id}", file_handlers.workspace_analyze)
+        router.add("POST", "/files/auto-clean/{ws_id}", file_handlers.workspace_auto_clean)
+        router.add("POST", "/files/generate-readme/{ws_id}", file_handlers.workspace_generate_readme)
+        router.add("POST", "/files/suggest-structure", file_handlers.workspace_suggest_structure)
+        # Plugin management
+        router.add("GET", "/plugins", plugin_handlers.list_plugins)
+        router.add("GET", "/plugins/{plugin_id}", plugin_handlers.get_plugin)
+        router.add("POST", "/plugins/{plugin_id}/reload", plugin_handlers.reload_plugin)
+        router.add("POST", "/plugins/install", plugin_handlers.install_plugin)
+
     def start(self) -> None:
         """Core services are passive — nothing to start."""
 

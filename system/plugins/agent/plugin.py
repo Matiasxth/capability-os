@@ -121,6 +121,18 @@ class AgentPlugin:
         except Exception:
             logger.exception("Failed to create AgentLoop")
 
+    def register_routes(self, router) -> None:
+        from system.core.ui_bridge.handlers import agent_handlers
+        router.add("POST", "/agent", agent_handlers.start_agent)
+        router.add("POST", "/agent/confirm", agent_handlers.confirm_action)
+        router.add("GET", "/agent/{session_id}", agent_handlers.get_session)
+        router.add("GET", "/agents", agent_handlers.list_agents)
+        router.add("POST", "/agents", agent_handlers.create_agent)
+        router.add("GET", "/agents/{agent_id}", agent_handlers.get_agent_def)
+        router.add("POST", "/agents/{agent_id}", agent_handlers.update_agent)
+        router.add("DELETE", "/agents/{agent_id}", agent_handlers.delete_agent)
+        router.add("POST", "/agents/design", agent_handlers.design_agent)
+
     def start(self) -> None:
         """Agent subsystems are passive — nothing to start."""
 

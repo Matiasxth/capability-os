@@ -54,6 +54,10 @@ def reload_plugin(service: Any, payload: Any, plugin_id: str = "", **kw: Any):
     if hasattr(service, "invalidate_alias_cache"):
         service.invalidate_alias_cache(plugin_id)
 
+    # Rebuild router so the reloaded plugin's routes are re-registered
+    if hasattr(service, "_build_router"):
+        service._router = service._build_router()
+
     return _resp(HTTPStatus.OK, {"status": "success", "plugin_id": plugin_id})
 
 

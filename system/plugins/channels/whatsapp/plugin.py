@@ -90,6 +90,22 @@ class WhatsAppChannelPlugin:
                 selectors_config_path=selectors_config,
             )
 
+    def register_routes(self, router) -> None:
+        from system.core.ui_bridge.handlers import integration_handlers
+        router.add("GET", "/integrations/whatsapp/selectors/health", integration_handlers.whatsapp_selectors_health)
+        router.add("POST", "/integrations/whatsapp/selectors", integration_handlers.whatsapp_selectors_override)
+        router.add("POST", "/integrations/whatsapp/close-session", integration_handlers.whatsapp_close_session)
+        router.add("GET", "/integrations/whatsapp/session-status", integration_handlers.whatsapp_session_status)
+        router.add("POST", "/integrations/whatsapp/start", integration_handlers.whatsapp_start)
+        router.add("GET", "/integrations/whatsapp/qr", integration_handlers.whatsapp_qr)
+        router.add("POST", "/integrations/whatsapp/stop", integration_handlers.whatsapp_stop)
+        router.add("POST", "/integrations/whatsapp/configure", integration_handlers.whatsapp_configure)
+        router.add("POST", "/integrations/whatsapp/switch-backend", integration_handlers.whatsapp_switch_backend)
+        router.add("GET", "/integrations/whatsapp/backends", integration_handlers.whatsapp_list_backends)
+        router.add("GET", "/integrations/whatsapp/debug", integration_handlers.whatsapp_debug)
+        router.add("GET", "/integrations/whatsapp/debug-chats", integration_handlers.whatsapp_debug_chats)
+        router.add("GET", "/integrations/whatsapp/reply-status", integration_handlers.whatsapp_reply_status)
+
     def start(self) -> None:
         from system.integrations.installed.whatsapp_web_connector.whatsapp_reply_worker import (
             WhatsAppReplyWorker,

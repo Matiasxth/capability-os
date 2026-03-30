@@ -52,6 +52,16 @@ class AuthPlugin:
         self.auth_middleware = AuthMiddleware()
         logger.info("AuthMiddleware ready")
 
+    def register_routes(self, router) -> None:
+        from system.core.ui_bridge.handlers import auth_handlers
+        router.add("POST", "/auth/setup", auth_handlers.auth_setup)
+        router.add("POST", "/auth/login", auth_handlers.auth_login)
+        router.add("GET", "/auth/me", auth_handlers.auth_me)
+        router.add("GET", "/auth/users", auth_handlers.list_users)
+        router.add("POST", "/auth/users", auth_handlers.create_user)
+        router.add("PUT", "/auth/users/{user_id}", auth_handlers.update_user)
+        router.add("DELETE", "/auth/users/{user_id}", auth_handlers.delete_user)
+
     def start(self) -> None:
         """Auth services are passive — nothing to start."""
 

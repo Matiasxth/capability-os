@@ -82,6 +82,16 @@ class MCPPlugin:
         except Exception:
             logger.exception("Failed to create MCPCapabilityGenerator")
 
+    def register_routes(self, router) -> None:
+        from system.core.ui_bridge.handlers import mcp_handlers
+        router.add("GET", "/mcp/servers", mcp_handlers.list_servers)
+        router.add("POST", "/mcp/servers", mcp_handlers.add_server)
+        router.add("DELETE", "/mcp/servers/{server_id}", mcp_handlers.remove_server)
+        router.add("POST", "/mcp/servers/{server_id}/discover", mcp_handlers.discover_tools)
+        router.add("GET", "/mcp/tools", mcp_handlers.list_tools)
+        router.add("POST", "/mcp/tools/{tool_id}/install", mcp_handlers.install_tool)
+        router.add("DELETE", "/mcp/tools/{tool_id}/uninstall", mcp_handlers.uninstall_tool)
+
     def start(self) -> None:
         """MCP subsystems are passive — nothing to start."""
 

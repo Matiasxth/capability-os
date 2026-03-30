@@ -77,6 +77,17 @@ class WorkspacePlugin:
         except Exception:
             logger.exception("Failed to create WorkspaceContext")
 
+    def register_routes(self, router) -> None:
+        from system.core.ui_bridge.handlers import workspace_handlers
+        router.add("GET", "/workspaces", workspace_handlers.list_workspaces)
+        router.add("POST", "/workspaces", workspace_handlers.add_workspace)
+        router.add("GET", "/workspaces/{ws_id}", workspace_handlers.get_workspace)
+        router.add("POST", "/workspaces/{ws_id}", workspace_handlers.update_workspace)
+        router.add("DELETE", "/workspaces/{ws_id}", workspace_handlers.delete_workspace)
+        router.add("POST", "/workspaces/{ws_id}/set-default", workspace_handlers.set_default)
+        router.add("POST", "/workspaces/{ws_id}/status", workspace_handlers.update_status)
+        router.add("GET", "/workspaces/{ws_id}/browse", workspace_handlers.browse)
+
     def start(self) -> None:
         """Workspace subsystems are passive — nothing to start."""
 

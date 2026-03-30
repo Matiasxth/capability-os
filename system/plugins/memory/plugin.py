@@ -146,6 +146,30 @@ class MemoryPlugin:
             self.vector_store.count(),
         )
 
+    def register_routes(self, router) -> None:
+        from system.core.ui_bridge.handlers import memory_handlers
+        router.add("GET", "/metrics", memory_handlers.get_metrics)
+        router.add("GET", "/memory/context", memory_handlers.get_context)
+        router.add("GET", "/memory/history", memory_handlers.get_history)
+        router.add("POST", "/memory/history/chat", memory_handlers.save_chat)
+        router.add("DELETE", "/memory/history/{exec_id}", memory_handlers.delete_history)
+        router.add("POST", "/memory/sessions", memory_handlers.save_session)
+        router.add("GET", "/memory/sessions/{exec_id}", memory_handlers.get_session)
+        router.add("GET", "/memory/preferences", memory_handlers.get_preferences)
+        router.add("POST", "/memory/preferences", memory_handlers.set_preferences)
+        router.add("GET", "/memory/semantic/search", memory_handlers.search_semantic)
+        router.add("POST", "/memory/semantic", memory_handlers.add_semantic)
+        router.add("DELETE", "/memory/semantic/{mem_id}", memory_handlers.delete_semantic)
+        router.add("DELETE", "/memory", memory_handlers.clear_all)
+        router.add("POST", "/memory/compact", memory_handlers.compact_sessions)
+        router.add("GET", "/memory/markdown", memory_handlers.get_markdown_memory)
+        router.add("POST", "/memory/markdown", memory_handlers.save_markdown_memory)
+        router.add("POST", "/memory/markdown/fact", memory_handlers.add_memory_fact)
+        router.add("DELETE", "/memory/markdown/fact", memory_handlers.remove_memory_fact)
+        router.add("GET", "/memory/daily", memory_handlers.get_daily_notes)
+        router.add("GET", "/memory/summaries", memory_handlers.get_session_summaries)
+        router.add("GET", "/memory/agent-context", memory_handlers.get_memory_agent_context)
+
     def start(self) -> None:
         """Nothing to start — all memory subsystems are passive."""
 

@@ -124,6 +124,18 @@ class CapabilitiesPlugin:
         except Exception:
             logger.exception("Failed to create PlanValidator")
 
+    def register_routes(self, router) -> None:
+        from system.core.ui_bridge.handlers import capability_handlers
+        router.add("GET", "/capabilities", capability_handlers.list_capabilities)
+        router.add("GET", "/capabilities/health", capability_handlers.capabilities_health)
+        router.add("GET", "/capabilities/{capability_id}", capability_handlers.get_capability)
+        router.add("POST", "/execute", capability_handlers.execute)
+        router.add("POST", "/chat", capability_handlers.chat)
+        router.add("POST", "/interpret", capability_handlers.interpret)
+        router.add("POST", "/plan", capability_handlers.plan)
+        router.add("GET", "/executions/{execution_id}", capability_handlers.get_execution)
+        router.add("GET", "/executions/{execution_id}/events", capability_handlers.get_execution_events)
+
     def start(self) -> None:
         """Capability subsystems are passive — nothing to start."""
 

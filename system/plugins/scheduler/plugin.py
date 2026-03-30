@@ -88,6 +88,16 @@ class SchedulerPlugin:
         if self.scheduler:
             ctx.publish_service(SchedulerContract, self.scheduler)
 
+    def register_routes(self, router) -> None:
+        from system.core.ui_bridge.handlers import scheduler_handlers
+        router.add("GET", "/scheduler/tasks", scheduler_handlers.list_tasks)
+        router.add("POST", "/scheduler/tasks", scheduler_handlers.create_task)
+        router.add("POST", "/scheduler/tasks/{task_id}", scheduler_handlers.update_task)
+        router.add("DELETE", "/scheduler/tasks/{task_id}", scheduler_handlers.delete_task)
+        router.add("POST", "/scheduler/tasks/{task_id}/run", scheduler_handlers.run_task_now)
+        router.add("GET", "/scheduler/status", scheduler_handlers.scheduler_status)
+        router.add("GET", "/scheduler/log", scheduler_handlers.scheduler_log)
+
     def start(self) -> None:
         """Start the proactive scheduler."""
         if self.scheduler is not None:

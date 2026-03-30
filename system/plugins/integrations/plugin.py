@@ -62,6 +62,14 @@ class IntegrationsPlugin:
         except Exception:
             logger.exception("Failed to initialize IntegrationRegistry")
 
+    def register_routes(self, router) -> None:
+        from system.core.ui_bridge.handlers import integration_handlers
+        router.add("GET", "/integrations", integration_handlers.list_integrations)
+        router.add("GET", "/integrations/{integration_id}", integration_handlers.inspect_integration)
+        router.add("POST", "/integrations/{integration_id}/validate", integration_handlers.validate_integration)
+        router.add("POST", "/integrations/{integration_id}/enable", integration_handlers.enable_integration)
+        router.add("POST", "/integrations/{integration_id}/disable", integration_handlers.disable_integration)
+
     def start(self) -> None:
         pass
 

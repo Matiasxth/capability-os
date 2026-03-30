@@ -83,6 +83,16 @@ class A2APlugin:
         except Exception:
             logger.exception("Failed to create AgentCardBuilder")
 
+    def register_routes(self, router) -> None:
+        from system.core.ui_bridge.handlers import a2a_handlers
+        router.add("GET", "/.well-known/agent.json", a2a_handlers.agent_card)
+        router.add("POST", "/a2a", a2a_handlers.handle_task)
+        router.add("GET", "/a2a/{task_id}/events", a2a_handlers.task_events)
+        router.add("GET", "/a2a/agents", a2a_handlers.list_agents)
+        router.add("POST", "/a2a/agents", a2a_handlers.add_agent)
+        router.add("DELETE", "/a2a/agents/{agent_id}", a2a_handlers.remove_agent)
+        router.add("POST", "/a2a/agents/{agent_id}/delegate", a2a_handlers.delegate_task)
+
     def start(self) -> None:
         """A2A subsystems are passive — nothing to start."""
 

@@ -203,6 +203,21 @@ class ServiceContainer:
         return order
 
     # ------------------------------------------------------------------
+    # Route registration
+    # ------------------------------------------------------------------
+
+    def register_all_routes(self, router: Any) -> None:
+        """Let every plugin with a register_routes() method declare its HTTP routes."""
+        for pid in self._resolve_order():
+            plugin = self._plugins.get(pid)
+            if plugin is not None and hasattr(plugin, "register_routes"):
+                try:
+                    plugin.register_routes(router)
+                    logger.debug(f"  Plugin [{pid}]: registered routes")
+                except Exception as exc:
+                    logger.error(f"  Plugin [{pid}]: route registration FAILED ({exc})")
+
+    # ------------------------------------------------------------------
     # Status / Debug
     # ------------------------------------------------------------------
 

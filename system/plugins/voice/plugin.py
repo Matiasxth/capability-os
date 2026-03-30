@@ -60,6 +60,12 @@ class VoicePlugin:
         except Exception:
             logger.exception("Failed to create TTSService")
 
+    def register_routes(self, router) -> None:
+        from system.core.ui_bridge.handlers import voice_handlers
+        router.add("POST", "/voice/transcribe", voice_handlers.transcribe)
+        router.add("POST", "/voice/synthesize", voice_handlers.synthesize)
+        router.add("GET", "/voice/config", voice_handlers.voice_config)
+
     def start(self) -> None:
         """Voice services are passive — nothing to start."""
 
