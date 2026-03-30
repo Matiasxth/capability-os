@@ -504,3 +504,110 @@ pre{background:#060608;border:1px solid var(--border);border-radius:var(--radius
 
 @keyframes msg-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:768px){.conv-sidebar{display:none}}
+
+/* ================================================================
+   WORKFLOW EDITOR
+   ================================================================ */
+
+/* ── Layout ── */
+.wf-editor{display:flex;height:100%;overflow:hidden;background:var(--bg-root)}
+.wf-sidebar{width:220px;min-width:180px;max-width:280px;background:var(--bg-surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.wf-sidebar-header{display:flex;align-items:center;justify-content:space-between;padding:12px;border-bottom:1px solid var(--border)}
+.wf-sidebar-title{font-size:12px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.06em}
+.wf-sidebar-list{flex:1;overflow-y:auto;padding:6px}
+.wf-sidebar-empty{padding:20px 12px;font-size:12px;color:var(--text-muted);text-align:center}
+.wf-sidebar-item{position:relative;padding:10px 12px;border-radius:var(--radius-md);cursor:pointer;margin-bottom:2px;transition:background var(--dur-fast) var(--ease)}
+.wf-sidebar-item:hover{background:var(--bg-hover)}
+.wf-sidebar-item.is-active{background:var(--accent-dim);border:1px solid var(--accent)33}
+.wf-sidebar-item-name{font-size:13px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:20px}
+.wf-sidebar-item-desc{font-size:11px;color:var(--text-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wf-sidebar-delete{position:absolute;top:8px;right:8px;width:20px;height:20px;border:none;background:transparent;color:var(--text-muted);font-size:12px;cursor:pointer;border-radius:4px;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity var(--dur-fast)}
+.wf-sidebar-item:hover .wf-sidebar-delete{opacity:1}
+.wf-sidebar-delete:hover{background:var(--error-dim);color:var(--error)}
+
+/* ── Create dialog ── */
+.wf-create-dialog{padding:10px 12px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:6px}
+.wf-create-actions{display:flex;gap:6px}
+
+/* ── Main area ── */
+.wf-main{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+
+/* ── Top bar ── */
+.wf-topbar{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--bg-surface);gap:12px;flex-shrink:0}
+.wf-topbar-name{background:transparent;border:1px solid transparent;color:var(--text);font-size:14px;font-weight:600;padding:4px 8px;border-radius:var(--radius-sm);flex:1;max-width:300px;font-family:var(--font-sans);transition:border-color var(--dur-fast)}
+.wf-topbar-name:hover{border-color:var(--border)}
+.wf-topbar-name:focus{outline:none;border-color:var(--accent);background:var(--bg-input)}
+.wf-topbar-actions{display:flex;align-items:center;gap:10px}
+.wf-status-dot{width:8px;height:8px;border-radius:50%;transition:background var(--dur-fast)}
+.wf-status-label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;min-width:50px}
+
+/* ── Buttons ── */
+.wf-btn{padding:6px 16px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);transition:all var(--dur-fast);font-family:var(--font-sans)}
+.wf-btn-save{background:var(--bg-elevated);color:var(--text)}
+.wf-btn-save:hover{background:var(--bg-hover);border-color:var(--accent)}
+.wf-btn-run{background:var(--accent-dim);color:var(--accent);border-color:var(--accent)55}
+.wf-btn-run:hover{background:var(--accent-hover);box-shadow:0 0 8px var(--accent)33}
+.wf-btn-sm{padding:4px 10px;border-radius:var(--radius-sm);font-size:11px;font-weight:500;cursor:pointer;border:1px solid var(--border);font-family:var(--font-sans);transition:all var(--dur-fast)}
+.wf-btn-accent{background:var(--accent-dim);color:var(--accent);border-color:var(--accent)44}
+.wf-btn-accent:hover{background:var(--accent-hover)}
+.wf-btn-dim{background:transparent;color:var(--text-muted)}
+.wf-btn-dim:hover{color:var(--text);background:var(--bg-hover)}
+
+/* ── Canvas area ── */
+.wf-canvas-area{flex:1;display:flex;min-height:0;overflow:hidden}
+.wf-canvas-center{flex:1;min-width:0;position:relative}
+.wf-canvas-wrapper{width:100%;height:100%}
+
+/* Empty canvas */
+.wf-empty-canvas{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-muted)}
+.wf-empty-icon{font-size:48px;margin-bottom:12px;opacity:0.3}
+.wf-empty-text{font-size:14px}
+
+/* ── Node Palette ── */
+.wf-palette{width:170px;min-width:150px;background:var(--bg-surface);border-right:1px solid var(--border);overflow-y:auto;padding:10px 8px;flex-shrink:0}
+.wf-palette-title{font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;padding:4px 6px 10px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.wf-palette-card{padding:8px 10px;border-radius:var(--radius-md);border:1px solid var(--border);margin-bottom:6px;cursor:grab;transition:all var(--dur-fast);background:var(--bg-root)}
+.wf-palette-card:hover{border-color:var(--card-accent,var(--accent));background:var(--bg-elevated);box-shadow:0 0 6px color-mix(in srgb, var(--card-accent, var(--accent)) 20%, transparent)}
+.wf-palette-card:active{cursor:grabbing}
+.wf-palette-card-header{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+.wf-palette-card-icon{font-size:14px}
+.wf-palette-card-label{font-size:12px;font-weight:600;color:var(--text)}
+.wf-palette-card-desc{font-size:10px;color:var(--text-muted);line-height:1.3}
+
+/* ── Custom Nodes ── */
+.wf-node{background:var(--bg-surface);border-radius:var(--radius-md);min-width:160px;max-width:220px;transition:box-shadow var(--dur-fast)}
+.wf-node-header{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:var(--radius-md) var(--radius-md) 0 0}
+.wf-node-icon{font-size:14px}
+.wf-node-label{font-size:12px;font-weight:600;color:var(--text)}
+.wf-node-body{padding:6px 10px 8px}
+.wf-node-detail{font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wf-node-handles-label{display:flex;justify-content:space-between;font-size:9px;margin-top:4px;padding:0 4px}
+
+/* ── Node Config Panel ── */
+.wf-config-panel{width:240px;min-width:200px;background:var(--bg-surface);border-left:1px solid var(--border);overflow-y:auto;padding:14px 12px;flex-shrink:0}
+.wf-config-empty{display:flex;align-items:center;justify-content:center}
+.wf-config-empty-text{font-size:12px;color:var(--text-muted);text-align:center;margin-top:40px}
+.wf-config-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.wf-cfg-label{display:block;font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin:10px 0 4px}
+.wf-cfg-input{display:block;width:100%;padding:6px 8px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:12px;font-family:var(--font-sans);transition:border-color var(--dur-fast);box-sizing:border-box}
+.wf-cfg-input:focus{outline:none;border-color:var(--accent)}
+.wf-cfg-textarea{display:block;width:100%;padding:6px 8px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:12px;font-family:var(--font-mono);resize:vertical;transition:border-color var(--dur-fast);box-sizing:border-box}
+.wf-cfg-textarea:focus{outline:none;border-color:var(--accent)}
+
+/* ── Run results panel ── */
+.wf-run-panel{border-top:1px solid var(--border);background:var(--bg-surface);max-height:200px;overflow-y:auto;flex-shrink:0}
+.wf-run-panel-header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid var(--border);font-size:12px;font-weight:600;color:var(--text-dim)}
+.wf-run-panel-output{padding:10px 14px;font-family:var(--font-mono);font-size:11px;color:var(--text-dim);margin:0;white-space:pre-wrap;word-break:break-all}
+
+/* ── Error toast ── */
+.wf-error-toast{position:fixed;bottom:20px;right:20px;background:var(--error-dim);border:1px solid var(--error);color:var(--error);padding:10px 16px;border-radius:var(--radius-md);font-size:12px;cursor:pointer;z-index:var(--z-toast);max-width:340px;animation:msg-in 200ms var(--ease)}
+
+/* ── ReactFlow overrides (dark theme) ── */
+.wf-canvas-wrapper .react-flow__node{border:none;background:none;padding:0;border-radius:0;box-shadow:none}
+.wf-canvas-wrapper .react-flow__edge-path{stroke:var(--accent);stroke-width:2}
+.wf-canvas-wrapper .react-flow__handle{width:10px;height:10px;border:2px solid var(--bg-surface);border-radius:50%}
+.wf-canvas-wrapper .react-flow__controls button{background:var(--bg-elevated);color:var(--text-dim);border:none;border-bottom:1px solid var(--border)}
+.wf-canvas-wrapper .react-flow__controls button:hover{background:var(--bg-hover);color:var(--text)}
+.wf-canvas-wrapper .react-flow__controls button svg{fill:currentColor}
+.wf-canvas-wrapper .react-flow__minimap{border-radius:var(--radius-md)}
+.wf-canvas-wrapper .react-flow__attribution{display:none}

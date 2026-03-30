@@ -153,12 +153,14 @@ class CapabilityOSUIBridgeService:
         from system.plugins.channels.discord.plugin import create_plugin as discord_factory
         from system.plugins.channels.whatsapp.plugin import create_plugin as wsp_factory
         from system.plugins.auth.plugin import create_plugin as auth_factory
+        from system.plugins.workflows.plugin import create_plugin as wf_factory
+        from system.plugins.sandbox.plugin import create_plugin as sandbox_factory
 
         for factory in [
             core_factory, auth_factory, mem_factory, cap_factory, ws_factory, agent_factory,
             skills_factory, browser_factory, voice_factory, mcp_factory, a2a_factory,
             growth_factory, seq_factory, sv_factory, sched_factory,
-            tg_factory, slack_factory, discord_factory, wsp_factory,
+            tg_factory, slack_factory, discord_factory, wsp_factory, wf_factory, sandbox_factory,
         ]:
             try:
                 plugin = factory()
@@ -285,6 +287,13 @@ class CapabilityOSUIBridgeService:
         self.sequence_storage = getattr(_seq, "sequence_storage", None) if _seq else None
         self.sequence_registry = getattr(_seq, "sequence_registry", None) if _seq else None
         self.sequence_runner = getattr(_seq, "sequence_runner", None) if _seq else None
+
+        _wf = self.container.get_plugin("capos.core.workflows")
+        self.workflow_registry = getattr(_wf, "workflow_registry", None) if _wf else None
+        self.workflow_executor = getattr(_wf, "workflow_executor", None) if _wf else None
+
+        _sbx = self.container.get_plugin("capos.core.sandbox")
+        self.sandbox_manager = getattr(_sbx, "sandbox_manager", None) if _sbx else None
 
         # Integration registry (still managed directly — not yet a plugin)
         self.integration_registry = IntegrationRegistry(self.integration_registry_data_path)
@@ -515,6 +524,21 @@ class CapabilityOSUIBridgeService:
         r.add("POST", "/scheduler/tasks/{task_id}/run", scheduler_handlers.run_task_now)
         r.add("GET", "/scheduler/status", scheduler_handlers.scheduler_status)
         r.add("GET", "/scheduler/log", scheduler_handlers.scheduler_log)
+        # Plugin management
+        from system.core.ui_bridge.handlers import plugin_handlers
+        r.add("GET", "/plugins", plugin_handlers.list_plugins)
+        r.add("GET", "/plugins/{plugin_id}", plugin_handlers.get_plugin)
+        r.add("POST", "/plugins/{plugin_id}/reload", plugin_handlers.reload_plugin)
+        r.add("POST", "/plugins/install", plugin_handlers.install_plugin)
+        # Workflows
+        from system.core.ui_bridge.handlers import workflow_handlers
+        r.add("GET", "/workflows", workflow_handlers.list_workflows)
+        r.add("POST", "/workflows", workflow_handlers.create_workflow)
+        r.add("GET", "/workflows/{wf_id}", workflow_handlers.get_workflow)
+        r.add("PUT", "/workflows/{wf_id}", workflow_handlers.update_workflow)
+        r.add("DELETE", "/workflows/{wf_id}", workflow_handlers.delete_workflow)
+        r.add("POST", "/workflows/{wf_id}/run", workflow_handlers.run_workflow)
+        r.add("POST", "/workflows/{wf_id}/layout", workflow_handlers.save_layout)
         return r
 
     def _load_registries(self) -> None:

@@ -677,3 +677,17 @@ export function updateWorkspaceStatus(wsId, status) {
     body: JSON.stringify({ status })
   });
 }
+
+// Workflow API
+export function listWorkflows() { return request("/workflows"); }
+export function createWorkflow(name, description) { return request("/workflows", { method: "POST", body: JSON.stringify({ name, description }) }); }
+export function getWorkflow(id) { return request(`/workflows/${id}`); }
+export function updateWorkflow(id, data) { return request(`/workflows/${id}`, { method: "PUT", body: JSON.stringify(data) }); }
+export function deleteWorkflow(id) { return request(`/workflows/${id}`, { method: "DELETE" }); }
+export function runWorkflow(id) { return request(`/workflows/${id}/run`, { method: "POST" }); }
+
+// Plugin management API
+export function listPlugins() { return request("/plugins"); }
+export function getPlugin(pluginId) { return request(`/plugins/${pluginId}`); }
+export function reloadPlugin(pluginId) { return request(`/plugins/${pluginId}/reload`, { method: "POST" }); }
+export function installPlugin(path) { return request("/plugins/install", { method: "POST", body: JSON.stringify({ path }) }); }

@@ -6,6 +6,7 @@ import EditorLayout from "./components/editor/EditorLayout";
 import Login from "./pages/Login";
 import Onboarding from "./pages/Onboarding";
 import Workspace from "./pages/Workspace";
+import WorkflowEditor from "./pages/WorkflowEditor";
 
 function EditorPage({ wsId, workspaces }) {
   return <div style={{ height: "100%", overflow: "hidden" }}><EditorLayout wsId={wsId} workspaces={workspaces} /></div>;
@@ -14,6 +15,7 @@ function EditorPage({ wsId, workspaces }) {
 function normalizePath(p) {
   if (p.startsWith("/control-center")) return "/control-center";
   if (p.startsWith("/editor")) return "/editor";
+  if (p.startsWith("/workflows")) return "/workflows";
   if (p.startsWith("/login")) return "/login";
   return "/";
 }
@@ -80,6 +82,7 @@ function AuthenticatedApp() {
           <nav className="app-nav">
             <button type="button" className={route === "/" ? "is-active" : ""} onClick={() => navigate("/")}>Workspace</button>
             <button type="button" className={route === "/editor" ? "is-active" : ""} onClick={() => navigate("/editor")}>Editor</button>
+            <button type="button" className={route === "/workflows" ? "is-active" : ""} onClick={() => navigate("/workflows")}>Workflows</button>
             <button type="button" className={route === "/control-center" ? "is-active" : ""} onClick={() => navigate("/control-center")}>Control Center</button>
           </nav>
         </div>
@@ -96,7 +99,7 @@ function AuthenticatedApp() {
         </div>
       </header>
       <main className="app-main">
-        {route === "/control-center" ? <ControlCenter /> : route === "/editor" ? <EditorPage wsId={defaultWsId} workspaces={workspaces} /> : <Workspace activeWorkspace={activeWs} userName={userName} />}
+        {route === "/control-center" ? <ControlCenter /> : route === "/workflows" ? <WorkflowEditor /> : route === "/editor" ? <EditorPage wsId={defaultWsId} workspaces={workspaces} /> : <Workspace activeWorkspace={activeWs} userName={userName} />}
       </main>
     </div>
   );
