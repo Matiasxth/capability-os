@@ -58,11 +58,15 @@ ENV PYTHONUNBUFFERED=1 \
     WORKSPACE_ROOT=/data/workspace \
     HOST=0.0.0.0 \
     PORT=8000 \
+    WS_PORT=8001 \
     LLM_PROVIDER=ollama \
     OLLAMA_BASE_URL=http://host.docker.internal:11434 \
-    OLLAMA_MODEL=llama3.1:8b
+    OLLAMA_MODEL=llama3.1:8b \
+    ANTHROPIC_API_KEY="" \
+    GEMINI_API_KEY="" \
+    DEEPSEEK_API_KEY=""
 
-EXPOSE 8000
+EXPOSE 8000 8001
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
     CMD curl -sf http://localhost:8000/health || exit 1

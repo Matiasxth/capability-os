@@ -56,6 +56,65 @@ export function planIntent(intent, conversationHistory) {
   });
 }
 
+export async function* streamChat(message, userName, conversationHistory) {
+  const body = { message, user_name: userName || "User" };
+  if (conversationHistory && conversationHistory.length > 0) {
+    body.conversation_history = conversationHistory;
+  }
+  const resp = await fetch(`${API_BASE_URL}/chat/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    while (buffer.includes("\n\n")) {
+      const idx = buffer.indexOf("\n\n");
+      const line = buffer.slice(0, idx).trim();
+      buffer = buffer.slice(idx + 2);
+      if (!line.startsWith("data:")) continue;
+      try {
+        const data = JSON.parse(line.slice(5).trim());
+        if (data.done) return;
+        if (data.error) throw new Error(data.error);
+        if (data.chunk) yield data.chunk;
+      } catch (e) { if (e.message) throw e; }
+    }
+  }
+}
+
+export async function* streamExecution(capabilityId, inputs) {
+  const resp = await fetch(`${API_BASE_URL}/execute/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ capability_id: capabilityId, inputs: inputs || {} })
+  });
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    while (buffer.includes("\n\n")) {
+      const idx = buffer.indexOf("\n\n");
+      const line = buffer.slice(0, idx).trim();
+      buffer = buffer.slice(idx + 2);
+      if (!line.startsWith("data:")) continue;
+      try {
+        const data = JSON.parse(line.slice(5).trim());
+        yield data;
+        if (data.done) return;
+      } catch { /* ignore parse errors */ }
+    }
+  }
+}
+
 export function chatMessage(message, userName, conversationHistory) {
   const body = { message, user_name: userName || "User" };
   if (conversationHistory && conversationHistory.length > 0) {
@@ -69,6 +128,17 @@ export function chatMessage(message, userName, conversationHistory) {
 
 export function getSystemStatus() {
   return request("/status");
+}
+
+export function exportConfig() {
+  return request("/system/export-config");
+}
+
+export function importConfig(data) {
+  return request("/system/import-config", {
+    method: "POST",
+    body: JSON.stringify(data)
+  });
 }
 
 export function getSystemHealth() {
@@ -95,6 +165,128 @@ export function testLLMConnection() {
 
 export function restartBrowserWorker() {
   return request("/browser/restart", {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+}
+
+export function getCDPStatus() {
+  return request("/browser/cdp-status");
+}
+
+export function launchChrome() {
+  return request("/browser/launch-chrome", {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+}
+
+export function openWhatsApp() {
+  return request("/browser/open-whatsapp", {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+}
+
+export function closeWhatsAppSession() {
+  return request("/integrations/whatsapp/close-session", {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+}
+
+export function getWhatsAppSessionStatus() {
+  return request("/integrations/whatsapp/session-status");
+}
+
+export function getWhatsAppQR() {
+  return request("/integrations/whatsapp/qr");
+}
+
+export function getTelegramStatus() {
+  return request("/integrations/telegram/status");
+}
+
+export function configureTelegram(botToken, defaultChatId, allowedUserIds) {
+  return request("/integrations/telegram/configure", {
+    method: "POST",
+    body: JSON.stringify({ bot_token: botToken, default_chat_id: defaultChatId || "", allowed_user_ids: allowedUserIds || [] })
+  });
+}
+
+export function testTelegram() {
+  return request("/integrations/telegram/test", {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+}
+
+export function startTelegramPolling() {
+  return request("/integrations/telegram/polling/start", { method: "POST", body: "{}" });
+}
+
+export function stopTelegramPolling() {
+  return request("/integrations/telegram/polling/stop", { method: "POST", body: "{}" });
+}
+
+export function getTelegramPollingStatus() {
+  return request("/integrations/telegram/polling/status");
+}
+
+// Slack
+export function getSlackStatus() { return request("/integrations/slack/status"); }
+export function configureSlack(config) { return request("/integrations/slack/configure", { method: "POST", body: JSON.stringify(config) }); }
+export function testSlack() { return request("/integrations/slack/test", { method: "POST", body: "{}" }); }
+export function startSlackPolling() { return request("/integrations/slack/polling/start", { method: "POST", body: "{}" }); }
+export function stopSlackPolling() { return request("/integrations/slack/polling/stop", { method: "POST", body: "{}" }); }
+export function getSlackPollingStatus() { return request("/integrations/slack/polling/status"); }
+
+// Discord
+export function getDiscordStatus() { return request("/integrations/discord/status"); }
+export function configureDiscord(config) { return request("/integrations/discord/configure", { method: "POST", body: JSON.stringify(config) }); }
+export function testDiscord() { return request("/integrations/discord/test", { method: "POST", body: "{}" }); }
+export function startDiscordPolling() { return request("/integrations/discord/polling/start", { method: "POST", body: "{}" }); }
+export function stopDiscordPolling() { return request("/integrations/discord/polling/stop", { method: "POST", body: "{}" }); }
+export function getDiscordPollingStatus() { return request("/integrations/discord/polling/status"); }
+
+export function startWhatsApp() {
+  return request("/integrations/whatsapp/start", {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+}
+
+export function whatsappBridgeCheck() {
+  return request("/integrations/whatsapp/session-status");
+}
+
+export function whatsappBridgeClose() {
+  return request("/integrations/whatsapp/stop", {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+}
+
+export function whatsappSwitchBackend(backend) {
+  return request("/integrations/whatsapp/switch-backend", {
+    method: "POST",
+    body: JSON.stringify({ backend })
+  });
+}
+
+export function whatsappConfigure(config) {
+  return request("/integrations/whatsapp/configure", {
+    method: "POST",
+    body: JSON.stringify(config)
+  });
+}
+
+export function whatsappListBackends() {
+  return request("/integrations/whatsapp/backends");
+}
+
+export function connectBrowserCDP() {
+  return request("/browser/connect-cdp", {
     method: "POST",
     body: JSON.stringify({})
   });
@@ -224,6 +416,10 @@ export function installMCPTool(toolId) {
   return request(`/mcp/tools/${toolId}/install`, { method: "POST", body: "{}" });
 }
 
+export function uninstallMCPTool(toolId) {
+  return request(`/mcp/tools/${toolId}/uninstall`, { method: "DELETE" });
+}
+
 // Memory endpoints
 export function getMemoryContext() {
   return request("/memory/context");
@@ -259,6 +455,16 @@ export function setMemoryPreferences(preferences) {
 export function clearAllMemory() {
   return request("/memory", { method: "DELETE" });
 }
+
+export function compactSessions(maxAgeHours = 24) {
+  return request("/memory/compact", { method: "POST", body: JSON.stringify({ max_age_hours: maxAgeHours }) });
+}
+
+// Skills
+export function listSkills() { return request("/skills"); }
+export function getSkill(skillId) { return request(`/skills/${skillId}`); }
+export function installSkill(source) { return request("/skills/install", { method: "POST", body: JSON.stringify({ source }) }); }
+export function uninstallSkill(skillId) { return request(`/skills/${skillId}`, { method: "DELETE" }); }
 
 export function saveSession(session) {
   return request("/memory/sessions", {
@@ -344,4 +550,24 @@ export function setDefaultWorkspace(wsId) {
 export function browseWorkspace(wsId, relativePath) {
   const p = relativePath ? `?path=${encodeURIComponent(relativePath)}` : "";
   return request(`/workspaces/${wsId}/browse${p}`);
+}
+
+// ── Agent API ──
+
+export function runAgent(message, sessionId, history) {
+  const body = { message };
+  if (sessionId) body.session_id = sessionId;
+  if (history) body.history = history;
+  return request("/agent", { method: "POST", body: JSON.stringify(body) });
+}
+
+export function confirmAgentAction(sessionId, confirmationId, approved, password) {
+  return request("/agent/confirm", {
+    method: "POST",
+    body: JSON.stringify({ session_id: sessionId, confirmation_id: confirmationId, approved, password })
+  });
+}
+
+export function getAgentSession(sessionId) {
+  return request(`/agent/${sessionId}`);
 }

@@ -30,7 +30,8 @@ API_PREFIXES = (
     "/capabilities", "/execute", "/status", "/health", "/settings",
     "/llm/", "/browser/", "/metrics", "/gaps/", "/optimizations/",
     "/proposals/", "/integrations", "/interpret", "/plan",
-    "/executions/", "/mcp/",
+    "/executions/", "/mcp/", "/a2a/", "/memory", "/chat",
+    "/workspaces", "/.well-known", "/skills",
 )
 
 
@@ -99,6 +100,9 @@ class UnifiedHandler(BaseHTTPRequestHandler):
         self._cors_headers()
         self.send_header("Content-Type", content_type or "application/octet-stream")
         self.send_header("Content-Length", str(len(content)))
+        # Prevent stale cache for HTML and service worker
+        if file_path.suffix in (".html", ".js") and "/assets/" not in str(file_path):
+            self.send_header("Cache-Control", "no-cache, must-revalidate")
         self.end_headers()
         self.wfile.write(content)
 
@@ -125,9 +129,32 @@ def main() -> None:
     host = os.environ.get("HOST", "0.0.0.0")
     port = int(os.environ.get("PORT", "8000"))
 
+    ws_port_str = os.environ.get("WS_PORT", "")
+    ws_port = int(ws_port_str) if ws_port_str.isdigit() else None
+
     service = CapabilityOSUIBridgeService(workspace_root=WORKSPACE_ROOT)
     server = ThreadingHTTPServer((host, port), UnifiedHandler)
     server.service = service
+    server.ws_server = None
+
+    # Start WebSocket server if configured
+    if ws_port is not None:
+        try:
+            from system.core.ui_bridge.ws_server import start_ws_server
+            from system.core.ui_bridge.event_bus import event_bus
+            server.ws_server = start_ws_server(host, ws_port, event_bus)
+            print(f"  WebSocket: ws://{host}:{ws_port}")
+        except Exception as exc:
+            print(f"  WebSocket: failed ({exc})")
+
+    # Start error notifier → triggers Claude Code on errors
+    try:
+        from system.core.ui_bridge.event_bus import event_bus
+        from system.core.observation.error_notifier import ErrorNotifier
+        _notifier = ErrorNotifier(project_root=PROJECT_ROOT)
+        _notifier.subscribe(event_bus)
+    except Exception as exc:
+        print(f"  ErrorNotifier: failed ({exc})")
 
     print(f"Capability OS listening on http://{host}:{port}")
     print(f"  Workspace: {WORKSPACE_ROOT}")
@@ -137,6 +164,8 @@ def main() -> None:
     except KeyboardInterrupt:
         pass
     finally:
+        if server.ws_server:
+            server.ws_server.shutdown()
         server.server_close()
 
 

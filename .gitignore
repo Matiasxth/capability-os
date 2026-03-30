@@ -8,10 +8,21 @@ __pycache__/
 .tmp_tests/
 tests/unit/.tmp_runtime/
 artifacts/
+workspace/
+errors/
+
+# Settings with secrets
+system/settings.json
+*.env
+workspace/chrome-profile/
 
 # Frontend
 system/frontend/app/node_modules/
 system/frontend/app/dist/
+
+# WhatsApp worker
+system/whatsapp_worker/node_modules/
+system/whatsapp_worker/session/
 
 # OS/editor
 .DS_Store

@@ -1,0 +1,30 @@
+{
+  "_security_note": "NEVER commit settings.json with real API keys. If a key was committed, rotate it immediately at your provider's console.",
+  "llm": {
+    "provider": "openai",
+    "base_url": "https://api.groq.com/openai/v1",
+    "model": "llama-3.3-70b-versatile",
+    "api_key": "YOUR_API_KEY_HERE",
+    "timeout_ms": 30000
+  },
+  "browser": {
+    "backend": "playwright",
+    "auto_start": false,
+    "cdp_port": 0,
+    "auto_restart_max_retries": 2
+  },
+  "agent": {
+    "enabled": true,
+    "max_iterations": 10
+  },
+  "a2a": {
+    "enabled": true,
+    "server_url": "http://localhost:8000",
+    "known_agents": []
+  },
+  "mcp": {
+    "servers": [],
+    "auto_discover_capabilities": false,
+    "server_timeout_ms": 10000
+  }
+}

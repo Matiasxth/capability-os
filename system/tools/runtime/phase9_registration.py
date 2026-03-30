@@ -21,6 +21,7 @@ def register_phase9_browser_tools(
     auto_start = kwargs.get("auto_start", True)
     cdp_port = kwargs.get("cdp_port", 0)
     auto_restart_max_retries = kwargs.get("auto_restart_max_retries", 2)
+    backend = kwargs.get("backend", "playwright")
     manager = BrowserSessionManager(
         workspace_root=workspace_root,
         ipc_client=ipc_client,
@@ -28,6 +29,7 @@ def register_phase9_browser_tools(
         auto_start=auto_start,
         cdp_port=cdp_port,
         auto_restart_max_retries=auto_restart_max_retries,
+        backend=backend,
     )
 
     tool_runtime.register_handler(

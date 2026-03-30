@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 
-VALID_LLM_PROVIDERS = {"openai", "ollama"}
+VALID_LLM_PROVIDERS = {"openai", "ollama", "anthropic", "gemini", "deepseek"}
 DEFAULT_TIMEOUT_MS = 30000
 
 
@@ -115,6 +115,9 @@ class SettingsService:
             errors.append("Field 'browser' must be an object.")
             browser = {}
             normalized["browser"] = browser
+        backend = browser.get("backend")
+        if backend is not None and backend not in ("playwright", "cdp"):
+            errors.append("Field 'browser.backend' must be 'playwright' or 'cdp'.")
         auto_start = browser.get("auto_start")
         if not isinstance(auto_start, bool):
             errors.append("Field 'browser.auto_start' must be boolean.")
@@ -124,6 +127,27 @@ class SettingsService:
         auto_restart_max_retries = browser.get("auto_restart_max_retries")
         if auto_restart_max_retries is not None and (not isinstance(auto_restart_max_retries, int) or auto_restart_max_retries < 0):
             errors.append("Field 'browser.auto_restart_max_retries' must be a non-negative integer.")
+
+        whatsapp = normalized.get("whatsapp")
+        if whatsapp is not None and isinstance(whatsapp, dict):
+            wsp_backend = whatsapp.get("backend")
+            if wsp_backend is not None and wsp_backend not in ("official", "browser", "baileys"):
+                errors.append("Field 'whatsapp.backend' must be 'official', 'browser', or 'baileys'.")
+            official = whatsapp.get("official")
+            if official is not None and not isinstance(official, dict):
+                errors.append("Field 'whatsapp.official' must be an object.")
+            allowed = whatsapp.get("allowed_user_ids")
+            if allowed is not None and not isinstance(allowed, list):
+                errors.append("Field 'whatsapp.allowed_user_ids' must be an array.")
+
+        agent = normalized.get("agent")
+        if agent is not None and isinstance(agent, dict):
+            agent_enabled = agent.get("enabled")
+            if agent_enabled is not None and not isinstance(agent_enabled, bool):
+                errors.append("Field 'agent.enabled' must be boolean.")
+            max_iter = agent.get("max_iterations")
+            if max_iter is not None and (not isinstance(max_iter, int) or max_iter < 1):
+                errors.append("Field 'agent.max_iterations' must be a positive integer.")
 
         workspace = normalized.get("workspace")
         if not isinstance(workspace, dict):
@@ -172,6 +196,16 @@ class SettingsService:
                     errors.append("Field 'a2a.server_url' must be a string.")
                 if a2a.get("known_agents") is not None and not isinstance(a2a["known_agents"], list):
                     errors.append("Field 'a2a.known_agents' must be an array.")
+
+        telegram = normalized.get("telegram")
+        if telegram is not None:
+            if not isinstance(telegram, dict):
+                errors.append("Field 'telegram' must be an object when present.")
+
+        whatsapp = normalized.get("whatsapp")
+        if whatsapp is not None:
+            if not isinstance(whatsapp, dict):
+                errors.append("Field 'whatsapp' must be an object when present.")
 
         if errors:
             raise SettingsValidationError("Settings validation failed.", details=errors)
@@ -256,6 +290,7 @@ def _defaults_from_env(workspace_root: Path) -> dict[str, Any]:
             "timeout_ms": timeout_ms if timeout_ms > 0 else DEFAULT_TIMEOUT_MS,
         },
         "browser": {
+            "backend": "playwright",
             "auto_start": True,
             "cdp_port": 0,
             "auto_restart_max_retries": 2,
@@ -263,6 +298,10 @@ def _defaults_from_env(workspace_root: Path) -> dict[str, Any]:
         "workspace": {
             "artifacts_path": str((workspace_root / "artifacts").resolve()),
             "sequences_path": str((workspace_root / "sequences").resolve()),
+        },
+        "agent": {
+            "enabled": True,
+            "max_iterations": 10,
         },
         "mcp": {
             "servers": [],

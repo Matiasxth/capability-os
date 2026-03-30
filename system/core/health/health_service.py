@@ -54,7 +54,15 @@ class HealthService:
         transport = browser.get("transport", {})
         alive = bool(transport.get("alive"))
         failed = bool(transport.get("worker_failed"))
-        status = "ready" if alive else "error" if failed else "not_configured"
+        backend = browser.get("backend", "playwright")
+        if alive:
+            status = "ready"
+        elif failed:
+            status = "error"
+        elif backend == "playwright":
+            status = "available"
+        else:
+            status = "not_configured"
 
         payload = dict(browser)
         payload["status"] = status

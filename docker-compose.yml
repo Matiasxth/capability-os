@@ -1,21 +1,45 @@
 version: "3.8"
 
 services:
+  chrome:
+    image: browserless/chrome:latest
+    container_name: capos-chrome
+    ports:
+      - "9222:3000"
+    environment:
+      - MAX_CONCURRENT_SESSIONS=2
+      - CONNECTION_TIMEOUT=120000
+    restart: unless-stopped
+
   capability-os:
     build: .
     container_name: capability-os
     ports:
       - "8000:8000"
+      - "8001:8001"
     volumes:
       - workspace:/data/workspace
       - artifacts:/data/workspace/artifacts
     environment:
+      # LLM
       - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
       - OLLAMA_BASE_URL=${LLM_BASE_URL:-http://host.docker.internal:11434}
       - OLLAMA_MODEL=${LLM_MODEL:-llama3.1:8b}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-4-20250514}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - DEEPSEEK_MODEL=${DEEPSEEK_MODEL:-deepseek-chat}
+      # WebSocket
+      - WS_PORT=8001
+      # Browser (connects to Chrome service)
+      - BROWSER_CDP_URL=ws://chrome:3000
+    depends_on:
+      - chrome
     restart: unless-stopped
 
 volumes:

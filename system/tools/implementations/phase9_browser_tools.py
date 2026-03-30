@@ -46,6 +46,7 @@ class BrowserSessionManager:
         auto_start: bool = True,
         cdp_port: int = 0,
         auto_restart_max_retries: int = 2,
+        backend: str = "playwright",
     ):
         self.workspace_root = Path(workspace_root).resolve()
         self._ipc_client = ipc_client or BrowserIPCClient(workspace_root=self.workspace_root)
@@ -56,7 +57,18 @@ class BrowserSessionManager:
         self._auto_start = bool(auto_start)
         self._cdp_port = int(cdp_port) if isinstance(cdp_port, int) and cdp_port > 0 else 0
         self._auto_restart_max_retries = int(auto_restart_max_retries) if isinstance(auto_restart_max_retries, int) and auto_restart_max_retries >= 0 else 2
+        self._backend = backend if backend in ("playwright", "cdp") else "playwright"
         self._ipc_client.set_max_restart_retries(self._auto_restart_max_retries)
+
+    def set_cdp_port(self, port: int) -> None:
+        """Update the CDP port used for new sessions."""
+        with self._lock:
+            self._cdp_port = int(port) if isinstance(port, int) and port > 0 else 0
+
+    def set_backend(self, backend: str) -> None:
+        """Switch browser backend ('playwright' or 'cdp')."""
+        with self._lock:
+            self._backend = backend if backend in ("playwright", "cdp") else "playwright"
 
     def set_auto_start(self, auto_start: bool) -> None:
         if not isinstance(auto_start, bool):
@@ -92,7 +104,7 @@ class BrowserSessionManager:
         if start_url not in (None, ""):
             _validate_url(start_url)
             payload["start_url"] = start_url
-        if self._cdp_port > 0:
+        if self._backend == "cdp" and self._cdp_port > 0:
             payload["cdp_endpoint"] = f"http://localhost:{self._cdp_port}"
 
         result = self._execute_command(
@@ -366,6 +378,7 @@ class BrowserSessionManager:
 
         return {
             "status": canonical_status,
+            "backend": self._backend,
             "active_session_id": active_session_id,
             "known_sessions": known_sessions,
             "auto_start": auto_start,

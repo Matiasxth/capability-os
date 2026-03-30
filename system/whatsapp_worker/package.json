@@ -1,0 +1,11 @@
+{
+  "name": "capos-whatsapp-worker",
+  "version": "1.0.0",
+  "private": true,
+  "main": "worker.js",
+  "dependencies": {
+    "@whiskeysockets/baileys": "^7.0.0-rc.9",
+    "pino": "^8.16.0",
+    "puppeteer": "^23.11.1"
+  }
+}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -14,6 +15,12 @@ from system.capabilities.implementations import (
     Phase7CapabilityExecutionError,
     Phase7CapabilityExecutor,
 )
+from system.capabilities.implementations.discord_executor import DiscordCapabilityExecutor
+from system.capabilities.implementations.slack_executor import SlackCapabilityExecutor
+from system.capabilities.implementations.telegram_executor import TelegramCapabilityExecutor
+from system.integrations.installed.discord_bot_connector import DiscordConnector, DiscordPollingWorker
+from system.integrations.installed.slack_bot_connector import SlackConnector, SlackPollingWorker
+from system.integrations.installed.telegram_bot_connector import TelegramConnector, TelegramConnectorError
 from system.capabilities.registry import CapabilityRegistry
 from system.core.capability_engine import (
     CapabilityEngine,
@@ -142,7 +149,18 @@ class CapabilityOSUIBridgeService:
             auto_start=runtime_settings["browser"]["auto_start"],
             cdp_port=runtime_settings["browser"].get("cdp_port", 0),
             auto_restart_max_retries=runtime_settings["browser"].get("auto_restart_max_retries", 2),
+            backend=runtime_settings["browser"].get("backend", "playwright"),
         )
+        # Skill registry
+        from system.core.skills import SkillRegistry
+        self.skill_registry = SkillRegistry(
+            skills_dir=self.workspace_root / "skills",
+            capability_registry=self.capability_registry,
+            tool_registry=self.tool_registry,
+            tool_runtime=self.tool_runtime,
+        )
+        self.skill_registry.load_installed()
+
         self.execution_history = ExecutionHistory(
             data_path=self.workspace_root / "memory" / "history.json",
         )
@@ -185,11 +203,138 @@ class CapabilityOSUIBridgeService:
             self.tool_runtime,
             whatsapp_selectors_config,
         )
+        # WhatsApp backend manager (3 switchable backends)
+        try:
+            from system.integrations.installed.whatsapp_web_connector.backends import WhatsAppBackendManager
+            from system.integrations.installed.whatsapp_web_connector.backends.baileys_backend import BaileysBackend
+            from system.integrations.installed.whatsapp_web_connector.backends.browser_backend import BrowserBackend
+            from system.integrations.installed.whatsapp_web_connector.backends.official_backend import OfficialBackend
+
+            self.whatsapp_manager = WhatsAppBackendManager()
+            self.whatsapp_manager.register(BaileysBackend())
+            self.whatsapp_manager.register(BrowserBackend())
+            official = OfficialBackend()
+            wsp_settings = runtime_settings.get("whatsapp", {})
+            if isinstance(wsp_settings, dict):
+                official_config = wsp_settings.get("official", {})
+                if isinstance(official_config, dict):
+                    official.configure(official_config)
+            self.whatsapp_manager.register(official)
+            wsp_backend = wsp_settings.get("backend", "browser") if isinstance(wsp_settings, dict) else "browser"
+            self.whatsapp_manager.switch(wsp_backend)
+            print(f"  WhatsApp backends: baileys, browser, official (active: {wsp_backend})")
+
+            self._wsp_reply_settings = wsp_settings  # defer reply worker until after interpreter
+        except Exception as exc:
+            print(f"  WhatsApp backend manager: failed ({exc})")
+
+        # Telegram connector — load bot_token from settings
+        tg_settings = runtime_settings.get("telegram", {})
+        tg_user_names: dict[str, str] = {}
+        for uid in tg_settings.get("allowed_user_ids", []):
+            tg_user_names[str(uid)] = tg_settings.get("display_name", "")
+        self.telegram_connector = TelegramConnector(
+            bot_token=tg_settings.get("bot_token", ""),
+            default_chat_id=tg_settings.get("default_chat_id", ""),
+            allowed_user_ids=tg_settings.get("allowed_user_ids", []),
+            allowed_usernames=tg_settings.get("allowed_usernames", []),
+            user_display_names=tg_user_names,
+        )
+        self.telegram_executor = TelegramCapabilityExecutor(self.telegram_connector)
         if llm_client is None:
             llm_client = LLMClient(
                 settings_provider=lambda: self.settings_service.get_settings(mask_secrets=False).get("llm", {})
             )
         self.intent_interpreter = IntentInterpreter(self.capability_registry, llm_client=llm_client)
+
+        # Telegram polling — must be after intent_interpreter
+        from system.integrations.installed.telegram_bot_connector.connector import TelegramPollingWorker
+        self.telegram_polling_worker = TelegramPollingWorker(
+            connector=self.telegram_connector,
+            interpreter=self.intent_interpreter,
+            executor=lambda cap_id, inputs: self._execute_capability({"capability_id": cap_id, "inputs": inputs}),
+            execution_history=self.execution_history,
+        )
+        if tg_settings.get("polling_enabled"):
+            self.telegram_polling_worker.start()
+
+        # WhatsApp auto-reply worker (must be after intent_interpreter)
+        try:
+            if hasattr(self, "whatsapp_manager"):
+                from system.integrations.installed.whatsapp_web_connector.whatsapp_reply_worker import WhatsAppReplyWorker
+                wsp_s = getattr(self, "_wsp_reply_settings", {}) or {}
+                wsp_allowed = wsp_s.get("allowed_user_ids", []) if isinstance(wsp_s, dict) else []
+                self.whatsapp_reply_worker = WhatsAppReplyWorker(
+                    backend_manager=self.whatsapp_manager,
+                    interpreter=self.intent_interpreter,
+                    executor=lambda cap_id, inputs: self._execute_capability_sync(cap_id, inputs),
+                    execution_history=self.execution_history,
+                    allowed_user_ids=wsp_allowed,
+                    agent_loop=getattr(self, "agent_loop", None),
+                )
+                self.whatsapp_reply_worker.start()
+                print(f"  WhatsApp auto-reply: active")
+        except Exception as exc:
+            print(f"  WhatsApp auto-reply: failed ({exc})")
+
+        # Agent Loop (autonomous agent with tool use)
+        try:
+            from system.core.agent import AgentLoop
+            from system.core.agent.tool_use_adapter import ToolUseAdapter
+            from system.core.security import SecurityService
+
+            security_svc = SecurityService(workspace_roots=[str(self.workspace_root)])
+            tool_adapter = ToolUseAdapter(llm_client=self.intent_interpreter.llm_client)
+            self.agent_loop = AgentLoop(
+                tool_use_adapter=tool_adapter,
+                tool_runtime=self.tool_runtime,
+                security_service=security_svc,
+                tool_registry=self.tool_registry,
+                workspace_root=str(self.workspace_root),
+                max_iterations=runtime_settings.get("agent", {}).get("max_iterations", 10) if isinstance(runtime_settings.get("agent"), dict) else 10,
+            )
+            self.security_service = security_svc
+            print(f"  Agent Loop: active (max_iterations={self.agent_loop._max_iterations})", flush=True)
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            print(f"  Agent Loop: failed ({exc})", flush=True)
+
+        # Slack connector
+        slack_settings = runtime_settings.get("slack", {})
+        self.slack_connector = SlackConnector(
+            bot_token=slack_settings.get("bot_token", ""),
+            channel_id=slack_settings.get("channel_id", ""),
+            allowed_user_ids=[str(i) for i in slack_settings.get("allowed_user_ids", [])],
+        )
+        self.slack_executor = SlackCapabilityExecutor(self.slack_connector)
+        self.slack_polling_worker = SlackPollingWorker(
+            adapter=self.slack_connector,
+            interpreter=self.intent_interpreter,
+            executor=lambda cap_id, inputs: self._execute_capability({"capability_id": cap_id, "inputs": inputs}),
+            execution_history=self.execution_history,
+        )
+        if slack_settings.get("polling_enabled"):
+            self.slack_polling_worker.start()
+
+        # Discord connector
+        discord_settings = runtime_settings.get("discord", {})
+        self.discord_connector = DiscordConnector(
+            bot_token=discord_settings.get("bot_token", ""),
+            channel_id=discord_settings.get("channel_id", ""),
+            guild_id=discord_settings.get("guild_id", ""),
+            allowed_user_ids=[str(i) for i in discord_settings.get("allowed_user_ids", [])],
+        )
+        self.discord_executor = DiscordCapabilityExecutor(self.discord_connector)
+        self.discord_polling_worker = DiscordPollingWorker(
+            adapter=self.discord_connector,
+            interpreter=self.intent_interpreter,
+            executor=lambda cap_id, inputs: self._execute_capability({"capability_id": cap_id, "inputs": inputs}),
+            execution_history=self.execution_history,
+        )
+        if discord_settings.get("polling_enabled"):
+            self.discord_polling_worker.start()
+
         self.plan_builder = PlanBuilder()
         self.plan_validator = PlanValidator(
             self.capability_registry,
@@ -275,6 +420,15 @@ class CapabilityOSUIBridgeService:
             tool_registry=self.tool_registry,
             tool_runtime=self.tool_runtime,
         )
+        # Auto-load saved MCP servers from settings
+        for srv_cfg in mcp_settings.get("servers", []):
+            if isinstance(srv_cfg, dict) and srv_cfg.get("id"):
+                try:
+                    client = self.mcp_client_manager.add_server(srv_cfg)
+                    client.connect()
+                except Exception as exc:
+                    print(f"MCP auto-load '{srv_cfg.get('id')}' failed: {exc}", flush=True)
+
         self.mcp_capability_generator = MCPCapabilityGenerator(
             tool_bridge=self.mcp_tool_bridge,
             proposals_dir=self.workspace_root / "proposals" / "mcp",
@@ -297,6 +451,142 @@ class CapabilityOSUIBridgeService:
 
         self._executions: dict[str, dict[str, Any]] = {}
         self._lock = Lock()
+        self._router = self._build_router()
+
+    def _build_router(self):
+        from system.core.ui_bridge.router import Router
+        from system.core.ui_bridge.handlers import (
+            system_handlers, browser_handlers, workspace_handlers,
+            memory_handlers, integration_handlers, capability_handlers,
+            growth_handlers, mcp_handlers, a2a_handlers, skill_handlers,
+        )
+        r = Router()
+        # System
+        r.add("GET", "/status", system_handlers.get_status)
+        r.add("GET", "/health", system_handlers.get_health)
+        r.add("GET", "/settings", system_handlers.get_settings)
+        r.add("POST", "/settings", system_handlers.save_settings)
+        r.add("POST", "/llm/test", system_handlers.test_llm)
+        r.add("GET", "/system/export-config", system_handlers.export_config)
+        r.add("POST", "/system/import-config", system_handlers.import_config)
+        # Browser
+        r.add("POST", "/browser/restart", browser_handlers.restart_worker)
+        r.add("GET", "/browser/cdp-status", browser_handlers.cdp_status)
+        r.add("POST", "/browser/launch-chrome", browser_handlers.launch_chrome)
+        r.add("POST", "/browser/open-whatsapp", browser_handlers.open_whatsapp)
+        r.add("POST", "/browser/connect-cdp", browser_handlers.connect_cdp)
+        # Workspaces
+        r.add("GET", "/workspaces", workspace_handlers.list_workspaces)
+        r.add("POST", "/workspaces", workspace_handlers.add_workspace)
+        r.add("GET", "/workspaces/{ws_id}", workspace_handlers.get_workspace)
+        r.add("POST", "/workspaces/{ws_id}", workspace_handlers.update_workspace)
+        r.add("DELETE", "/workspaces/{ws_id}", workspace_handlers.delete_workspace)
+        r.add("POST", "/workspaces/{ws_id}/set-default", workspace_handlers.set_default)
+        r.add("GET", "/workspaces/{ws_id}/browse", workspace_handlers.browse)
+        # Memory + metrics
+        r.add("GET", "/metrics", memory_handlers.get_metrics)
+        r.add("GET", "/memory/context", memory_handlers.get_context)
+        r.add("GET", "/memory/history", memory_handlers.get_history)
+        r.add("POST", "/memory/history/chat", memory_handlers.save_chat)
+        r.add("DELETE", "/memory/history/{exec_id}", memory_handlers.delete_history)
+        r.add("POST", "/memory/sessions", memory_handlers.save_session)
+        r.add("GET", "/memory/sessions/{exec_id}", memory_handlers.get_session)
+        r.add("GET", "/memory/preferences", memory_handlers.get_preferences)
+        r.add("POST", "/memory/preferences", memory_handlers.set_preferences)
+        r.add("GET", "/memory/semantic/search", memory_handlers.search_semantic)
+        r.add("POST", "/memory/semantic", memory_handlers.add_semantic)
+        r.add("DELETE", "/memory/semantic/{mem_id}", memory_handlers.delete_semantic)
+        r.add("DELETE", "/memory", memory_handlers.clear_all)
+        r.add("POST", "/memory/compact", memory_handlers.compact_sessions)
+        # Capabilities
+        r.add("GET", "/capabilities", capability_handlers.list_capabilities)
+        r.add("GET", "/capabilities/health", capability_handlers.capabilities_health)
+        r.add("GET", "/capabilities/{capability_id}", capability_handlers.get_capability)
+        r.add("POST", "/execute", capability_handlers.execute)
+        r.add("POST", "/chat", capability_handlers.chat)
+        r.add("POST", "/interpret", capability_handlers.interpret)
+        r.add("POST", "/plan", capability_handlers.plan)
+        # Agent endpoints
+        from system.core.ui_bridge.handlers import agent_handlers
+        r.add("POST", "/agent", agent_handlers.start_agent)
+        r.add("POST", "/agent/confirm", agent_handlers.confirm_action)
+        r.add("GET", "/agent/{session_id}", agent_handlers.get_session)
+        r.add("GET", "/executions/{execution_id}", capability_handlers.get_execution)
+        r.add("GET", "/executions/{execution_id}/events", capability_handlers.get_execution_events)
+        # Growth
+        r.add("GET", "/gaps/pending", growth_handlers.pending_gaps)
+        r.add("POST", "/gaps/{gap_id}/analyze", growth_handlers.analyze_gap)
+        r.add("POST", "/gaps/{gap_id}/generate", growth_handlers.generate_gap)
+        r.add("POST", "/gaps/{gap_id}/approve", growth_handlers.approve_gap)
+        r.add("POST", "/gaps/{gap_id}/reject", growth_handlers.reject_gap)
+        r.add("GET", "/proposals", growth_handlers.list_proposals)
+        r.add("POST", "/proposals/{prop_id}/regenerate", growth_handlers.regenerate_proposal)
+        r.add("POST", "/proposals/{cap_id}/approve", growth_handlers.approve_proposal)
+        r.add("POST", "/proposals/{cap_id}/reject", growth_handlers.reject_proposal)
+        r.add("GET", "/optimizations/pending", growth_handlers.pending_optimizations)
+        r.add("POST", "/optimizations/{opt_id}/approve", growth_handlers.approve_optimization)
+        r.add("POST", "/optimizations/{opt_id}/reject", growth_handlers.reject_optimization)
+        # MCP
+        r.add("GET", "/mcp/servers", mcp_handlers.list_servers)
+        r.add("POST", "/mcp/servers", mcp_handlers.add_server)
+        r.add("DELETE", "/mcp/servers/{server_id}", mcp_handlers.remove_server)
+        r.add("POST", "/mcp/servers/{server_id}/discover", mcp_handlers.discover_tools)
+        r.add("GET", "/mcp/tools", mcp_handlers.list_tools)
+        r.add("POST", "/mcp/tools/{tool_id}/install", mcp_handlers.install_tool)
+        r.add("DELETE", "/mcp/tools/{tool_id}/uninstall", mcp_handlers.uninstall_tool)
+        # A2A
+        r.add("GET", "/.well-known/agent.json", a2a_handlers.agent_card)
+        r.add("POST", "/a2a", a2a_handlers.handle_task)
+        r.add("GET", "/a2a/{task_id}/events", a2a_handlers.task_events)
+        r.add("GET", "/a2a/agents", a2a_handlers.list_agents)
+        r.add("POST", "/a2a/agents", a2a_handlers.add_agent)
+        r.add("DELETE", "/a2a/agents/{agent_id}", a2a_handlers.remove_agent)
+        r.add("POST", "/a2a/agents/{agent_id}/delegate", a2a_handlers.delegate_task)
+        # Integrations
+        r.add("GET", "/integrations", integration_handlers.list_integrations)
+        r.add("GET", "/integrations/{integration_id}", integration_handlers.inspect_integration)
+        r.add("POST", "/integrations/{integration_id}/validate", integration_handlers.validate_integration)
+        r.add("POST", "/integrations/{integration_id}/enable", integration_handlers.enable_integration)
+        r.add("POST", "/integrations/{integration_id}/disable", integration_handlers.disable_integration)
+        r.add("GET", "/integrations/whatsapp/selectors/health", integration_handlers.whatsapp_selectors_health)
+        r.add("POST", "/integrations/whatsapp/selectors", integration_handlers.whatsapp_selectors_override)
+        r.add("POST", "/integrations/whatsapp/close-session", integration_handlers.whatsapp_close_session)
+        r.add("GET", "/integrations/whatsapp/session-status", integration_handlers.whatsapp_session_status)
+        r.add("POST", "/integrations/whatsapp/start", integration_handlers.whatsapp_start)
+        r.add("GET", "/integrations/whatsapp/qr", integration_handlers.whatsapp_qr)
+        r.add("POST", "/integrations/whatsapp/stop", integration_handlers.whatsapp_stop)
+        r.add("POST", "/integrations/whatsapp/configure", integration_handlers.whatsapp_configure)
+        r.add("POST", "/integrations/whatsapp/switch-backend", integration_handlers.whatsapp_switch_backend)
+        r.add("GET", "/integrations/whatsapp/backends", integration_handlers.whatsapp_list_backends)
+        r.add("GET", "/integrations/whatsapp/debug", integration_handlers.whatsapp_debug)
+        r.add("GET", "/integrations/whatsapp/debug-chats", integration_handlers.whatsapp_debug_chats)
+        r.add("GET", "/integrations/whatsapp/reply-status", integration_handlers.whatsapp_reply_status)
+        r.add("GET", "/integrations/telegram/status", integration_handlers.telegram_status)
+        r.add("POST", "/integrations/telegram/configure", integration_handlers.telegram_configure)
+        r.add("POST", "/integrations/telegram/test", integration_handlers.telegram_test)
+        r.add("POST", "/integrations/telegram/polling/start", integration_handlers.telegram_polling_start)
+        r.add("POST", "/integrations/telegram/polling/stop", integration_handlers.telegram_polling_stop)
+        r.add("GET", "/integrations/telegram/polling/status", integration_handlers.telegram_polling_status)
+        # Slack
+        r.add("GET", "/integrations/slack/status", integration_handlers.slack_status)
+        r.add("POST", "/integrations/slack/configure", integration_handlers.slack_configure)
+        r.add("POST", "/integrations/slack/test", integration_handlers.slack_test)
+        r.add("POST", "/integrations/slack/polling/start", integration_handlers.slack_polling_start)
+        r.add("POST", "/integrations/slack/polling/stop", integration_handlers.slack_polling_stop)
+        r.add("GET", "/integrations/slack/polling/status", integration_handlers.slack_polling_status)
+        # Discord
+        r.add("GET", "/integrations/discord/status", integration_handlers.discord_status)
+        r.add("POST", "/integrations/discord/configure", integration_handlers.discord_configure)
+        r.add("POST", "/integrations/discord/test", integration_handlers.discord_test)
+        r.add("POST", "/integrations/discord/polling/start", integration_handlers.discord_polling_start)
+        r.add("POST", "/integrations/discord/polling/stop", integration_handlers.discord_polling_stop)
+        r.add("GET", "/integrations/discord/polling/status", integration_handlers.discord_polling_status)
+        # Skills
+        r.add("GET", "/skills", skill_handlers.list_skills)
+        r.add("POST", "/skills/install", skill_handlers.install_skill)
+        r.add("GET", "/skills/{skill_id}", skill_handlers.get_skill)
+        r.add("DELETE", "/skills/{skill_id}", skill_handlers.uninstall_skill)
+        return r
 
     def _load_registries(self) -> None:
         capability_dir = self.project_root / "system" / "capabilities" / "contracts" / "v1"
@@ -306,387 +596,27 @@ class CapabilityOSUIBridgeService:
 
     def handle(self, method: str, path: str, payload: dict[str, Any] | None = None) -> APIResponse:
         clean_path = urlparse(path).path.rstrip("/") or "/"
-        try:
-            if method == "GET" and clean_path == "/.well-known/agent.json":
-                return APIResponse(HTTPStatus.OK, self.agent_card_builder.build())
 
-            if method == "POST" and clean_path == "/a2a":
-                result = self.a2a_server.handle_task(payload or {})
-                return APIResponse(HTTPStatus.OK, result)
-
-            if method == "GET" and clean_path.startswith("/a2a/") and clean_path.endswith("/events"):
-                task_id = clean_path[len("/a2a/"):-len("/events")]
-                events = self.a2a_server.list_events(task_id)
-                if events is None:
-                    raise APIRequestError(HTTPStatus.NOT_FOUND, "task_not_found", f"Task '{task_id}' not found.")
-                return APIResponse(HTTPStatus.OK, {"task_id": task_id, "events": events})
-
-            if method == "GET" and clean_path == "/status":
-                return APIResponse(HTTPStatus.OK, self._status_snapshot())
-
-            if method == "GET" and clean_path == "/health":
-                return APIResponse(HTTPStatus.OK, self.health_service.get_system_health())
-
-            if method == "GET" and clean_path == "/settings":
-                return APIResponse(HTTPStatus.OK, {"settings": self.settings_service.get_settings(mask_secrets=True)})
-
-            if method == "POST" and clean_path == "/settings":
-                request = payload or {}
-                return APIResponse(HTTPStatus.OK, self._save_settings(request))
-
-            if method == "POST" and clean_path == "/llm/test":
-                return APIResponse(HTTPStatus.OK, self._test_llm_connection())
-
-            if method == "POST" and clean_path == "/browser/restart":
-                return APIResponse(HTTPStatus.OK, self._restart_browser_worker())
-
-            if method == "GET" and clean_path == "/metrics":
-                return APIResponse(HTTPStatus.OK, {"metrics": self.metrics_collector.get_metrics()})
-
-            if method == "GET" and clean_path == "/gaps/pending":
-                return APIResponse(HTTPStatus.OK, {"gaps": self.gap_analyzer.get_actionable_gaps()})
-
-            if clean_path.startswith("/gaps/") and clean_path.endswith("/analyze") and method == "POST":
-                gap_id = clean_path[len("/gaps/"):-len("/analyze")]
-                return APIResponse(HTTPStatus.OK, self._analyze_gap(gap_id))
-
-            if clean_path.startswith("/gaps/") and clean_path.endswith("/generate") and method == "POST":
-                gap_id = clean_path[len("/gaps/"):-len("/generate")]
-                return APIResponse(HTTPStatus.OK, self._auto_generate_for_gap(gap_id))
-
-            if method == "GET" and clean_path == "/proposals":
-                return APIResponse(HTTPStatus.OK, {"proposals": self.auto_install_pipeline.list_proposals()})
-
-            if clean_path.startswith("/proposals/") and clean_path.endswith("/regenerate") and method == "POST":
-                prop_id = clean_path[len("/proposals/"):-len("/regenerate")]
-                return APIResponse(HTTPStatus.OK, self._regenerate_proposal(prop_id))
-
-            if method == "GET" and clean_path == "/capabilities/health":
-                return APIResponse(HTTPStatus.OK, {"suggestions": self.performance_monitor.get_improvement_suggestions()})
-
-            if method == "GET" and clean_path == "/optimizations/pending":
-                return APIResponse(HTTPStatus.OK, {"proposals": self.strategy_optimizer.get_optimization_proposals()})
-
-            # --- Approval endpoints (spec section 14: user confirms) ---
-
-            if clean_path.startswith("/gaps/") and clean_path.endswith("/approve") and method == "POST":
-                gap_id = clean_path[len("/gaps/"):-len("/approve")]
-                return APIResponse(HTTPStatus.OK, self._approve_gap(gap_id))
-
-            if clean_path.startswith("/gaps/") and clean_path.endswith("/reject") and method == "POST":
-                gap_id = clean_path[len("/gaps/"):-len("/reject")]
-                return APIResponse(HTTPStatus.OK, self._reject_gap(gap_id))
-
-            if clean_path.startswith("/optimizations/") and clean_path.endswith("/approve") and method == "POST":
-                opt_id = clean_path[len("/optimizations/"):-len("/approve")]
-                return APIResponse(HTTPStatus.OK, self._approve_optimization(opt_id, payload or {}))
-
-            if clean_path.startswith("/optimizations/") and clean_path.endswith("/reject") and method == "POST":
-                opt_id = clean_path[len("/optimizations/"):-len("/reject")]
-                return APIResponse(HTTPStatus.OK, self._reject_optimization(opt_id))
-
-            if clean_path.startswith("/proposals/") and clean_path.endswith("/approve") and method == "POST":
-                cap_id = clean_path[len("/proposals/"):-len("/approve")]
-                return APIResponse(HTTPStatus.OK, self._approve_proposal(cap_id))
-
-            if clean_path.startswith("/proposals/") and clean_path.endswith("/reject") and method == "POST":
-                cap_id = clean_path[len("/proposals/"):-len("/reject")]
-                return APIResponse(HTTPStatus.OK, self._reject_proposal(cap_id))
-
-            if method == "GET" and clean_path == "/capabilities":
-                return APIResponse(HTTPStatus.OK, {"capabilities": self._list_capabilities()})
-
-            if method == "GET" and clean_path.startswith("/capabilities/"):
-                capability_id = clean_path.split("/", 2)[2]
-                return APIResponse(HTTPStatus.OK, {"capability": self._get_capability(capability_id)})
-
-            if method == "POST" and clean_path == "/execute":
-                request = payload or {}
-                result = self._execute_capability(request)
-                return APIResponse(HTTPStatus.OK, result)
-
-            if method == "POST" and clean_path == "/chat":
-                body = payload or {}
-                message = body.get("message", "")
-                user_name = body.get("user_name", "User")
-                history = body.get("conversation_history") or []
-                if not isinstance(message, str) or not message.strip():
-                    raise APIRequestError(HTTPStatus.BAD_REQUEST, "invalid_input", "A non-empty 'message' is required.")
-                self._refresh_llm_client_settings()
-                msg_type = self.intent_interpreter.classify_message(message, history)
-                if msg_type == "conversational":
-                    response_text = self.intent_interpreter.chat_response(message, user_name, history)
-                    return APIResponse(HTTPStatus.OK, {"type": "chat", "response": response_text})
-                # For confirmations with a suggested_action, pass it back
-                suggested = None
-                for msg in reversed(history):
-                    if msg.get("role") in ("assistant", "system") and msg.get("suggested_action"):
-                        suggested = msg["suggested_action"]
-                        break
-                return APIResponse(HTTPStatus.OK, {"type": "action", "suggested_action": suggested})
-
-            if method == "POST" and clean_path == "/interpret":
-                request = payload or {}
-                result = self._interpret_text(request)
-                return APIResponse(HTTPStatus.OK, result)
-
-            if method == "POST" and clean_path == "/plan":
-                request = payload or {}
-                result = self._plan_intent(request)
-                return APIResponse(HTTPStatus.OK, result)
-
-            if method == "GET" and clean_path == "/integrations":
-                return APIResponse(HTTPStatus.OK, {"integrations": self._list_integrations()})
-
-            if clean_path.startswith("/integrations/"):
-                suffix = clean_path[len("/integrations/") :]
-                if method == "GET" and suffix and "/" not in suffix:
-                    return APIResponse(HTTPStatus.OK, {"integration": self._inspect_integration(suffix)})
-
-                if method == "POST" and suffix.endswith("/validate"):
-                    integration_id = suffix[: -len("/validate")].rstrip("/")
-                    return APIResponse(HTTPStatus.OK, self._validate_integration(integration_id))
-
-                if method == "POST" and suffix.endswith("/enable"):
-                    integration_id = suffix[: -len("/enable")].rstrip("/")
-                    return APIResponse(HTTPStatus.OK, self._enable_integration(integration_id))
-
-                if method == "POST" and suffix.endswith("/disable"):
-                    integration_id = suffix[: -len("/disable")].rstrip("/")
-                    return APIResponse(HTTPStatus.OK, self._disable_integration(integration_id))
-
-            if method == "GET" and clean_path.startswith("/executions/"):
-                suffix = clean_path[len("/executions/") :]
-                if suffix.endswith("/events"):
-                    execution_id = suffix[: -len("/events")].rstrip("/")
-                    execution = self._get_execution(execution_id)
-                    return APIResponse(
-                        HTTPStatus.OK,
-                        {
-                            "execution_id": execution_id,
-                            "events": execution["runtime"].get("logs", []),
-                        },
-                    )
-
-                execution_id = suffix
-                execution = self._get_execution(execution_id)
-                return APIResponse(HTTPStatus.OK, execution)
-
-            # --- MCP endpoints ---
-
-            if method == "GET" and clean_path == "/mcp/servers":
-                return APIResponse(HTTPStatus.OK, {"servers": self.mcp_client_manager.list_servers()})
-
-            if method == "POST" and clean_path == "/mcp/servers":
-                return APIResponse(HTTPStatus.OK, self._mcp_add_server(payload or {}))
-
-            if clean_path.startswith("/mcp/servers/") and method == "DELETE":
-                server_id = clean_path[len("/mcp/servers/"):]
-                return APIResponse(HTTPStatus.OK, self._mcp_remove_server(server_id))
-
-            if clean_path.startswith("/mcp/servers/") and clean_path.endswith("/discover") and method == "POST":
-                server_id = clean_path[len("/mcp/servers/"):-len("/discover")]
-                return APIResponse(HTTPStatus.OK, self._mcp_discover_tools(server_id))
-
-            if method == "GET" and clean_path == "/mcp/tools":
-                return APIResponse(HTTPStatus.OK, {"tools": self.mcp_tool_bridge.list_bridged_tools()})
-
-            if clean_path.startswith("/mcp/tools/") and clean_path.endswith("/install") and method == "POST":
-                tool_id = clean_path[len("/mcp/tools/"):-len("/install")]
-                return APIResponse(HTTPStatus.OK, self._mcp_install_tool(tool_id))
-
-            # --- Memory endpoints ---
-
-            if method == "GET" and clean_path == "/memory/context":
-                return APIResponse(HTTPStatus.OK, {"context": self.user_context.get_context()})
-
-            if method == "GET" and clean_path == "/memory/history":
-                cap_filter = None
-                if "?" in path:
-                    from urllib.parse import parse_qs
-                    qs = parse_qs(urlparse(path).query)
-                    cap_filter = qs.get("capability_id", [None])[0]
-                if cap_filter:
-                    entries = self.execution_history.get_by_capability(cap_filter)
-                else:
-                    entries = self.execution_history.get_recent(20)
-                return APIResponse(HTTPStatus.OK, {"history": entries})
-
-            if method == "POST" and clean_path == "/memory/history/chat":
-                body = payload or {}
-                session_id = body.get("session_id", "")
-                if not session_id:
-                    from datetime import datetime, timezone
-                    session_id = f"chat_{datetime.now(timezone.utc).isoformat().replace(':', '-')}"
-                exec_id = self.execution_history.upsert_chat(
-                    session_id=session_id,
-                    intent=body.get("intent", ""),
-                    messages=body.get("messages"),
-                    duration_ms=body.get("duration_ms", 0),
-                )
-                return APIResponse(HTTPStatus.OK, {"status": "success", "id": exec_id})
-
-            if clean_path.startswith("/memory/history/") and method == "DELETE":
-                exec_id = clean_path[len("/memory/history/"):]
-                deleted = self.execution_history.delete(exec_id)
-                if not deleted:
-                    raise APIRequestError(HTTPStatus.NOT_FOUND, "entry_not_found", f"History entry '{exec_id}' not found.")
-                return APIResponse(HTTPStatus.OK, {"status": "success", "deleted": exec_id})
-
-            if method == "POST" and clean_path == "/memory/sessions":
-                body = payload or {}
-                exec_id = self.execution_history.record_session(
-                    intent=body.get("intent", ""),
-                    plan_steps=body.get("plan_steps", []),
-                    step_runs=body.get("step_runs", []),
-                    status=body.get("status", "unknown"),
-                    duration_ms=body.get("duration_ms", 0),
-                    error_message=body.get("error_message"),
-                    failed_step=body.get("failed_step"),
-                    final_output=body.get("final_output", {}),
-                )
-                return APIResponse(HTTPStatus.OK, {"status": "success", "id": exec_id})
-
-            if clean_path.startswith("/memory/sessions/") and method == "GET":
-                exec_id = clean_path[len("/memory/sessions/"):]
-                entry = self.execution_history.get_session(exec_id)
-                if entry is None:
-                    raise APIRequestError(HTTPStatus.NOT_FOUND, "session_not_found", f"Session '{exec_id}' not found.")
-                return APIResponse(HTTPStatus.OK, {"session": entry})
-
-            if method == "GET" and clean_path == "/memory/preferences":
-                return APIResponse(HTTPStatus.OK, {"preferences": self.user_context.get_context().get("custom_preferences", {})})
-
-            if method == "POST" and clean_path == "/memory/preferences":
-                prefs = (payload or {}).get("preferences", payload or {})
-                if isinstance(prefs, dict):
-                    for k, v in prefs.items():
-                        self.user_context.set_preference(k, v)
-                return APIResponse(HTTPStatus.OK, {"status": "success", "preferences": self.user_context.get_context().get("custom_preferences", {})})
-
-            # --- Semantic memory ---
-
-            if method == "GET" and clean_path == "/memory/semantic/search":
-                from urllib.parse import parse_qs
-                qs = parse_qs(urlparse(path).query)
-                q = (qs.get("q") or qs.get("query") or [""])[0]
-                top_k = int((qs.get("top_k") or ["5"])[0])
-                results = self.semantic_memory.recall_semantic(q, top_k=top_k) if q else []
-                return APIResponse(HTTPStatus.OK, {"results": results, "query": q, "count": len(results)})
-
-            if method == "POST" and clean_path == "/memory/semantic":
-                text = (payload or {}).get("text", "")
-                if not isinstance(text, str) or not text.strip():
-                    raise APIRequestError(HTTPStatus.BAD_REQUEST, "missing_text", "Field 'text' is required.")
-                mem_type = (payload or {}).get("memory_type", "capability_context")
-                meta = (payload or {}).get("metadata", {})
-                rec = self.semantic_memory.remember_semantic(text, metadata=meta, memory_type=mem_type)
-                return APIResponse(HTTPStatus.OK, {"status": "success", "memory": rec})
-
-            if clean_path.startswith("/memory/semantic/") and method == "DELETE":
-                mem_id = clean_path[len("/memory/semantic/"):]
-                deleted = self.semantic_memory.forget_semantic(mem_id)
-                if not deleted:
-                    raise APIRequestError(HTTPStatus.NOT_FOUND, "memory_not_found", f"Semantic memory '{mem_id}' not found.")
-                return APIResponse(HTTPStatus.OK, {"status": "success", "deleted": mem_id})
-
-            if method == "DELETE" and clean_path == "/memory":
-                self.execution_history.clear()
-                self.vector_store.clear()
-                for rec in self.memory_manager.recall_all():
-                    self.memory_manager.forget(rec["id"])
-                return APIResponse(HTTPStatus.OK, {"status": "success", "message": "All memory cleared."})
-
-            # --- A2A agent management ---
-
-            if method == "GET" and clean_path == "/a2a/agents":
-                return APIResponse(HTTPStatus.OK, {"agents": self._a2a_list_agents()})
-
-            if method == "POST" and clean_path == "/a2a/agents":
-                return APIResponse(HTTPStatus.OK, self._a2a_add_agent(payload or {}))
-
-            if clean_path.startswith("/a2a/agents/") and method == "DELETE":
-                agent_id = clean_path[len("/a2a/agents/"):]
-                return APIResponse(HTTPStatus.OK, self._a2a_remove_agent(agent_id))
-
-            if clean_path.startswith("/a2a/agents/") and clean_path.endswith("/delegate") and method == "POST":
-                agent_id = clean_path[len("/a2a/agents/"):-len("/delegate")]
-                return APIResponse(HTTPStatus.OK, self._a2a_delegate(agent_id, payload or {}))
-
-            # --- Workspace management ---
-
-            if method == "GET" and clean_path == "/workspaces":
-                return APIResponse(HTTPStatus.OK, {"workspaces": self.workspace_registry.list(), "default_id": (self.workspace_registry.get_default() or {}).get("id")})
-
-            if method == "POST" and clean_path == "/workspaces":
-                p = payload or {}
-                ws_path = p.get("path", "")
-                if not ws_path or not isinstance(ws_path, str):
-                    raise APIRequestError(HTTPStatus.BAD_REQUEST, "workspace_error", "A non-empty 'path' is required.")
-                from pathlib import Path as _P
-                resolved_ws = _P(ws_path).resolve()
-                if not resolved_ws.exists():
-                    raise APIRequestError(HTTPStatus.BAD_REQUEST, "workspace_error", f"Path '{ws_path}' does not exist.")
-                if not resolved_ws.is_dir():
-                    raise APIRequestError(HTTPStatus.BAD_REQUEST, "workspace_error", f"Path '{ws_path}' is not a directory.")
+        # Router-based dispatch (new system — migrated routes)
+        match = self._router.dispatch(method, clean_path)
+        if match is not None:
+            try:
+                return match.handler(self, payload, _raw_path=path, **match.params)
+            except APIRequestError as exc:
+                return APIResponse(exc.status_code, {"status": "error", "error_code": exc.error_code, "error_message": str(exc), "details": exc.details})
+            except Exception as exc:
                 try:
-                    ws = self.workspace_registry.add(p.get("name", ""), ws_path, access=p.get("access", "write"), capabilities=p.get("capabilities", "*"), color=p.get("color", "#00ff88"))
-                    return APIResponse(HTTPStatus.OK, {"status": "success", "workspace": ws})
-                except (ValueError, FileNotFoundError) as exc:
-                    raise APIRequestError(HTTPStatus.BAD_REQUEST, "workspace_error", str(exc)) from exc
+                    from system.core.ui_bridge.event_bus import event_bus
+                    event_bus.emit("error", {"source": "handler", "path": clean_path, "message": str(exc)[:300]})
+                except Exception:
+                    pass
+                return APIResponse(HTTPStatus.INTERNAL_SERVER_ERROR, {"status": "error", "error_code": "internal_error", "error_message": "An unexpected error occurred.", "details": {}})
 
-            if clean_path.startswith("/workspaces/") and not clean_path.endswith("/browse") and not clean_path.endswith("/set-default"):
-                ws_id = clean_path[len("/workspaces/"):]
-                if method == "GET":
-                    ws = self.workspace_registry.get(ws_id)
-                    if ws is None:
-                        raise APIRequestError(HTTPStatus.NOT_FOUND, "workspace_not_found", f"Workspace '{ws_id}' not found.")
-                    return APIResponse(HTTPStatus.OK, {"workspace": ws})
-                if method == "POST":
-                    try:
-                        ws = self.workspace_registry.update(ws_id, **(payload or {}))
-                        return APIResponse(HTTPStatus.OK, {"status": "success", "workspace": ws})
-                    except KeyError as exc:
-                        raise APIRequestError(HTTPStatus.NOT_FOUND, "workspace_not_found", str(exc)) from exc
-                if method == "DELETE":
-                    try:
-                        self.workspace_registry.remove(ws_id)
-                        return APIResponse(HTTPStatus.OK, {"status": "success", "removed": ws_id})
-                    except ValueError as exc:
-                        raise APIRequestError(HTTPStatus.BAD_REQUEST, "workspace_error", str(exc)) from exc
-
-            if clean_path.startswith("/workspaces/") and clean_path.endswith("/set-default") and method == "POST":
-                ws_id = clean_path[len("/workspaces/"):-len("/set-default")]
-                if not self.workspace_registry.set_default(ws_id):
-                    raise APIRequestError(HTTPStatus.NOT_FOUND, "workspace_not_found", f"Workspace '{ws_id}' not found.")
-                return APIResponse(HTTPStatus.OK, {"status": "success", "default_id": ws_id})
-
-            if clean_path.startswith("/workspaces/") and clean_path.endswith("/browse") and method == "GET":
-                ws_id = clean_path[len("/workspaces/"):-len("/browse")]
-                from urllib.parse import parse_qs
-                qs = parse_qs(urlparse(path).query)
-                rel_path = (qs.get("path") or ["."])[0]
-                try:
-                    result = self.file_browser.list_directory(ws_id, rel_path)
-                    return APIResponse(HTTPStatus.OK, result)
-                except (KeyError, FileNotFoundError, PermissionError) as exc:
-                    raise APIRequestError(HTTPStatus.BAD_REQUEST, "browse_error", str(exc)) from exc
-
-            raise APIRequestError(
-                HTTPStatus.NOT_FOUND,
-                "endpoint_not_found",
-                f"Endpoint '{clean_path}' does not exist.",
-            )
-        except APIRequestError as exc:
-            return APIResponse(
-                exc.status_code,
-                {
-                    "status": "error",
-                    "error_code": exc.error_code,
-                    "error_message": exc.error_message,
-                    "details": exc.details,
-                },
-            )
+        # All routes migrated to handler modules — only 404 fallback remains
+        return APIResponse(
+            HTTPStatus.NOT_FOUND,
+            {"status": "error", "error_code": "endpoint_not_found", "error_message": f"Endpoint '{clean_path}' does not exist."},
+        )
 
     def _list_capabilities(self) -> list[dict[str, Any]]:
         capabilities: list[dict[str, Any]] = []
@@ -995,6 +925,9 @@ class CapabilityOSUIBridgeService:
             auto_start = browser_settings.get("auto_start")
             if isinstance(auto_start, bool):
                 self.browser_session_manager.set_auto_start(auto_start)
+            backend = browser_settings.get("backend")
+            if isinstance(backend, str) and backend in ("playwright", "cdp"):
+                self.browser_session_manager.set_backend(backend)
 
         llm_settings = settings.get("llm")
         self._refresh_llm_client_settings(llm_settings if isinstance(llm_settings, dict) else None)
@@ -1051,6 +984,227 @@ class CapabilityOSUIBridgeService:
             "error_message": None,
         }
 
+    def _cdp_status(self) -> dict[str, Any]:
+        """Check if Chrome is running with CDP on the configured port."""
+        cdp_port = self._get_cdp_port()
+        try:
+            from urllib.request import urlopen as _urlopen
+            resp = _urlopen(f"http://127.0.0.1:{cdp_port}/json/version", timeout=2)
+            info = json.loads(resp.read().decode("utf-8"))
+            tabs_resp = _urlopen(f"http://127.0.0.1:{cdp_port}/json/list", timeout=2)
+            tabs = json.loads(tabs_resp.read().decode("utf-8"))
+            wa_tabs = [t for t in tabs if isinstance(t, dict) and "web.whatsapp.com" in (t.get("url") or "")]
+            return {"connected": True, "tabs": len(tabs), "browser": info.get("Browser", ""), "port": cdp_port, "whatsapp_open": len(wa_tabs) > 0}
+        except Exception:
+            return {"connected": False, "tabs": 0, "browser": "", "port": cdp_port}
+
+    def _connect_worker_to_cdp(self) -> dict[str, Any]:
+        """Connect the browser worker to an already-running Chrome via CDP."""
+        cdp_port = self._get_cdp_port()
+        # Verify Chrome is running
+        try:
+            from urllib.request import urlopen as _urlopen
+            _urlopen(f"http://127.0.0.1:{cdp_port}/json/version", timeout=2)
+        except Exception:
+            raise APIRequestError(HTTPStatus.BAD_REQUEST, "chrome_not_running", f"Chrome is not running on port {cdp_port}.")
+        # Update worker's CDP port and open a session
+        self.browser_session_manager.set_cdp_port(cdp_port)
+        try:
+            session = self.browser_session_manager.open_session(
+                {"headless": False},
+                {"constraints": {"timeout_ms": 10000}},
+            )
+            return {"status": "success", "connected": True, "port": cdp_port, "session_id": session.get("session_id")}
+        except Exception as exc:
+            return {"status": "success", "connected": False, "port": cdp_port, "error": str(exc)}
+
+    def _launch_chrome(self) -> dict[str, Any]:
+        """Launch Chrome with remote debugging enabled."""
+        import subprocess as _sp
+        import sys as _sys
+        import time as _time
+
+        cdp_port = self._get_cdp_port()
+
+        # Check if already running
+        already_running = False
+        try:
+            from urllib.request import urlopen as _urlopen
+            _urlopen(f"http://127.0.0.1:{cdp_port}/json/version", timeout=1)
+            already_running = True
+        except Exception:
+            pass
+
+        if not already_running:
+            # Find Chrome executable
+            chrome = self._find_chrome()
+            if not chrome:
+                raise APIRequestError(HTTPStatus.NOT_FOUND, "chrome_not_found", "Chrome executable not found. Install Google Chrome.")
+
+            profile_dir = self.workspace_root / "workspace" / "chrome-profile"
+            profile_dir.mkdir(parents=True, exist_ok=True)
+            cmd = [chrome, f"--remote-debugging-port={cdp_port}", f"--user-data-dir={str(profile_dir)}", "--no-first-run", "--no-default-browser-check"]
+            try:
+                proc = _sp.Popen(cmd, stdout=_sp.DEVNULL, stderr=_sp.DEVNULL)
+            except Exception as exc:
+                raise APIRequestError(HTTPStatus.INTERNAL_SERVER_ERROR, "chrome_launch_failed", str(exc)) from exc
+            # Wait briefly for Chrome to start accepting CDP connections
+            _time.sleep(1.5)
+
+        # Restart worker so it picks up the CDP port, then connect
+        worker_connected = False
+        session_id = None
+        result_error = ""
+        try:
+            self.browser_session_manager.set_cdp_port(cdp_port)
+            self.browser_session_manager.restart_worker()
+            import time as _time2
+            _time2.sleep(1)
+            session = self.browser_session_manager.open_session(
+                {"headless": False},
+                {"constraints": {"timeout_ms": 10000}},
+            )
+            worker_connected = True
+            session_id = session.get("session_id")
+        except Exception as _conn_exc:
+            result_error = str(_conn_exc)
+
+        result: dict[str, Any] = {"status": "success", "port": cdp_port, "worker_connected": worker_connected}
+        if not worker_connected and result_error:
+            result["worker_error"] = result_error
+        if already_running:
+            result["already_running"] = True
+        else:
+            result["launched"] = True
+            result["pid"] = proc.pid
+        if session_id:
+            result["session_id"] = session_id
+        return result
+
+    def _open_whatsapp(self) -> dict[str, Any]:
+        """Open WhatsApp Web in the CDP-connected Chrome."""
+        cdp_port = self._get_cdp_port()
+        try:
+            from urllib.request import urlopen as _urlopen, Request as _Request
+            body = json.dumps({"url": "https://web.whatsapp.com"}).encode("utf-8")
+            req = _Request(f"http://127.0.0.1:{cdp_port}/json/new?https://web.whatsapp.com", method="PUT")
+            resp = _urlopen(req, timeout=5)
+            tab = json.loads(resp.read().decode("utf-8"))
+            return {"status": "success", "tab_id": tab.get("id", ""), "url": "https://web.whatsapp.com"}
+        except Exception as exc:
+            raise APIRequestError(HTTPStatus.BAD_REQUEST, "whatsapp_open_failed", f"Failed to open WhatsApp: {exc}. Is Chrome running with debugging?") from exc
+
+    def _start_whatsapp_worker(self) -> dict[str, Any]:
+        """Start WhatsApp — tries Baileys first, falls back to browser bridge."""
+        # Try Baileys first (fast, no browser)
+        connector = self.phase10_whatsapp_executor.connector
+        baileys = connector._get_baileys()
+        if baileys is not None:
+            try:
+                result = baileys.ensure_connected(timeout_s=10.0)
+                status = result.get("status", "unknown")
+                # If Baileys works (QR or connected), use it
+                if status in ("qr_required", "connected"):
+                    response: dict[str, Any] = {"status": status, "backend": "baileys"}
+                    if result.get("qr"):
+                        response["qr"] = result["qr"]
+                        response["qr_image"] = self._qr_to_data_url(result["qr"])
+                    if result.get("user"):
+                        response["user"] = result["user"]
+                    response["connected"] = status == "connected"
+                    return response
+                # Baileys blocked/failed — fall through to browser bridge
+            except Exception:
+                pass
+
+        # Fallback: browser bridge (Playwright headless)
+        return self._start_whatsapp_browser_bridge()
+
+    def _start_whatsapp_browser_bridge(self) -> dict[str, Any]:
+        """Open WhatsApp Web in headless Playwright and capture QR."""
+        if not hasattr(self, "_wsp_bridge"):
+            try:
+                from system.integrations.installed.whatsapp_web_connector.browser_bridge import BrowserBridge
+                self._wsp_bridge = BrowserBridge()
+            except ImportError:
+                return {"status": "error", "error": "Playwright not installed. Run: pip install playwright && python -m playwright install chromium"}
+
+        bridge = self._wsp_bridge
+        if not bridge.available:
+            return {"status": "error", "error": "Playwright not available. Run: pip install playwright && python -m playwright install chromium"}
+
+        result = bridge.start(timeout_s=25.0)
+        result["backend"] = "browser"
+        return result
+
+    def _whatsapp_bridge_check(self) -> dict[str, Any]:
+        """Poll the browser bridge for QR refresh or login detection."""
+        if not hasattr(self, "_wsp_bridge"):
+            return {"status": "idle", "connected": False}
+        return self._wsp_bridge.check_login()
+
+    def _whatsapp_bridge_close(self) -> dict[str, Any]:
+        """Close the browser bridge session."""
+        if not hasattr(self, "_wsp_bridge"):
+            return {"status": "idle"}
+        result = self._wsp_bridge.close()
+        del self._wsp_bridge
+        return result
+
+    def _whatsapp_bridge_debug(self) -> dict[str, Any]:
+        """Screenshot the bridge page for debugging."""
+        if not hasattr(self, "_wsp_bridge"):
+            return {"status": "idle"}
+        return self._wsp_bridge.debug_screenshot()
+
+    @staticmethod
+    def _qr_to_data_url(qr_data: str) -> str | None:
+        """Convert QR string to a data:image/png;base64 URL. Returns None if qrcode lib unavailable."""
+        try:
+            import base64
+            import io
+            import qrcode  # type: ignore
+            img = qrcode.make(qr_data)
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+            return f"data:image/png;base64,{b64}"
+        except ImportError:
+            return None
+        except Exception:
+            return None
+
+    def _get_cdp_port(self) -> int:
+        try:
+            return int(self.settings_service.load_settings().get("browser", {}).get("cdp_port", 0)) or 9222
+        except Exception:
+            return 9222
+
+    @staticmethod
+    def _find_chrome() -> str | None:
+        """Find Chrome executable on Windows/Mac/Linux."""
+        import sys as _sys
+        candidates: list[str] = []
+        if _sys.platform == "win32":
+            for base in [os.environ.get("PROGRAMFILES", ""), os.environ.get("PROGRAMFILES(X86)", ""), os.environ.get("LOCALAPPDATA", "")]:
+                if base:
+                    candidates.append(os.path.join(base, "Google", "Chrome", "Application", "chrome.exe"))
+        elif _sys.platform == "darwin":
+            candidates.append("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+        else:
+            candidates.extend(["google-chrome", "google-chrome-stable", "chromium-browser", "chromium"])
+        for c in candidates:
+            if os.path.isfile(c):
+                return c
+        # Try PATH on Linux
+        if _sys.platform != "win32":
+            import shutil as _shutil
+            for name in ["google-chrome", "google-chrome-stable", "chromium-browser", "chromium"]:
+                found = _shutil.which(name)
+                if found:
+                    return found
+        return None
+
     def _integration_status(self, integration_id: str) -> str | None:
         if not isinstance(integration_id, str) or not integration_id:
             return None
@@ -1063,7 +1217,7 @@ class CapabilityOSUIBridgeService:
             return status
         return None
 
-    def _execute_capability(self, request: dict[str, Any]) -> dict[str, Any]:
+    def _execute_capability(self, request: dict[str, Any], event_callback: Any = None) -> dict[str, Any]:
         capability_id = request.get("capability_id")
         if not isinstance(capability_id, str) or not capability_id:
             raise APIRequestError(
@@ -1098,9 +1252,15 @@ class CapabilityOSUIBridgeService:
         try:
             result = self.phase10_whatsapp_executor.execute(capability_id, inputs)
             if result is None:
+                result = self.telegram_executor.execute(capability_id, inputs)
+            if result is None:
+                result = self.slack_executor.execute(capability_id, inputs)
+            if result is None:
+                result = self.discord_executor.execute(capability_id, inputs)
+            if result is None:
                 result = self.phase7_executor.execute(capability_id, inputs)
             if result is None:
-                result = self.engine.execute(contract, inputs)
+                result = self.engine.execute(contract, inputs, event_callback=event_callback)
             response = {
                 "status": result["status"],
                 "execution_id": result["execution_id"],
@@ -1111,6 +1271,11 @@ class CapabilityOSUIBridgeService:
                 "error_message": None,
             }
             self._store_execution(response)
+            try:
+                from system.core.ui_bridge.event_bus import event_bus
+                event_bus.emit("execution_complete", {"execution_id": response.get("execution_id"), "capability_id": capability_id, "status": "success"})
+            except Exception:
+                pass
             return response
         except Phase7CapabilityExecutionError as exc:
             runtime = exc.runtime_model
@@ -1126,6 +1291,11 @@ class CapabilityOSUIBridgeService:
             }
             if isinstance(execution_id, str) and execution_id:
                 self._store_execution(response)
+            try:
+                from system.core.ui_bridge.event_bus import event_bus
+                event_bus.emit("execution_complete", {"execution_id": execution_id, "capability_id": capability_id, "status": "error"})
+            except Exception:
+                pass
             return response
         except CapabilityExecutionError as exc:
             runtime = exc.runtime_model
@@ -1141,6 +1311,11 @@ class CapabilityOSUIBridgeService:
             }
             if isinstance(execution_id, str) and execution_id:
                 self._store_execution(response)
+            try:
+                from system.core.ui_bridge.event_bus import event_bus
+                event_bus.emit("execution_complete", {"execution_id": execution_id, "capability_id": capability_id, "status": "error"})
+            except Exception:
+                pass
             return response
         except (CapabilityInputError, SchemaValidationError) as exc:
             raise APIRequestError(HTTPStatus.BAD_REQUEST, "validation_error", str(exc)) from exc
@@ -1287,6 +1462,14 @@ class CapabilityOSUIBridgeService:
                 "error_code": error_code,
                 "error_message": str(exc),
             }
+
+    def _execute_capability_sync(self, capability_id: str, inputs: dict[str, Any]) -> dict[str, Any]:
+        """Execute a capability synchronously. Used by channel reply workers."""
+        try:
+            result = self._execute_capability({"capability_id": capability_id, "inputs": inputs})
+            return result
+        except Exception as exc:
+            return {"status": "error", "error_message": str(exc)}
 
     def _store_execution(self, execution_response: dict[str, Any]) -> None:
         execution_id = execution_response.get("execution_id")
@@ -1454,6 +1637,7 @@ class CapabilityOSUIBridgeService:
         try:
             client = self.mcp_client_manager.add_server(config)
             client.connect()
+            self._persist_mcp_server(config)
             return {"status": "success", "server": client.status()}
         except MCPClientError as exc:
             raise APIRequestError(HTTPStatus.BAD_REQUEST, exc.error_code, str(exc), details=exc.details) from exc
@@ -1463,7 +1647,35 @@ class CapabilityOSUIBridgeService:
         removed = self.mcp_client_manager.remove_server(server_id)
         if not removed:
             raise APIRequestError(HTTPStatus.NOT_FOUND, "mcp_server_not_found", f"MCP server '{server_id}' not found.")
+        self._unpersist_mcp_server(server_id)
         return {"status": "success", "server_id": server_id, "removed": True}
+
+    def _persist_mcp_server(self, config: dict[str, Any]) -> None:
+        """Save MCP server config to settings.json."""
+        try:
+            current = self.settings_service.load_settings()
+            mcp = current.get("mcp", {})
+            servers = mcp.get("servers", [])
+            # Replace if same id exists, otherwise append
+            servers = [s for s in servers if s.get("id") != config.get("id")]
+            servers.append(config)
+            mcp["servers"] = servers
+            current["mcp"] = mcp
+            self.settings_service.save_settings(current)
+        except Exception:
+            pass  # Don't break the add flow
+
+    def _unpersist_mcp_server(self, server_id: str) -> None:
+        """Remove MCP server config from settings.json."""
+        try:
+            current = self.settings_service.load_settings()
+            mcp = current.get("mcp", {})
+            servers = mcp.get("servers", [])
+            mcp["servers"] = [s for s in servers if s.get("id") != server_id]
+            current["mcp"] = mcp
+            self.settings_service.save_settings(current)
+        except Exception:
+            pass
 
     def _mcp_discover_tools(self, server_id: str) -> dict[str, Any]:
         client = self.mcp_client_manager.get_client(server_id)
@@ -1479,7 +1691,30 @@ class CapabilityOSUIBridgeService:
         result = self.mcp_capability_generator.generate_for_tool(tool_id)
         if result is None:
             raise APIRequestError(HTTPStatus.NOT_FOUND, "mcp_tool_not_found", f"MCP tool '{tool_id}' not found.")
-        return {"status": "success", "proposal": result}
+        # Auto-register the capability so it's immediately usable
+        contract = result.get("contract")
+        if contract and isinstance(contract, dict):
+            try:
+                self.capability_registry.register(contract)
+            except Exception:
+                pass  # Already registered or validation error — don't block
+        return {"status": "success", "proposal": result, "capability_id": result.get("capability_id")}
+
+    def _mcp_uninstall_tool(self, tool_id: str) -> dict[str, Any]:
+        removed = self.capability_registry.remove(tool_id)
+        # Also try with mcp_ prefix in case the capability_id differs
+        if not removed:
+            removed = self.capability_registry.remove("mcp_" + tool_id)
+        # Remove proposal file if it exists
+        try:
+            proposal_path = self.mcp_capability_generator._proposals_dir / f"{tool_id}.json"
+            if proposal_path.exists():
+                proposal_path.unlink()
+        except Exception:
+            pass
+        if not removed:
+            raise APIRequestError(HTTPStatus.NOT_FOUND, "mcp_tool_not_found", f"Capability for tool '{tool_id}' not found.")
+        return {"status": "success", "tool_id": tool_id, "uninstalled": True}
 
     # ------------------------------------------------------------------
     # A2A agent management handlers
@@ -1489,15 +1724,19 @@ class CapabilityOSUIBridgeService:
         results: list[dict[str, Any]] = []
         for agent in self._a2a_known_agents:
             url = agent.get("url", "")
-            entry: dict[str, Any] = {"id": agent.get("id", url), "url": url, "status": "unknown"}
+            entry: dict[str, Any] = {"id": agent.get("id", url), "url": url, "status": "unknown", "skills": agent.get("skills", [])}
             try:
                 client = A2AClient(url, timeout_ms=3000)
                 card = client.discover()
                 entry["status"] = "reachable"
                 entry["name"] = card.get("name")
-                entry["skills"] = len(card.get("skills", []))
+                entry["skills"] = card.get("skills", [])
+                # Update cached skills
+                agent["skills"] = entry["skills"]
+                agent["name"] = entry["name"]
             except Exception:
                 entry["status"] = "error"
+                entry["name"] = agent.get("name")
             results.append(entry)
         return results
 
@@ -1506,7 +1745,15 @@ class CapabilityOSUIBridgeService:
         agent_id = payload.get("id") or url
         if not url:
             raise APIRequestError(HTTPStatus.BAD_REQUEST, "invalid_a2a_agent", "Field 'url' is required.")
-        entry = {"id": agent_id, "url": url}
+        entry: dict[str, Any] = {"id": agent_id, "url": url}
+        # Discover agent card to get name and skills
+        try:
+            client = A2AClient(url, timeout_ms=5000)
+            card = client.discover()
+            entry["name"] = card.get("name")
+            entry["skills"] = card.get("skills", [])
+        except Exception:
+            entry["skills"] = []
         self._a2a_known_agents = [a for a in self._a2a_known_agents if a.get("id") != agent_id]
         self._a2a_known_agents.append(entry)
         return {"status": "success", "agent": entry}
@@ -1571,6 +1818,25 @@ class CapabilityOSRequestHandler(BaseHTTPRequestHandler):
         return
 
     def _dispatch(self, method: str) -> None:
+        # Rate limiting
+        rate_limiter = getattr(self.server, "rate_limiter", None)
+        if rate_limiter is not None:
+            client_ip = self.client_address[0]
+            if not rate_limiter.allow(client_ip):
+                self.send_response(HTTPStatus.TOO_MANY_REQUESTS)
+                self._send_headers()
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "error", "error_code": "rate_limited", "error_message": "Too many requests. Try again later."}).encode("utf-8"))
+                return
+
+        # SSE streaming endpoint — handled directly, not through service.handle()
+        if method == "POST" and self.path.split("?")[0] == "/chat/stream":
+            self._handle_chat_stream()
+            return
+        if method == "POST" and self.path.split("?")[0] == "/execute/stream":
+            self._handle_execute_stream()
+            return
+
         service: CapabilityOSUIBridgeService = self.server.service  # type: ignore[attr-defined]
         try:
             payload = self._read_json_payload() if method == "POST" else None
@@ -1584,6 +1850,16 @@ class CapabilityOSRequestHandler(BaseHTTPRequestHandler):
                     "error_message": exc.error_message,
                     "details": exc.details,
                 },
+            )
+        except Exception as exc:
+            try:
+                from system.core.ui_bridge.event_bus import event_bus
+                event_bus.emit("error", {"source": "api_dispatch", "method": method, "path": self.path, "message": str(exc)[:300]})
+            except Exception:
+                pass
+            response = APIResponse(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"status": "error", "error_code": "internal_error", "error_message": "An unexpected error occurred.", "details": {}},
             )
 
         self.send_response(response.status_code)
@@ -1620,20 +1896,148 @@ class CapabilityOSRequestHandler(BaseHTTPRequestHandler):
             )
         return payload
 
+    def _handle_chat_stream(self) -> None:
+        """SSE endpoint for streaming LLM chat responses."""
+        service: CapabilityOSUIBridgeService = self.server.service  # type: ignore[attr-defined]
+        try:
+            body = self._read_json_payload() or {}
+        except Exception:
+            body = {}
+        message = body.get("message", "")
+        user_name = body.get("user_name", "User")
+        history = body.get("conversation_history") or []
+
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+
+        try:
+            service._refresh_llm_client_settings()
+            workspaces = service.intent_interpreter._get_workspace_context()
+            from system.core.interpretation.prompts import build_chat_prompt
+            system_prompt, user_prompt = build_chat_prompt(
+                message, user_name, workspaces, history,
+                capability_ids=service.capability_registry.ids(),
+            )
+            for chunk in service.intent_interpreter.llm_client.stream_complete(
+                system_prompt=system_prompt, user_prompt=user_prompt,
+            ):
+                sse_line = f"data: {json.dumps({'chunk': chunk})}\n\n"
+                self.wfile.write(sse_line.encode("utf-8"))
+                self.wfile.flush()
+            self.wfile.write(b"data: {\"done\":true}\n\n")
+            self.wfile.flush()
+        except Exception as exc:
+            self.wfile.write(f"data: {json.dumps({'error': str(exc)[:200]})}\n\n".encode("utf-8"))
+            self.wfile.flush()
+
+
+    def _handle_execute_stream(self) -> None:
+        """SSE endpoint for streaming capability execution events."""
+        import queue as _queue
+
+        service: CapabilityOSUIBridgeService = self.server.service  # type: ignore[attr-defined]
+        try:
+            body = self._read_json_payload() or {}
+        except Exception:
+            body = {}
+
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+
+        event_queue: _queue.Queue[dict[str, Any] | None] = _queue.Queue()
+
+        def on_event(entry: dict[str, Any]) -> None:
+            event_queue.put(entry)
+
+        def run_execution() -> dict[str, Any] | None:
+            try:
+                return service._execute_capability(body, event_callback=on_event)
+            except Exception as exc:
+                event_queue.put({"event": "error", "timestamp": "", "payload": {"message": str(exc)[:300]}})
+                return None
+            finally:
+                event_queue.put(None)  # sentinel
+
+        import threading
+        t = threading.Thread(target=lambda: event_queue.put(("__result__", run_execution())), daemon=True)
+
+        # Simpler approach: run in same thread, callback writes to queue, drain after
+        # Actually we need to stream events AS they happen. Use a thread:
+        result_holder: list[Any] = [None]
+
+        def _run() -> None:
+            try:
+                result_holder[0] = service._execute_capability(body, event_callback=on_event)
+            except Exception as exc:
+                event_queue.put({"event": "error", "timestamp": "", "payload": {"message": str(exc)[:300]}})
+            finally:
+                event_queue.put(None)
+
+        worker = threading.Thread(target=_run, daemon=True)
+        worker.start()
+
+        try:
+            while True:
+                entry = event_queue.get(timeout=120)
+                if entry is None:
+                    break
+                sse_line = f"data: {json.dumps(entry, default=str)}\n\n"
+                self.wfile.write(sse_line.encode("utf-8"))
+                self.wfile.flush()
+        except Exception:
+            pass
+
+        # Send final result
+        result = result_holder[0]
+        if result is not None:
+            done_payload = {"done": True, "result": {
+                "status": result.get("status", "error"),
+                "execution_id": result.get("execution_id", ""),
+                "capability_id": result.get("capability_id", ""),
+                "final_output": result.get("final_output", {}),
+                "error_code": result.get("error_code"),
+                "error_message": result.get("error_message"),
+            }}
+        else:
+            done_payload = {"done": True, "result": {"status": "error", "error_message": "Execution failed"}}
+        self.wfile.write(f"data: {json.dumps(done_payload, default=str)}\n\n".encode("utf-8"))
+        self.wfile.flush()
+
 
 def create_http_server(
     host: str = "127.0.0.1",
     port: int = 8000,
     workspace_root: str | Path | None = None,
+    ws_port: int | None = None,
 ) -> ThreadingHTTPServer:
     service = CapabilityOSUIBridgeService(workspace_root=workspace_root)
+    from system.core.ui_bridge.rate_limiter import RateLimiter
     server = ThreadingHTTPServer((host, port), CapabilityOSRequestHandler)
     server.service = service  # type: ignore[attr-defined]
+    server.rate_limiter = RateLimiter()  # type: ignore[attr-defined]
+    server.ws_server = None  # type: ignore[attr-defined]
+    if ws_port is not None:
+        try:
+            from system.core.ui_bridge.ws_server import start_ws_server
+            from system.core.ui_bridge.event_bus import event_bus
+            server.ws_server = start_ws_server(host, ws_port, event_bus)
+        except Exception as exc:
+            print(f"[WS] Failed to start WebSocket server: {exc}", flush=True)
     return server
 
 
 if __name__ == "__main__":
-    http_server = create_http_server()
+    _http_port = int(os.environ.get("PORT", 8000))
+    _ws_port = int(os.environ.get("WS_PORT", _http_port + 1))
+    http_server = create_http_server(port=_http_port, ws_port=_ws_port)
     bound_host, bound_port = http_server.server_address
     print(f"Capability OS UI Bridge listening on http://{bound_host}:{bound_port}")
     try:
@@ -1641,4 +2045,6 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         pass
     finally:
+        if http_server.ws_server:
+            http_server.ws_server.shutdown()
         http_server.server_close()

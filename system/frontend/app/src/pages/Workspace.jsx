@@ -2,20 +2,32 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   chatMessage, clearAllMemory, deleteHistoryEntry, executeCapability,
   getExecution, getExecutionEvents, getMemoryContext, getMemoryHistory,
-  getSession, listCapabilities, planIntent, saveChatSession
+  listCapabilities, planIntent, saveChatSession, streamChat,
+  runAgent, confirmAgentAction,
 } from "../api";
-import OutputRenderer from "../components/OutputRenderer";
+import ChatInput from "../components/ChatInput";
+import ChatThread from "../components/ChatThread";
+import AgentStepView from "../components/AgentStepView";
+import ConfirmationModal from "../components/ConfirmationModal";
+import FileDropZone from "../components/workspace/FileDropZone";
+import QuickActionsBar from "../components/workspace/QuickActionsBar";
+import { useVoice } from "../hooks/useVoice";
+import { useCollapsible } from "../hooks/useCollapsible";
+import SessionSidebar from "../components/SessionSidebar";
+import ToastContainer from "../components/ToastContainer";
+import { useToast } from "../hooks/useToast";
+import { useWebSocket } from "../hooks/useWebSocket";
 import { useWorkspaceState } from "../state/useWorkspaceState";
 
-/* Template resolution (unchanged logic) */
+/* Template resolution */
 const TMPL = /^\{\{([a-zA-Z0-9_.]+)\}\}$/;
 function resolvePath(p,ctx){const s=p.split("."),r=s[0];if(!["inputs","state","steps","runtime"].includes(r))throw new Error(`Bad '${r}'.`);let n=ctx[r];for(let i=1;i<s.length;i++){const k=s[i];if(n==null||typeof n!=="object"||!(k in n))throw new Error(`Unresolved '{{${p}}}'.`);n=n[k]}return n}
 function resolve(v,c){if(typeof v==="string"){const m=v.match(TMPL);if(!m)return v;return resolvePath(m[1],c)}if(Array.isArray(v))return v.map(x=>resolve(x,c));if(v&&typeof v==="object"){const o={};for(const[k,x]of Object.entries(v))o[k]=resolve(x,c);return o}return v}
 
-function greeting(name){const h=new Date().getHours();const g=h<6?"Working late":h<12?"Good morning":h<18?"Good afternoon":"Good evening";return `${g}, ${name}`}
-
 export default function Workspace({ activeWorkspace, userName }) {
   const {intent,setIntent,plan,setPlan,planValidationErrors,setPlanValidationErrors,execution,setExecution,logs,setLogs}=useWorkspaceState();
+  const voice=useVoice();
+  const {isCollapsed:sidebarCollapsed,toggle:toggleSidebar}=useCollapsible("capos_sidebar_collapsed");
   const [capabilities,setCapabilities]=useState([]);
   const [freqCaps,setFreqCaps]=useState([]);
   const [loadingPlan,setLoadingPlan]=useState(false);
@@ -28,24 +40,77 @@ export default function Workspace({ activeWorkspace, userName }) {
   const [currentSessionId,setCurrentSessionId]=useState(()=>"chat_"+Date.now());
   const [deletingId,setDeletingId]=useState(null);
   const [confirmClear,setConfirmClear]=useState(false);
-  const [toast,setToast]=useState(null);
+  const {toasts,addToast,removeToast}=useToast();
+  const [activeSessionId,setActiveSessionId]=useState(null);
+  const activeSessionRef=useRef(null);
+  const [autoExecute,setAutoExecute]=useState(()=>localStorage.getItem("capos_autoexecute")==="true");
+  const [agentMode,setAgentMode]=useState(()=>localStorage.getItem("capos_agentmode")!=="false");
+  const [agentEvents,setAgentEvents]=useState([]);
+  const [agentSessionId,setAgentSessionId]=useState(null);
+  const [pendingConfirmation,setPendingConfirmation]=useState(null);
+  const autoExecTimerRef=useRef(null);
   const sessionDirtyRef=useRef(false);
   const messagesRef=useRef(messages);
   const threadRef=useRef(null);
 
+  // ── History loading ──
+  const historyIdsRef=useRef("");
+  function loadHistory(force){
+    return getMemoryHistory().then(r=>{
+      const valid=(r.history||[]).filter(h=>h.intent&&h.intent.trim().length>0&&h.intent!=="session"&&h.intent!=="New session");
+      const mapped=valid.slice(0,20).map(h=>({id:h.execution_id,intent:h.intent,status:h.status==="ready"?"success":h.status,duration_ms:h.duration_ms,time:h.timestamp,plan_steps:h.plan_steps||null,step_runs:h.step_runs||null,error_message:h.error_message||null,failed_step:h.failed_step||null,final_output:h.key_outputs||{},chat_response:h.chat_response||null,chat_messages:h.chat_messages||null,message_count:h.message_count||0,isChat:h.capability_id==="chat",hasExecution:!!h.has_execution}));
+      const newIds=mapped.map(h=>h.id+":"+(h.message_count||0)+":"+(h.time||"")).join(",");
+      if(force||newIds!==historyIdsRef.current){
+        historyIdsRef.current=newIds;setHistory(mapped);
+        const sid=activeSessionRef.current;
+        if(sid&&sid.startsWith("telegram_")){
+          const entry=mapped.find(h=>h.id===sid);
+          if(entry&&entry.chat_messages&&entry.chat_messages.length>0){
+            const restored=[];const ts=new Date(entry.time||Date.now());
+            entry.chat_messages.forEach((m,i)=>{restored.push({id:Date.now()+i,role:m.role==="user"?"user":"system",content:m.content,meta:{},ts})});
+            if(restored.length>0)setMessages(restored);
+          }
+        }
+      }
+    }).catch(()=>{});
+  }
+
+  // ── Init ──
   useEffect(()=>{let o=false;
     listCapabilities().then(r=>{if(!o)setCapabilities(r.capabilities||[])}).catch(()=>{});
-    getMemoryHistory().then(r=>{if(!o){const valid=(r.history||[]).filter(h=>h.intent&&h.intent.trim().length>0&&h.intent!=="session"&&h.intent!=="New session");setHistory(valid.slice(0,10).map(h=>({id:h.execution_id,intent:h.intent,status:h.status==="ready"?"success":h.status,duration_ms:h.duration_ms,time:h.timestamp,plan_steps:h.plan_steps||null,step_runs:h.step_runs||null,error_message:h.error_message||null,failed_step:h.failed_step||null,final_output:h.key_outputs||{},chat_response:h.chat_response||null,chat_messages:h.chat_messages||null,message_count:h.message_count||0,isChat:h.capability_id==="chat",hasExecution:!!h.has_execution})))}}).catch(()=>{});
+    loadHistory(true);
     getMemoryContext().then(r=>{if(!o)setFreqCaps((r.context?.frequent_capabilities||[]).slice(0,6))}).catch(()=>{});
     return()=>{o=true};
   },[]);
 
+  // ── WebSocket ──
+  const HISTORY_EVENTS=["telegram_message","whatsapp_message","slack_message","discord_message","session_updated","execution_complete","memory_cleared"];
+  const TOAST_EVENTS={
+    settings_updated:"Settings updated",
+    config_imported:"Configuration imported",
+    workspace_changed:"Workspace updated",
+    growth_update:"Growth system updated",
+    integration_changed:"Integration updated",
+    mcp_changed:"MCP updated",
+    a2a_changed:"A2A updated",
+    browser_changed:"Browser updated",
+    preferences_updated:"Preferences saved",
+  };
+  const handleWsEvent=useCallback((event)=>{
+    if(!event||!event.type)return;
+    if(HISTORY_EVENTS.includes(event.type)){loadHistory()}
+    if(TOAST_EVENTS[event.type]){addToast(TOAST_EVENTS[event.type]+(event.data?.action?" — "+event.data.action:""),"success")}
+    if(event.type==="error"&&event.data?.message){addToast("Error: "+event.data.message.slice(0,80),"error")}
+  },[]);
+  const{connected:wsConnected}=useWebSocket(handleWsEvent);
+  useEffect(()=>{const ms=wsConnected?30000:5000;const id=setInterval(()=>loadHistory(),ms);return()=>clearInterval(id)},[wsConnected]);
+
+  // ── Messages ──
   useEffect(()=>{messagesRef.current=messages;if(threadRef.current)threadRef.current.scrollTop=threadRef.current.scrollHeight},[messages]);
-
   function addMsg(role,content,meta){setMessages(p=>[...p,{id:Date.now()+Math.random(),role,content,meta,ts:new Date()}])}
+  function showToast(msg,type="info"){addToast(msg,type)}
 
-  function showToast(msg){setToast(msg);setTimeout(()=>setToast(null),2500)}
-
+  // ── Session flush ──
   const flushSession=useCallback(()=>{
     if(!sessionDirtyRef.current)return;
     setMessages(cur=>{
@@ -55,113 +120,117 @@ export default function Workspace({ activeWorkspace, userName }) {
       sessionDirtyRef.current=false;
       let hasExec=false,lastStatus="success",lastDur=0;
       const compact=visible.map(m=>{
-        if(m.meta?.execution){
-          hasExec=true;lastStatus=m.meta.execution.status||"success";lastDur=m.meta.execution.duration_ms||0;
-          return{role:"assistant",content:"Execution: "+m.meta.execution.status,type:"execution",execution:m.meta.execution};
-        }
+        if(m.meta?.execution){hasExec=true;lastStatus=m.meta.execution.status||"success";lastDur=m.meta.execution.duration_ms||0;return{role:"assistant",content:"Execution: "+m.meta.execution.status,type:"execution",execution:m.meta.execution}}
         if(m.meta?.plan)return{role:"assistant",content:"Plan: "+m.meta.plan.steps?.map(s=>s.capability).join(", "),type:"plan",plan:m.meta.plan};
+        if(m.meta?.agentEvents){const ft=m.meta.finalText||"";const tools=(m.meta.agentEvents||[]).filter(e=>e.event==="tool_call").map(e=>e.tool_id).join(", ");return{role:"assistant",content:ft||("Agent: "+tools),type:"agent",agentEvents:m.meta.agentEvents}}
         if(m.meta?.error)return{role:"assistant",content:m.content,type:"error"};
         return{role:m.role==="user"?"user":"assistant",content:typeof m.content==="string"?m.content:JSON.stringify(m.content),type:"chat"};
       });
-      const intentText=firstUser.content;
-      const sid=currentSessionId;
+      const intentText=firstUser.content;const sid=currentSessionId;
       saveChatSession(sid,intentText,compact,lastDur).then(()=>{
         const entry={id:sid,intent:intentText,status:lastStatus,duration_ms:lastDur,time:new Date().toISOString(),isChat:!hasExec,hasExecution:hasExec,chat_messages:compact,message_count:compact.length};
-        setHistory(p=>{
-          const idx=p.findIndex(h=>h.id===sid);
-          if(idx>=0){const u=[...p];u[idx]=entry;return u}
-          return[entry,...p].slice(0,10);
-        });
+        setHistory(p=>{const idx=p.findIndex(h=>h.id===sid);if(idx>=0){const u=[...p];u[idx]=entry;return u}return[entry,...p].slice(0,10)});
       }).catch(()=>{});
       return cur;
     });
   },[currentSessionId]);
 
+  // ── Conversation history for LLM ──
   function getConversationHistory(msgs,max=6){
     return msgs.filter(m=>!m.meta?.loading&&!m.meta?.executing).slice(-max).map(m=>{
       const role=m.role==="user"?"user":"assistant";
       let content=m.content;
-      if(m.meta?.plan)content="I suggest a plan: "+m.meta.plan.steps.map(s=>s.capability).join(", ");
-      else if(m.meta?.execution)content=m.meta.execution.status==="success"?"Execution completed successfully.":"Execution failed: "+(m.meta.execution.error_message||"error");
+      if(m.meta?.agentEvents&&m.meta?.finalText){content=m.meta.finalText}
+      else if(m.meta?.plan){content="Plan: "+m.meta.plan.steps.map(s=>`${s.capability}(${Object.entries(s.inputs||{}).map(([k,v])=>k+"="+JSON.stringify(v)).join(", ")})`).join(" → ")}
+      else if(m.meta?.execution){const ex=m.meta.execution;if(ex.status==="success"){const runs=(ex.step_runs||[]).map(r=>{const out=r.final_output||{};if(out.items)return`${r.capability}: listed ${out.items.length} items in ${out.path||"?"}`;if(out.content)return`${r.capability}: read file ${out.path||"?"}`;if("stdout" in out)return`${r.capability}: exit ${out.exit_code}`;return r.capability+": done"});content="Executed: "+runs.join("; ")}else{content="Failed: "+(ex.error_message||"error")}}
       const entry={role,content};
       if(m.meta?.suggestedAction)entry.suggested_action=m.meta.suggestedAction;
       return entry;
     });
   }
 
+  // ── Session restore ──
   function restoreSession(h){
-    flushSession();
-    const restored=[];
-    const ts=new Date(h.time||Date.now());
-    if(h.id)setCurrentSessionId(h.id);
+    flushSession();const restored=[];const ts=new Date(h.time||Date.now());
+    if(h.id){setCurrentSessionId(h.id);setActiveSessionId(h.id);activeSessionRef.current=h.id}
     setPlan(null);setExecution(null);setPlanExecuted(false);sessionDirtyRef.current=false;
-    // Unified format: chat_messages with type field
     if(h.chat_messages&&h.chat_messages.length>0){
       let restoredHasExec=false;
       h.chat_messages.forEach((m,i)=>{
-        if(m.type==="execution"&&m.execution){
-          restoredHasExec=true;
-          setExecution(m.execution);
-          restored.push({id:Date.now()+i,role:"system",content:"result",meta:{execution:m.execution},ts});
-        }else if(m.type==="plan"&&m.plan){
-          setPlan(m.plan);
-          restored.push({id:Date.now()+i,role:"system",content:"plan",meta:{plan:m.plan},ts});
-        }else if(m.type==="error"){
-          restored.push({id:Date.now()+i,role:"system",content:m.content,meta:{error:true},ts});
-        }else{
-          restored.push({id:Date.now()+i,role:m.role==="user"?"user":"system",content:m.content,meta:{},ts});
-        }
+        if(m.type==="execution"&&m.execution){restoredHasExec=true;setExecution(m.execution);restored.push({id:Date.now()+i,role:"system",content:"result",meta:{execution:m.execution},ts})}
+        else if(m.type==="plan"&&m.plan){setPlan(m.plan);restored.push({id:Date.now()+i,role:"system",content:"plan",meta:{plan:m.plan},ts})}
+        else if(m.type==="agent"&&m.agentEvents){restored.push({id:Date.now()+i,role:"system",content:m.agentEvents?.length>1?"agent_steps":m.content,meta:{agentEvents:m.agentEvents,finalText:m.content},ts})}
+        else if(m.type==="error"){restored.push({id:Date.now()+i,role:"system",content:m.content,meta:{error:true},ts})}
+        else{restored.push({id:Date.now()+i,role:m.role==="user"?"user":"system",content:m.content,meta:{},ts})}
       });
       if(restoredHasExec)setPlanExecuted(true);
       if(restored.length>0){setMessages(restored);setIntent("");setErrorMessage("");return}
     }
-    // Legacy format: separate plan_steps/step_runs fields
     if(h.intent)restored.push({id:Date.now()+1,role:"user",content:h.intent,ts});
-    if(h.chat_response&&!h.plan_steps){
-      restored.push({id:Date.now()+2,role:"system",content:h.chat_response,meta:{},ts});
-    }
-    if(h.plan_steps&&h.plan_steps.length>0){
-      const restoredPlan={steps:h.plan_steps};
-      setPlan(restoredPlan);setPlanValidationErrors([]);
-      restored.push({id:Date.now()+2,role:"system",content:"plan",meta:{plan:restoredPlan},ts});
-    }
-    if(h.step_runs){
-      const ex={status:h.status,current_step:"",started_at:h.time,ended_at:null,duration_ms:h.duration_ms||0,failed_step:h.failed_step||null,error_code:null,error_message:h.error_message||null,final_output:h.final_output||{},step_runs:h.step_runs};
-      setExecution(ex);setPlanExecuted(true);
-      restored.push({id:Date.now()+3,role:"system",content:"result",meta:{execution:ex},ts});
-    }
+    if(h.chat_response&&!h.plan_steps)restored.push({id:Date.now()+2,role:"system",content:h.chat_response,meta:{},ts});
+    if(h.plan_steps?.length>0){const rp={steps:h.plan_steps};setPlan(rp);restored.push({id:Date.now()+2,role:"system",content:"plan",meta:{plan:rp},ts})}
+    if(h.step_runs){const ex={status:h.status,current_step:"",started_at:h.time,ended_at:null,duration_ms:h.duration_ms||0,failed_step:h.failed_step||null,error_code:null,error_message:h.error_message||null,final_output:h.final_output||{},step_runs:h.step_runs};setExecution(ex);setPlanExecuted(true);restored.push({id:Date.now()+3,role:"system",content:"result",meta:{execution:ex},ts})}
     if(restored.length===0){setIntent(h.intent||"");setMessages([]);return}
     setMessages(restored);setIntent("");setErrorMessage(h.error_message||"");
   }
 
-  function navigateDir(dirPath){
-    if(!dirPath)return;
-    handleSubmit("list files in "+dirPath);
-  }
-
+  // ── Submit + Execute ──
   async function handleSubmit(text){
     if(!text?.trim())return;
-    const q=text.trim();setIntent("");
-    addMsg("user",q);
-    setLoadingPlan(true);setErrorMessage("");
+    const q=text.trim();setIntent("");addMsg("user",q);setLoadingPlan(true);setErrorMessage("");
+
+    // Agent Mode: direct tool-use loop
+    if(agentMode){
+      addMsg("system","Thinking...",{loading:true});
+      try{
+        const hist=getConversationHistory(messages);
+        const r=await runAgent(q,agentSessionId,hist);
+        setAgentSessionId(r.session_id||null);
+        setAgentEvents(r.events||[]);
+        // Check if needs confirmation
+        if(r.status==="awaiting_confirmation"&&r.confirmation){
+          setPendingConfirmation({...r.confirmation,session_id:r.session_id});
+          // Show events so far + waiting message
+          setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now(),role:"system",content:"agent_steps",meta:{agentEvents:r.events,awaiting:true},ts:new Date()};return c});
+        }else{
+          // Complete — show agent events + final text
+          const finalText=r.final_text||"Done.";
+          const hasToolCalls=(r.events||[]).some(e=>e.event==="tool_call");
+          if(hasToolCalls){
+            setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now(),role:"system",content:"agent_steps",meta:{agentEvents:r.events,finalText},ts:new Date()};return c});
+          }else{
+            setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now(),role:"system",content:finalText,meta:{},ts:new Date()};return c});
+          }
+        }
+        sessionDirtyRef.current=true;
+        // Flush session immediately so agent responses are saved
+        setTimeout(()=>flushSession(),500);
+      }catch(e){
+        const msg=e.payload?.error_message||e.message||"Agent error.";
+        setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now(),role:"system",content:msg,meta:{error:true},ts:new Date()};return c});
+        setErrorMessage(msg);
+      }finally{setLoadingPlan(false)}
+      return;
+    }
+
+    // Classic Mode: plan-then-execute
     addMsg("system","Thinking...",{loading:true});
     try{
       const hist=getConversationHistory(messages);
       const cls=await chatMessage(q,userName,hist).catch(()=>({type:"action"}));
       if(cls.type==="chat"){
-        const chatResp=cls.response||"How can I help?";
-        setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now(),role:"system",content:chatResp,meta:{},ts:new Date()};return c});
-        setSuggestedAction(null);
-        sessionDirtyRef.current=true;
-        setLoadingPlan(false);return;
+        let streamed="";
+        try{for await(const chunk of streamChat(q,userName,hist)){streamed+=chunk;setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now(),role:"system",content:streamed,meta:{},ts:new Date()};return c})}}catch{if(!streamed)streamed=cls.response||"How can I help?"}
+        if(!streamed)streamed=cls.response||"How can I help?";
+        setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now(),role:"system",content:streamed,meta:{},ts:new Date()};return c});
+        setSuggestedAction(null);sessionDirtyRef.current=true;setLoadingPlan(false);return;
       }
-      // If there's a suggested_action from a prior chat and user confirmed, use it as the intent
-      const actionIntent=(cls.suggested_action&&suggestedAction)?suggestedAction:q;
-      setSuggestedAction(null);
-      setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now()+.1,role:"system",content:"Analyzing your request...",meta:{loading:true},ts:new Date()};return c});
+      const actionIntent=(cls.suggested_action&&suggestedAction)?suggestedAction:q;setSuggestedAction(null);
+      setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now()+.1,role:"system",content:"Analyzing...",meta:{loading:true},ts:new Date()};return c});
       const r=await planIntent(actionIntent,hist);setPlan(r);setPlanValidationErrors(Array.isArray(r.errors)?r.errors:[]);setPlanExecuted(false);
       setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now(),role:"system",content:"plan",meta:{plan:r},ts:new Date()};return c});
       sessionDirtyRef.current=true;
+      if(autoExecute&&r?.steps?.length>0&&(!Array.isArray(r.errors)||r.errors.length===0)){autoExecTimerRef.current=setTimeout(()=>{autoExecTimerRef.current=null;runPlan()},800)}
     }catch(e){
       const msg=e.payload?.error_message||e.message||"Plan failed.";
       setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now(),role:"system",content:msg,meta:{error:true},ts:new Date()};return c});
@@ -169,9 +238,41 @@ export default function Workspace({ activeWorkspace, userName }) {
     }finally{setLoadingPlan(false)}
   }
 
+  // ── Agent confirmation handler ──
+  async function handleAgentConfirm(confirmationId,password){
+    if(!pendingConfirmation)return;
+    const sid=pendingConfirmation.session_id;
+    setPendingConfirmation(null);
+    addMsg("system","Continuing...",{loading:true});
+    try{
+      const r=await confirmAgentAction(sid,confirmationId,true,password);
+      setAgentEvents(r.events||[]);
+      if(r.status==="awaiting_confirmation"&&r.confirmation){
+        setPendingConfirmation({...r.confirmation,session_id:sid});
+        setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now(),role:"system",content:"agent_steps",meta:{agentEvents:r.events,awaiting:true},ts:new Date()};return c});
+      }else{
+        const finalText=r.final_text||"Done.";
+        setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now(),role:"system",content:r.events?.length>1?"agent_steps":"",meta:{agentEvents:r.events,finalText},ts:new Date()};return c});
+        if(r.events?.length<=1)setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now(),role:"system",content:finalText,meta:{},ts:new Date()};return c});
+      }
+    }catch(e){
+      setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now(),role:"system",content:e.message||"Confirmation error",meta:{error:true},ts:new Date()};return c});
+    }
+  }
+
+  function handleAgentDeny(){
+    if(!pendingConfirmation)return;
+    const sid=pendingConfirmation.session_id;
+    const cid=pendingConfirmation.confirmation_id;
+    setPendingConfirmation(null);
+    confirmAgentAction(sid,cid,false).then(r=>{
+      const finalText=r.final_text||"Action denied.";
+      setMessages(p=>[...p,{id:Date.now(),role:"system",content:finalText,meta:{},ts:new Date()}]);
+    }).catch(()=>{});
+  }
+
   async function runPlan(){
-    if(!plan?.steps?.length)return;setRunningPlan(true);setErrorMessage("");setLogs([]);
-    addMsg("system","Executing...",{executing:true});
+    if(!plan?.steps?.length)return;setRunningPlan(true);setErrorMessage("");setLogs([]);addMsg("system","Executing...",{executing:true});
     const t0=new Date().toISOString(),runs=[],agg=[],ctx={inputs:{},state:{},steps:{},runtime:{}};
     let st="running",fail=null,ec=null,em=null,fo={};
     setExecution({status:"running",current_step:plan.steps[0].step_id,started_at:t0,ended_at:null,duration_ms:0,failed_step:null,error_code:null,error_message:null,final_output:{},step_runs:[]});
@@ -193,90 +294,77 @@ export default function Workspace({ activeWorkspace, userName }) {
     const fin={status:st,current_step:fail||"",started_at:t0,ended_at:t1,duration_ms:dur,failed_step:fail,error_code:ec,error_message:em,final_output:fo,step_runs:[...runs]};
     setExecution(fin);
     setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now(),role:"system",content:"result",meta:{execution:fin},ts:new Date()};return c});
-    sessionDirtyRef.current=true;setPlanExecuted(true);
-    if(em)setErrorMessage(em);setRunningPlan(false);
+    sessionDirtyRef.current=true;setPlanExecuted(true);if(em)setErrorMessage(em);setRunningPlan(false);
   }
 
-  // Flush session after execution completes
+  // ── Effects ──
   const prevRunning=useRef(false);
   useEffect(()=>{if(prevRunning.current&&!runningPlan&&sessionDirtyRef.current)flushSession();prevRunning.current=runningPlan},[runningPlan,flushSession]);
-
-  // Flush session on page unload — only if there's a real user message
   useEffect(()=>{const h=()=>{if(!sessionDirtyRef.current)return;const hasUser=messagesRef.current.some(m=>m.role==="user"&&typeof m.content==="string"&&m.content.trim().length>0);if(hasUser)flushSession()};window.addEventListener("beforeunload",h);return()=>window.removeEventListener("beforeunload",h)},[flushSession]);
 
-  const steps=plan?.steps||[];const stepRuns=execution?.step_runs||[];
-  const hasConv=messages.length>0;
+  // ── Helpers ──
+  function renderAmbiguousContacts(errorMessage){
+    const m=errorMessage.match(/matching '([^']+)': (.+)\. Please/);if(!m)return null;
+    const names=m[2].split(", ").map(n=>n.trim()).filter(Boolean);
+    return(<div><div style={{color:"var(--warning)",fontWeight:500,marginBottom:8}}>Multiple contacts found</div><div style={{fontSize:12,color:"var(--text-dim)",marginBottom:6}}>Which one?</div>{names.map(name=><button key={name} className="conv-chip" style={{margin:"2px 0",display:"block"}} onClick={()=>handleSubmit("send whatsapp to "+name)}>{name}</button>)}</div>);
+  }
 
+  function handleNewSession(){
+    flushSession();setMessages([]);setPlan(null);setExecution(null);setErrorMessage("");setSuggestedAction(null);setPlanExecuted(false);
+    sessionDirtyRef.current=false;setCurrentSessionId("chat_"+Date.now());setActiveSessionId(null);activeSessionRef.current=null;
+  }
+
+  function handleDeleteSession(id){
+    if(!id)return;setDeletingId(id);
+    setTimeout(()=>{deleteHistoryEntry(id).then(()=>{setHistory(p=>p.filter(x=>x.id!==id));showToast("Session deleted")}).catch(()=>{showToast("Failed to delete")}).finally(()=>setDeletingId(null))},220);
+  }
+
+  function handleClearAll(){
+    clearAllMemory().catch(()=>{});setHistory([]);setMessages([]);setPlan(null);setExecution(null);setConfirmClear(false);showToast("All sessions cleared");
+  }
+
+  const stepRuns=execution?.step_runs||[];
+
+  // ── Render ──
   return (
-    <div className="conv-layout">
-      {/* SIDEBAR */}
-      <aside className="conv-sidebar">
-        <div className="conv-sidebar-header">
-          <div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:18,height:18,borderRadius:4,background:"var(--accent)"}}/><span style={{fontSize:13,fontWeight:600,color:"#f0f0f0"}}>CapOS</span></div>
-          <button onClick={()=>{flushSession();setMessages([]);setPlan(null);setExecution(null);setErrorMessage("");setSuggestedAction(null);setPlanExecuted(false);sessionDirtyRef.current=false;setCurrentSessionId("chat_"+Date.now())}} style={{width:"100%",height:30,fontSize:12,fontWeight:500,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:7,color:"var(--text-dim)",cursor:"pointer"}}>+ New session</button>
-        </div>
-        <div className="conv-sidebar-list">
-          <div style={{fontSize:10,fontWeight:600,color:"var(--text-muted)",textTransform:"uppercase",letterSpacing:"0.06em",padding:"8px 10px 4px"}}>Recent</div>
-          {history.map((h,i)=><div key={h.id||i} className={`conv-sidebar-item${deletingId===h.id?" session-fade-out":""}`} onClick={()=>restoreSession(h)}><span style={{fontSize:11,width:16,textAlign:"center",flexShrink:0}}>{(h.hasExecution||h.plan_steps||h.step_runs)?"\u26A1":"\uD83D\uDCAC"}</span><span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontSize:12}}>{h.intent?.slice(0,30)||`Session ${new Date(h.time||Date.now()).toLocaleDateString("es-CL",{day:"numeric",month:"short"})}`}</span>{h.isChat&&h.message_count>0&&<span style={{fontSize:10,color:"var(--text-muted)",flexShrink:0}}>{h.message_count}</span>}{!h.isChat&&h.duration_ms>0&&<span style={{fontSize:10,color:"var(--text-muted)",flexShrink:0}}>{h.duration_ms}ms</span>}<span className={`dot dot-${h.status==="success"?"success":"error"}`}/><button className="session-delete" onClick={e=>{e.stopPropagation();if(!h.id)return;setDeletingId(h.id);setTimeout(()=>{deleteHistoryEntry(h.id).then(()=>{setHistory(p=>p.filter(x=>x.id!==h.id));showToast("Session deleted")}).catch(()=>{showToast("Failed to delete")}).finally(()=>setDeletingId(null))},220)}}>✕</button></div>)}
-          {history.length===0&&<div style={{padding:"12px 10px",fontSize:12,color:"var(--text-muted)"}}>No sessions yet.</div>}
-        </div>
-        <div className="conv-sidebar-footer">
-          {history.length>0&&!confirmClear&&<button className="conv-sidebar-clear" onClick={()=>setConfirmClear(true)}>Clear all sessions</button>}
-          {confirmClear&&<div style={{display:"flex",gap:6,padding:"2px 10px"}}><button className="conv-sidebar-clear" style={{color:"#ff4444",flex:1}} onClick={()=>{clearAllMemory().catch(()=>{});setHistory([]);setMessages([]);setPlan(null);setExecution(null);setConfirmClear(false);showToast("All sessions cleared")}}>Confirm</button><button className="conv-sidebar-clear" style={{flex:1}} onClick={()=>setConfirmClear(false)}>Cancel</button></div>}
-          <div className="conv-sidebar-item" onClick={()=>{window.history.pushState({},"","/control-center");window.dispatchEvent(new PopStateEvent("popstate"))}}><span style={{fontSize:13}}>⚙</span><span>Control Center</span></div>
-          <div style={{display:"flex",alignItems:"center",gap:8,padding:"4px 10px"}}><div style={{width:22,height:22,borderRadius:6,background:"#1e1e2e",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:600,color:"var(--accent)"}}>{(userName||"U").charAt(0).toUpperCase()}</div><span style={{fontSize:12,color:"var(--text-dim)"}}>{userName||"User"}</span></div>
-        </div>
-      </aside>
-
-      {/* MAIN */}
+    <div className={`conv-layout${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
+      {!sidebarCollapsed && <SessionSidebar
+        history={history} wsConnected={wsConnected} userName={userName}
+        deletingId={deletingId} confirmClear={confirmClear}
+        onNewSession={handleNewSession} onRestoreSession={restoreSession}
+        onDeleteSession={handleDeleteSession} setConfirmClear={setConfirmClear}
+        onClearAll={handleClearAll} onToggleSidebar={toggleSidebar}
+      />}
+      <FileDropZone onFileDrop={(files)=>{const names=Array.from(files).map(f=>f.name).join(", ");setIntent(p=>(p?p+" ":"")+`[files: ${names}]`)}}>
       <div className="conv-main-col">
-        <div ref={threadRef} className="conv-messages">
-          <div className="conv-messages-inner">
-            {/* STATE 1: Empty */}
-            {!hasConv&&(<>
-              <div className="conv-greeting">{greeting(userName||"there")} 👋</div>
-              <div className="conv-sub">What would you like to do?</div>
-              {freqCaps.length>0&&<div className="conv-chips">{freqCaps.map(c=><button key={c} className="conv-chip" onClick={()=>handleSubmit(c.replace(/_/g," "))}>{c.replace(/_/g," ")}</button>)}</div>}
-            </>)}
-
-            {/* Conversation */}
-            {hasConv&&<div className="conv-thread" style={{paddingTop:24}}>
-              {messages.map(msg=>{
-                if(msg.role==="user")return<div key={msg.id} className="conv-msg conv-msg-user">{msg.content}</div>;
-                const m=msg.meta||{};
-                if(m.loading)return<div key={msg.id} className="conv-msg conv-msg-system"><span style={{animation:"pulse 1.5s infinite",color:"var(--text-dim)"}}>{msg.content}</span></div>;
-                if(m.error)return<div key={msg.id} className="conv-msg conv-msg-system" style={{borderColor:"rgba(255,68,68,0.15)"}}><span style={{color:"var(--error)"}}>✗ {msg.content}</span></div>;
-                if(msg.content==="plan"&&m.plan){const st=m.plan.steps||[];return<div key={msg.id} className="conv-msg conv-msg-system">
-                  <div style={{marginBottom:8,fontWeight:500}}>Here's my plan:</div>
-                  {st.map((s,i)=><div key={s.step_id} className="conv-step is-ok" style={{opacity:0.8}}><span className="conv-step-icon">{i+1}</span><span className="conv-step-name">{s.step_id} <span style={{color:"var(--text-muted)"}}>→ {s.capability}</span></span></div>)}
-                  {planValidationErrors.length>0&&<div style={{color:"var(--error)",fontSize:12,marginTop:6}}>{planValidationErrors.map(e=>e.message).join("; ")}</div>}
-                  {!planExecuted&&<button className="btn-primary" style={{marginTop:12,width:"100%",height:36,fontSize:13,borderRadius:10}} onClick={runPlan} disabled={runningPlan||!st.length}>{runningPlan?"Executing...":"Execute plan →"}</button>}
-                </div>}
-                if(m.executing){return<div key={msg.id} className="conv-msg conv-msg-system">
-                  <div style={{marginBottom:6,fontWeight:500,animation:"pulse 1.5s infinite"}}>Executing...</div>
-                  {stepRuns.map(run=>{const cls=run.status==="success"?"is-ok":run.status==="error"?"is-err":"is-run";const icon=run.status==="success"?"✓":run.status==="error"?"✗":"⟳";return<div key={run.step_id} className={`conv-step ${cls}`}><span className="conv-step-icon">{icon}</span><span className="conv-step-name">{run.step_id}</span><span className="conv-step-time">{run.capability}</span></div>})}
-                </div>}
-                if(msg.content==="result"&&m.execution){const ex=m.execution;const allRuns=ex.step_runs||[];const shownOutputs=new Set();return<div key={msg.id} className="conv-msg conv-msg-system">
-                  {ex.status==="success"?<div><div style={{color:"var(--success)",fontWeight:500,marginBottom:8}}>✓ Done in {ex.duration_ms}ms</div>{allRuns.map(r=>{const outKey=r.final_output?JSON.stringify(r.final_output):"";const isDup=outKey&&shownOutputs.has(outKey);if(outKey)shownOutputs.add(outKey);return<div key={r.step_id}><div className="conv-step is-ok"><span className="conv-step-icon">✓</span><span className="conv-step-name">{r.step_id} <span style={{color:"var(--text-muted)"}}>→ {r.capability}</span></span></div>{!isDup&&r.final_output&&Object.keys(r.final_output).length>0&&<OutputRenderer output={r.final_output} onNavigate={navigateDir}/>}</div>})}</div>
-                  :<div><div style={{color:"var(--error)",fontWeight:500,marginBottom:8}}>✗ Error in "{ex.failed_step}"</div>{(ex.step_runs||[]).map(r=><div key={r.step_id} className={`conv-step ${r.status==="success"?"is-ok":"is-err"}`}><span className="conv-step-icon">{r.status==="success"?"✓":"✗"}</span><span className="conv-step-name">{r.step_id}</span></div>)}{ex.error_message&&<div style={{color:"var(--error)",fontSize:12,marginTop:6}}>{ex.error_message}</div>}</div>}
-                </div>}
-                return<div key={msg.id} className="conv-msg conv-msg-system">{msg.content}</div>;
-              })}
-            </div>}
-          </div>
-        </div>
-
-        {/* Input */}
-        <div className="conv-input-area">
-          <form onSubmit={e=>{e.preventDefault();handleSubmit(intent)}}>
-            <div className="conv-input-wrap">
-              <input className="conv-input" value={intent} onChange={e=>setIntent(e.target.value)} placeholder={hasConv?"Ask a follow-up...":"What do you want to do?"} autoFocus/>
-              <button type="submit" className="conv-input-btn" disabled={loadingPlan||!intent.trim()}>{loadingPlan?"...":"Send"}</button>
-            </div>
-          </form>
-        </div>
+        {sidebarCollapsed && <button className="sidebar-toggle" onClick={toggleSidebar} title="Show sidebar" style={{position:"absolute",left:4,top:8,zIndex:5}}>{"\u25B6"}</button>}
+        <ChatThread
+          messages={messages} userName={userName} freqCaps={freqCaps}
+          activeSessionId={activeSessionId} planValidationErrors={planValidationErrors}
+          planExecuted={planExecuted} runningPlan={runningPlan} stepRuns={stepRuns}
+          autoExecTimerRef={autoExecTimerRef}
+          onRunPlan={()=>{if(autoExecTimerRef.current){clearTimeout(autoExecTimerRef.current);autoExecTimerRef.current=null}runPlan()}}
+          onCancelAutoExec={()=>{if(autoExecTimerRef.current){clearTimeout(autoExecTimerRef.current);autoExecTimerRef.current=null;showToast("Auto-execute cancelled")}}}
+          onSubmit={handleSubmit} onNavigateDir={p=>p&&handleSubmit("list files in "+p)}
+          renderAmbiguousContacts={renderAmbiguousContacts} threadRef={threadRef}
+          voice={voice}
+        />
+        {messages.length===0 && <QuickActionsBar freqCaps={freqCaps} onAction={(capId)=>handleSubmit(capId)}/>}
+        <ChatInput
+          intent={intent} setIntent={setIntent} onSubmit={handleSubmit}
+          loadingPlan={loadingPlan} hasConv={messages.length>0}
+          autoExecute={autoExecute} setAutoExecute={setAutoExecute}
+          agentMode={agentMode} setAgentMode={setAgentMode}
+          voice={voice}
+        />
       </div>
-      {toast&&<div style={{position:"fixed",bottom:20,left:"50%",transform:"translateX(-50%)",padding:"8px 18px",borderRadius:8,background:"#1a1a2e",border:"1px solid rgba(255,255,255,0.08)",color:"#d0d0d0",fontSize:12,zIndex:999,animation:"msg-in .2s var(--ease)"}}>{toast}</div>}
+      </FileDropZone>
+      <ToastContainer toasts={toasts} onDismiss={removeToast}/>
+      <ConfirmationModal
+        confirmation={pendingConfirmation}
+        onConfirm={handleAgentConfirm}
+        onDeny={handleAgentDeny}
+      />
     </div>
   );
 }
