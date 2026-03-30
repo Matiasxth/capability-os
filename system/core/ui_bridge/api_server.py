@@ -152,9 +152,10 @@ class CapabilityOSUIBridgeService:
         from system.plugins.channels.slack.plugin import create_plugin as slack_factory
         from system.plugins.channels.discord.plugin import create_plugin as discord_factory
         from system.plugins.channels.whatsapp.plugin import create_plugin as wsp_factory
+        from system.plugins.auth.plugin import create_plugin as auth_factory
 
         for factory in [
-            core_factory, mem_factory, cap_factory, ws_factory, agent_factory,
+            core_factory, auth_factory, mem_factory, cap_factory, ws_factory, agent_factory,
             skills_factory, browser_factory, voice_factory, mcp_factory, a2a_factory,
             growth_factory, seq_factory, sv_factory, sched_factory,
             tg_factory, slack_factory, discord_factory, wsp_factory,
@@ -212,6 +213,12 @@ class CapabilityOSUIBridgeService:
         self.agent_loop = _get(AgentLoopContract)
         self.agent_registry = _get(AgentRegistryContract)
         self.workspace_registry = _get(WorkspaceRegistryContract)
+
+        # Auth plugin alias
+        _auth = self.container.get_plugin("capos.core.auth")
+        self.user_registry = getattr(_auth, "user_registry", None) if _auth else None
+        self.jwt_service = getattr(_auth, "jwt_service", None) if _auth else None
+        self.auth_middleware = getattr(_auth, "auth_middleware", None) if _auth else None
 
         # Plugin-specific aliases for handlers that access deep attributes
         _core = self.container.get_plugin("capos.core.settings")
@@ -318,7 +325,16 @@ class CapabilityOSUIBridgeService:
             memory_handlers, integration_handlers, capability_handlers,
             growth_handlers, mcp_handlers, a2a_handlers, skill_handlers,
         )
+        from system.core.ui_bridge.handlers import auth_handlers
         r = Router()
+        # Auth
+        r.add("POST", "/auth/setup", auth_handlers.auth_setup)
+        r.add("POST", "/auth/login", auth_handlers.auth_login)
+        r.add("GET", "/auth/me", auth_handlers.auth_me)
+        r.add("GET", "/auth/users", auth_handlers.list_users)
+        r.add("POST", "/auth/users", auth_handlers.create_user)
+        r.add("PUT", "/auth/users/{user_id}", auth_handlers.update_user)
+        r.add("DELETE", "/auth/users/{user_id}", auth_handlers.delete_user)
         # System
         r.add("GET", "/status", system_handlers.get_status)
         r.add("GET", "/health", system_handlers.get_health)
@@ -507,14 +523,14 @@ class CapabilityOSUIBridgeService:
         self.capability_registry.load_from_directory(capability_dir)
         self.tool_registry.load_from_directory(tool_dir)
 
-    def handle(self, method: str, path: str, payload: dict[str, Any] | None = None) -> APIResponse:
+    def handle(self, method: str, path: str, payload: dict[str, Any] | None = None, headers: dict[str, str] | None = None) -> APIResponse:
         clean_path = urlparse(path).path.rstrip("/") or "/"
 
         # Router-based dispatch (new system — migrated routes)
         match = self._router.dispatch(method, clean_path)
         if match is not None:
             try:
-                return match.handler(self, payload, _raw_path=path, **match.params)
+                return match.handler(self, payload, _raw_path=path, _headers=headers or {}, **match.params)
             except APIRequestError as exc:
                 return APIResponse(exc.status_code, {"status": "error", "error_code": exc.error_code, "error_message": str(exc), "details": exc.details})
             except Exception as exc:
@@ -1724,6 +1740,9 @@ class CapabilityOSRequestHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         self._dispatch("POST")
 
+    def do_PUT(self) -> None:  # noqa: N802
+        self._dispatch("PUT")
+
     def do_DELETE(self) -> None:  # noqa: N802
         self._dispatch("DELETE")
 
@@ -1755,8 +1774,10 @@ class CapabilityOSRequestHandler(BaseHTTPRequestHandler):
 
         service: CapabilityOSUIBridgeService = self.server.service  # type: ignore[attr-defined]
         try:
-            payload = self._read_json_payload() if method == "POST" else None
-            response = service.handle(method, self.path, payload)
+            payload = self._read_json_payload() if method in ("POST", "PUT") else None
+            # Forward request headers so auth handlers can extract tokens
+            req_headers = {k: v for k, v in self.headers.items()}
+            response = service.handle(method, self.path, payload, headers=req_headers)
         except APIRequestError as exc:
             response = APIResponse(
                 exc.status_code,
@@ -1786,8 +1807,8 @@ class CapabilityOSRequestHandler(BaseHTTPRequestHandler):
     def _send_headers(self) -> None:
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
-        self.send_header("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        self.send_header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
 
     def _read_json_payload(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0"))

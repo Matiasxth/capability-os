@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { getMemoryPreferences, listWorkspaces } from "./api";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import ControlCenter from "./pages/ControlCenter";
 import EditorLayout from "./components/editor/EditorLayout";
+import Login from "./pages/Login";
 import Onboarding from "./pages/Onboarding";
 import Workspace from "./pages/Workspace";
 
@@ -9,9 +11,15 @@ function EditorPage({ wsId, workspaces }) {
   return <div style={{ height: "100%", overflow: "hidden" }}><EditorLayout wsId={wsId} workspaces={workspaces} /></div>;
 }
 
-function normalizePath(p) { return p.startsWith("/control-center") ? "/control-center" : p.startsWith("/editor") ? "/editor" : "/"; }
+function normalizePath(p) {
+  if (p.startsWith("/control-center")) return "/control-center";
+  if (p.startsWith("/editor")) return "/editor";
+  if (p.startsWith("/login")) return "/login";
+  return "/";
+}
 
-export default function App() {
+function AuthenticatedApp() {
+  const { user, isAuthenticated, loading: authLoading, logout } = useAuth();
   const [route, setRoute] = useState(normalizePath(window.location.pathname));
   const [apiOnline, setApiOnline] = useState(true);
   const [workspaces, setWorkspaces] = useState([]);
@@ -39,20 +47,24 @@ export default function App() {
     (async () => {
       try {
         const [prefs, ws] = await Promise.all([getMemoryPreferences(), listWorkspaces()]);
-        const name = (prefs.preferences || {}).name || localStorage.getItem("capos_username") || "";
+        const name = user?.display_name || (prefs.preferences || {}).name || localStorage.getItem("capos_username") || "";
         setUserName(name);
         if (name) localStorage.setItem("capos_username", name);
         setWorkspaces(ws.workspaces || []);
         setDefaultWsId(ws.default_id || null);
-      } catch { setUserName(""); }
+      } catch { setUserName(user?.display_name || ""); }
       setBooting(false);
     })();
-  }, []);
+  }, [user]);
 
   function navigate(path) {
     if (path !== normalizePath(window.location.pathname)) window.history.pushState({}, "", path);
     setRoute(path);
   }
+
+  // Show login if auth is required and not authenticated
+  if (authLoading) return <div style={{ minHeight: "100vh", background: "#0a0a0a" }} />;
+  if (!isAuthenticated && route === "/login") return <Login onSuccess={() => navigate("/")} />;
 
   if (booting) return <div style={{ minHeight: "100vh", background: "#0a0a0a" }} />;
   if (!userName) return <Onboarding onComplete={name => { localStorage.setItem("capos_username", name); setUserName(name); }} />;
@@ -74,11 +86,12 @@ export default function App() {
         <div className="app-header-right">
           {activeWs && <div className="ws-selector" title={activeWs.path}><span className="ws-dot" style={{ background: activeWs.color || "#00ff88" }} /><span>{activeWs.name}</span></div>}
           <div className={`dot ${apiOnline ? "dot-success" : "dot-error"}`} />
-          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#888" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#888", cursor: "pointer" }} onClick={logout} title="Logout">
             <div style={{ width: 22, height: 22, borderRadius: 6, background: "#1e1e2e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: "#00ff88" }}>
               {userName.charAt(0).toUpperCase()}
             </div>
             <span>{userName}</span>
+            {user?.role && <span style={{ fontSize: 9, opacity: 0.5 }}>{user.role}</span>}
           </div>
         </div>
       </header>
@@ -86,5 +99,13 @@ export default function App() {
         {route === "/control-center" ? <ControlCenter /> : route === "/editor" ? <EditorPage wsId={defaultWsId} workspaces={workspaces} /> : <Workspace activeWorkspace={activeWs} userName={userName} />}
       </main>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AuthenticatedApp />
+    </AuthProvider>
   );
 }
