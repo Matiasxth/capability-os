@@ -161,9 +161,8 @@ class WorkflowExecutor:
         expression = data.get("expression", "True")
         result = context["previous_results"].get(source_node)
         try:
-            safe_globals: dict[str, Any] = {"__builtins__": {}}
-            safe_locals: dict[str, Any] = {"result": result}
-            outcome = bool(eval(expression, safe_globals, safe_locals))  # noqa: S307
+            from system.core.strategy.safe_expression import safe_eval
+            outcome = bool(safe_eval(expression, {"result": result}))
         except Exception as exc:
             logger.warning("Condition expression failed: %s", exc)
             outcome = False

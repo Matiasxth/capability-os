@@ -72,6 +72,8 @@ class SecurityAuditor:
         findings.extend(self._check_exposed_keys())
         findings.extend(self._check_security_rules())
         findings.extend(self._check_log_files())
+        findings.extend(self._check_generated_code())
+        findings.extend(self._check_settings_secrets())
         self._last_audit = _now()
 
         for f in findings:
@@ -180,6 +182,66 @@ class SecurityAuditor:
                     "detail": f"{critical_count} security-related errors in recent error logs",
                     "timestamp": _now(),
                 })
+
+        return findings
+
+    def _check_generated_code(self) -> list[dict[str, Any]]:
+        """Scan auto-generated skill handler code for dangerous patterns."""
+        findings = []
+        dangerous_patterns = [
+            re.compile(r'\beval\s*\('),
+            re.compile(r'\bexec\s*\('),
+            re.compile(r'\b__import__\s*\('),
+            re.compile(r'\bos\.system\s*\('),
+            re.compile(r'\bsubprocess\.(run|call|Popen)\s*\('),
+            re.compile(r'\bopen\s*\([^)]*["\']w'),
+        ]
+
+        skills_dir = self._root / "skills"
+        if not skills_dir.exists():
+            return findings
+
+        for py_file in skills_dir.rglob("*.py"):
+            try:
+                content = py_file.read_text(encoding="utf-8", errors="replace")[:20000]
+                for pattern in dangerous_patterns:
+                    matches = pattern.findall(content)
+                    if matches:
+                        findings.append({
+                            "check": "dangerous_code",
+                            "severity": "high",
+                            "file": str(py_file.relative_to(self._root)),
+                            "detail": f"Dangerous pattern '{matches[0]}' found in auto-generated skill",
+                            "timestamp": _now(),
+                        })
+            except Exception:
+                pass
+
+        return findings
+
+    def _check_settings_secrets(self) -> list[dict[str, Any]]:
+        """Check for hardcoded secrets in settings files."""
+        findings = []
+        settings_path = self._root / "system" / "settings.json"
+
+        if not settings_path.exists():
+            return findings
+
+        try:
+            content = settings_path.read_text(encoding="utf-8", errors="replace")
+            for pattern in SECRET_PATTERNS:
+                matches = pattern.findall(content)
+                if matches:
+                    findings.append({
+                        "check": "settings_secret",
+                        "severity": "medium",
+                        "file": "system/settings.json",
+                        "detail": f"API key found in settings file — consider using environment variables",
+                        "timestamp": _now(),
+                    })
+                    break  # One finding per file is enough
+        except Exception:
+            pass
 
         return findings
 
