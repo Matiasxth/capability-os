@@ -10,67 +10,26 @@ from threading import Lock
 from typing import Any
 from urllib.parse import urlparse
 
-from system.capabilities.implementations import (
-    Phase10WhatsAppCapabilityExecutor,
-    Phase7CapabilityExecutionError,
-    Phase7CapabilityExecutor,
-)
-from system.capabilities.implementations.discord_executor import DiscordCapabilityExecutor
-from system.capabilities.implementations.slack_executor import SlackCapabilityExecutor
-from system.capabilities.implementations.telegram_executor import TelegramCapabilityExecutor
-from system.integrations.installed.discord_bot_connector import DiscordConnector, DiscordPollingWorker
-from system.integrations.installed.slack_bot_connector import SlackConnector, SlackPollingWorker
-from system.integrations.installed.telegram_bot_connector import TelegramConnector, TelegramConnectorError
-from system.capabilities.registry import CapabilityRegistry
-from system.core.capability_engine import (
-    CapabilityEngine,
-    CapabilityExecutionError,
-    CapabilityInputError,
-)
-from system.core.health import HealthService
-from system.core.interpretation import IntentInterpreter, IntentInterpreterError, LLMClient
-from system.core.a2a import A2AClient, A2AClientError, A2AServer, AgentCardBuilder, register_a2a_delegate_tool
-from system.core.memory import EmbeddingsEngine, ExecutionHistory, MarkdownMemory, MemoryCompactor, MemoryManager, SemanticMemory, UserContext, VectorStore
-from system.core.workspace import FileBrowser, PathValidator, WorkspaceContext, WorkspaceRegistry
-from system.core.metrics import MetricsCollector
+# Only imports still used by methods remaining in this file.
+# All other classes are resolved via plugins + ServiceContainer.
+from system.core.interpretation import IntentInterpreterError, LLMClient
+from system.core.a2a import A2AClient, A2AClientError, register_a2a_delegate_tool
 from system.core.observation import ObservationLogger
-from system.core.self_improvement import (
-    AutoInstallPipeline,
-    CapabilityGenerator,
-    CapabilityGeneratorError,
-    GapAnalyzer,
-    PerformanceMonitor,
-    RuntimeAnalyzer,
-    StrategyOptimizer,
-    ToolCodeGenerator,
-    ToolValidator,
-)
-from system.core.mcp import MCPClientManager, MCPToolBridge, MCPCapabilityGenerator, MCPClientError
-from system.integrations.bridge import CapabilityBridge
-from system.integrations.classifier import IntegrationClassifier
-from system.integrations.detector import IntegrationDetector
-from system.core.planning import PlanBuildError, PlanBuilder, PlanValidator
-from system.core.sequences import (
-    SequenceRegistry,
-    SequenceRunError,
-    SequenceRunner,
-    SequenceStorage,
-    SequenceStorageError,
-    SequenceValidationError,
-)
+from system.core.mcp import MCPClientError
+from system.core.planning import PlanBuildError
 from system.core.settings import SettingsService, SettingsValidationError
-from system.integrations.registry import (
-    IntegrationLoader,
-    IntegrationLoaderError,
-    IntegrationNotFoundError,
-    IntegrationRegistry,
-    IntegrationRegistryError,
-    IntegrationValidationError,
-    IntegrationValidator,
-)
 from system.shared.schema_validation import SchemaValidationError
-from system.tools.registry import ToolRegistry
-from system.tools.runtime import ToolRuntime, register_phase3_real_tools, register_phase9_browser_tools
+
+# Imports for private methods still in this file (to be fully extracted in Phase 5 completion).
+# These will be removed once the methods move to their service modules.
+from system.capabilities.implementations import Phase7CapabilityExecutionError, Phase7CapabilityExecutor
+from system.core.capability_engine import CapabilityExecutionError, CapabilityInputError
+from system.integrations.registry import (
+    IntegrationLoader, IntegrationLoaderError, IntegrationNotFoundError,
+    IntegrationRegistry, IntegrationRegistryError, IntegrationValidationError, IntegrationValidator,
+)
+from system.core.self_improvement import CapabilityGeneratorError
+from system.core.sequences import SequenceRunError, SequenceStorageError, SequenceValidationError
 
 
 @dataclass
