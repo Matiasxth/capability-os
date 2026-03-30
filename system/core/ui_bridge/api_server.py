@@ -142,6 +142,26 @@ class CapabilityOSUIBridgeService:
 
         self.tool_runtime = ToolRuntime(self.tool_registry, workspace_root=self.workspace_root)
         register_phase3_real_tools(self.tool_runtime, self.workspace_root)
+        # Register extended system tools
+        from system.tools.implementations.system_tools_extended import (
+            system_monitor_overview, system_monitor_processes,
+            package_install, package_list,
+            git_status, git_log, git_commit,
+            backup_create, backup_list,
+        )
+        for tid, fn in [
+            ("system_monitor_overview", system_monitor_overview),
+            ("system_monitor_processes", system_monitor_processes),
+            ("package_install", package_install),
+            ("package_list", package_list),
+            ("git_status", git_status),
+            ("git_log", git_log),
+            ("git_commit", git_commit),
+            ("backup_create", backup_create),
+            ("backup_list", backup_list),
+        ]:
+            self.tool_runtime.register_handler(tid, lambda p, c, ctx=None, f=fn: f(p, c))
+
         self.browser_session_manager = register_phase9_browser_tools(
             self.tool_runtime,
             self.workspace_root,
@@ -343,6 +363,7 @@ class CapabilityOSUIBridgeService:
                 self.supervisor = SupervisorDaemon(
                     project_root=self.project_root,
                     skill_creator=getattr(self, "skill_creator", None),
+                    execution_history=self.execution_history,
                     max_claude_per_hour=sv_cfg.get("max_claude_per_hour", 10),
                     health_interval_s=sv_cfg.get("health_interval_s", 60),
                 )

@@ -11,7 +11,9 @@ from typing import Any
 
 from .claude_bridge import ClaudeBridge
 from .error_interceptor import ErrorInterceptor
+from .gap_detector import GapDetector
 from .health_monitor import HealthMonitor
+from .security_auditor import SecurityAuditor
 
 
 class SupervisorDaemon:
@@ -21,6 +23,7 @@ class SupervisorDaemon:
         self,
         project_root: Path,
         skill_creator: Any = None,
+        execution_history: Any = None,
         max_claude_per_hour: int = 10,
         health_interval_s: int = 60,
     ) -> None:
@@ -31,6 +34,12 @@ class SupervisorDaemon:
             claude_bridge=self._claude,
             skill_creator=skill_creator,
         )
+        self._gap_detector = GapDetector(
+            execution_history=execution_history,
+            claude_bridge=self._claude,
+            skill_creator=skill_creator,
+        )
+        self._security_auditor = SecurityAuditor(project_root)
         self._running = False
         self._started_at: str | None = None
 
@@ -47,10 +56,12 @@ class SupervisorDaemon:
         # Subscribe error interceptor to event bus
         self._error_interceptor.subscribe(event_bus)
 
-        # Start health monitor
+        # Start all monitors
         self._health.start()
+        self._gap_detector.start()
+        self._security_auditor.start()
 
-        print(f"[SUPERVISOR] Started (claude={'available' if self._claude.available else 'not found'})", flush=True)
+        print(f"[SUPERVISOR] Started (claude={'available' if self._claude.available else 'not found'}, gap_detector=on, security=on)", flush=True)
 
     def stop(self) -> None:
         self._running = False
@@ -68,6 +79,15 @@ class SupervisorDaemon:
             "claude": {
                 "available": self._claude.available,
                 "invocations": self._claude.invocation_count,
+            },
+            "security": {
+                "status": self._security_auditor.status,
+                "findings": len(self._security_auditor.findings),
+            },
+            "gaps": {
+                "detected": len(self._gap_detector.detected_gaps),
+                "auto_created": len(self._gap_detector.auto_created),
+                "gaps": self._gap_detector.detected_gaps[-5:],
             },
             "errors": {
                 "recent": self._error_interceptor.recent_log[-10:],
