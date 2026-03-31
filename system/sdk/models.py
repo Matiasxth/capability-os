@@ -33,6 +33,13 @@ class PluginStatus(TypedDict):
     error: str | None
 
 
+class PluginHealthStatus(TypedDict):
+    """Result of a plugin health check."""
+    healthy: bool
+    message: str
+    checks: NotRequired[dict[str, bool]]
+
+
 class LLMHealth(TypedDict):
     """Health info for the LLM provider."""
     status: str           # "ready" | "not_configured" | "error"

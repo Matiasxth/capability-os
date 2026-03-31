@@ -8,7 +8,16 @@ from .context import PluginContext
 
 @runtime_checkable
 class BasePlugin(Protocol):
-    """Every plugin must implement this base interface."""
+    """Every plugin must implement this base interface.
+
+    Required: plugin_id, plugin_name, version, dependencies,
+    initialize(), start(), stop().
+
+    Optional lifecycle hooks (implement if needed):
+    - health_check() — periodic health monitoring
+    - get_state() / restore_state() — state persistence across hot-reloads
+    - on_config_changed() — react to settings changes at runtime
+    """
 
     @property
     def plugin_id(self) -> str: ...
@@ -22,6 +31,39 @@ class BasePlugin(Protocol):
     def initialize(self, ctx: PluginContext) -> None: ...
     def start(self) -> None: ...
     def stop(self) -> None: ...
+
+    # Optional hooks — default implementations provided below
+    # Plugins override these only if they need the functionality.
+
+
+class PluginLifecycleHooks:
+    """Mixin with default no-op implementations for optional lifecycle hooks.
+
+    Plugins can inherit from this to get no-op defaults::
+
+        class MyPlugin(PluginLifecycleHooks):
+            plugin_id = "my.plugin"
+            ...
+
+            def health_check(self):
+                return {"healthy": self._db.connected, "message": "DB check"}
+    """
+
+    def health_check(self) -> dict[str, Any]:
+        """Return health status. Override to add custom checks."""
+        return {"healthy": True, "message": "ok"}
+
+    def get_state(self) -> dict[str, Any]:
+        """Return serializable state for persistence across hot-reloads."""
+        return {}
+
+    def restore_state(self, state: dict[str, Any]) -> None:
+        """Restore state after a hot-reload. Called after initialize()."""
+        pass
+
+    def on_config_changed(self, new_config: dict[str, Any]) -> None:
+        """Called when plugin settings change at runtime."""
+        pass
 
 
 @runtime_checkable

@@ -240,6 +240,28 @@ class ServiceContainer:
                     logger.error(f"  Plugin [{pid}]: route registration FAILED ({exc})")
 
     # ------------------------------------------------------------------
+    # Health checks
+    # ------------------------------------------------------------------
+
+    def check_plugin_health(self, plugin_id: str) -> dict[str, Any]:
+        """Run health check on a single plugin."""
+        plugin = self._plugins.get(plugin_id)
+        if plugin is None:
+            return {"healthy": False, "message": f"Plugin '{plugin_id}' not found"}
+        if self._states.get(plugin_id) != PluginState.RUNNING:
+            return {"healthy": False, "message": f"Plugin not running (state: {self._states.get(plugin_id, '?')})"}
+        if hasattr(plugin, "health_check") and callable(plugin.health_check):
+            try:
+                return plugin.health_check()
+            except Exception as exc:
+                return {"healthy": False, "message": f"Health check failed: {exc}"}
+        return {"healthy": True, "message": "No health check declared"}
+
+    def check_all_health(self) -> dict[str, dict[str, Any]]:
+        """Run health checks on all running plugins."""
+        return {pid: self.check_plugin_health(pid) for pid in self._plugins}
+
+    # ------------------------------------------------------------------
     # Status / Debug
     # ------------------------------------------------------------------
 

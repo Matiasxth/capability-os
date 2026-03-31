@@ -22,6 +22,15 @@ def reload_plugin(container: Any, plugin_id: str) -> str | None:
     if plugin is None:
         return f"Plugin '{plugin_id}' not found"
 
+    # 0. Save state before stopping (if plugin supports it)
+    saved_state: dict = {}
+    if hasattr(plugin, "get_state") and callable(plugin.get_state):
+        try:
+            saved_state = plugin.get_state()
+            logger.info(f"Saved state for {plugin_id} ({len(saved_state)} keys)")
+        except Exception as exc:
+            logger.warning(f"get_state failed for {plugin_id}: {exc}")
+
     # 1. Stop
     try:
         if container._states.get(plugin_id) == PluginState.RUNNING:
@@ -64,6 +73,16 @@ def reload_plugin(container: Any, plugin_id: str) -> str | None:
     err = container._start_one(plugin_id)
     if err:
         return err
+
+    # 6. Restore saved state (if plugin supports it)
+    if saved_state:
+        new_plugin = container.get_plugin(plugin_id)
+        if new_plugin and hasattr(new_plugin, "restore_state") and callable(new_plugin.restore_state):
+            try:
+                new_plugin.restore_state(saved_state)
+                logger.info(f"Restored state for {plugin_id}")
+            except Exception as exc:
+                logger.warning(f"restore_state failed for {plugin_id}: {exc}")
 
     logger.info(f"Hot-reloaded plugin {plugin_id}")
     return None
