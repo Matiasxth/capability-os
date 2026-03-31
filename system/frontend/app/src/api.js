@@ -1,9 +1,17 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+
+function _authHeaders() {
+  const h = { "Content-Type": "application/json" };
+  const token = localStorage.getItem("capos_token");
+  if (token) h["Authorization"] = `Bearer ${token}`;
+  return h;
+}
 
 async function request(path, options = {}) {
+  const headers = { ..._authHeaders(), ...(options.headers || {}) };
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...options
+    ...options,
+    headers,
   });
 
   const payload = await response.json();

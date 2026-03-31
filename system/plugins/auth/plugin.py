@@ -54,6 +54,7 @@ class AuthPlugin:
 
     def register_routes(self, router) -> None:
         from system.core.ui_bridge.handlers import auth_handlers
+        router.add("GET", "/auth/status", auth_handlers.auth_status)
         router.add("POST", "/auth/setup", auth_handlers.auth_setup)
         router.add("POST", "/auth/login", auth_handlers.auth_login)
         router.add("GET", "/auth/me", auth_handlers.auth_me)

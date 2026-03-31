@@ -3,10 +3,13 @@ import FileExplorer from "./FileExplorer";
 import CodeEditor from "./CodeEditor";
 import Terminal from "./Terminal";
 
-const API = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+const API = import.meta.env.VITE_API_BASE_URL || "";
 
 async function api(path, opts = {}) {
-  const r = await fetch(`${API}${path}`, { headers: { "Content-Type": "application/json" }, ...opts });
+  const h = { "Content-Type": "application/json" };
+  const token = localStorage.getItem("capos_token");
+  if (token) h["Authorization"] = `Bearer ${token}`;
+  const r = await fetch(`${API}${path}`, { headers: h, ...opts });
   return r.json();
 }
 

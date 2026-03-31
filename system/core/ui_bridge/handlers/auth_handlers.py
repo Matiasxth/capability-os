@@ -101,6 +101,21 @@ def auth_setup(service: Any, payload: Any, **kw: Any):
 
 
 # ======================================================================
+# GET /auth/status — check if owner exists (public, no auth required)
+# ======================================================================
+
+def auth_status(service: Any, payload: Any, **kw: Any):
+    from system.core.ui_bridge.api_server import APIResponse
+    try:
+        plugin = _get_auth_plugin(service)
+        users = plugin.user_registry.list_users()
+        owner_exists = any(u.get("role") == "owner" for u in users)
+        return APIResponse(HTTPStatus.OK, {"owner_exists": owner_exists, "user_count": len(users)})
+    except Exception:
+        return APIResponse(HTTPStatus.OK, {"owner_exists": False, "user_count": 0})
+
+
+# ======================================================================
 # POST /auth/login
 # ======================================================================
 

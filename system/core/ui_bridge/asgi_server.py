@@ -63,15 +63,20 @@ class CapOSASGI:
             await self._handle_sse(path, body, send)
             return
 
+        # Extract request headers from ASGI scope
+        req_headers = {}
+        for key, value in scope.get("headers", []):
+            req_headers[key.decode("latin-1").lower()] = value.decode("latin-1")
+
         # API route
         if self._is_api_path(path):
-            await self._handle_api(method, path, raw_path, body, send)
+            await self._handle_api(method, path, raw_path, body, send, headers=req_headers)
             return
 
         # Static file serving
         await self._serve_static(path, send)
 
-    async def _handle_api(self, method: str, path: str, raw_path: str, body: bytes, send: Any) -> None:
+    async def _handle_api(self, method: str, path: str, raw_path: str, body: bytes, send: Any, headers: dict[str, str] | None = None) -> None:
         """Dispatch to sync handlers via thread pool."""
         payload = None
         if body:
@@ -80,17 +85,18 @@ class CapOSASGI:
             except (json.JSONDecodeError, UnicodeDecodeError):
                 payload = None
 
+        req_headers = headers or {}
         loop = asyncio.get_event_loop()
         try:
             response = await loop.run_in_executor(
                 _executor,
-                lambda: self._dispatch_sync(method, path, raw_path, payload),
+                lambda: self._dispatch_sync(method, path, raw_path, payload, req_headers),
             )
             await self._send_json(send, response.status_code, response.payload)
         except Exception as exc:
             await self._send_json(send, 500, {"error": str(exc)})
 
-    def _dispatch_sync(self, method: str, path: str, raw_path: str, payload: Any) -> Any:
+    def _dispatch_sync(self, method: str, path: str, raw_path: str, payload: Any, headers: dict[str, str] | None = None) -> Any:
         """Run the existing router dispatch synchronously."""
         from system.core.ui_bridge.api_server import APIResponse, APIRequestError
 
@@ -99,7 +105,7 @@ class CapOSASGI:
             return APIResponse(404, {"error": "Not found", "path": path})
 
         try:
-            return match.handler(self.service, payload, _raw_path=raw_path, **match.params)
+            return match.handler(self.service, payload, _raw_path=raw_path, _headers=headers or {}, **match.params)
         except APIRequestError as exc:
             return APIResponse(exc.status_code, {
                 "error_code": exc.error_code,

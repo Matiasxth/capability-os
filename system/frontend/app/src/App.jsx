@@ -66,7 +66,7 @@ function AuthenticatedApp() {
 
   // Show login if auth is required and not authenticated
   if (authLoading) return <div style={{ minHeight: "100vh", background: "#0a0a0a" }} />;
-  if (!isAuthenticated && route === "/login") return <Login onSuccess={() => navigate("/")} />;
+  if (!isAuthenticated) return <Login onSuccess={() => { window.location.reload(); }} />;
 
   if (booting) return <div style={{ minHeight: "100vh", background: "#0a0a0a" }} />;
   if (!userName) return <Onboarding onComplete={name => { localStorage.setItem("capos_username", name); setUserName(name); }} />;
