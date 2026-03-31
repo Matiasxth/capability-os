@@ -5,5 +5,10 @@
   "dependencies": [
     "capos.core.settings"
   ],
-  "entry_point": "plugin:create_plugin"
+  "entry_point": "plugin:create_plugin",
+  "permissions": [
+    "browser.*",
+    "tools.register"
+  ],
+  "tags": ["builtin"]
 }

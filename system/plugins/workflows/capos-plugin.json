@@ -5,5 +5,20 @@
   "dependencies": [
     "capos.core.settings"
   ],
-  "entry_point": "plugin:create_plugin"
+  "entry_point": "plugin:create_plugin",
+  "permissions": [
+    "workflows.*",
+    "tools.execute",
+    "agents.execute",
+    "filesystem.read",
+    "filesystem.write"
+  ],
+  "provided_services": [
+    "WorkflowRegistryContract",
+    "WorkflowExecutorContract"
+  ],
+  "events_emitted": [
+    "workflow_step"
+  ],
+  "tags": ["builtin"]
 }

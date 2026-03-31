@@ -6,5 +6,18 @@
     "capos.core.settings",
     "capos.core.agent"
   ],
-  "entry_point": "plugin:create_plugin"
+  "entry_point": "plugin:create_plugin",
+  "permissions": [
+    "scheduler.*",
+    "agents.execute",
+    "event_bus.emit"
+  ],
+  "provided_services": [
+    "TaskQueueContract",
+    "SchedulerContract"
+  ],
+  "events_emitted": [
+    "scheduler_cycle"
+  ],
+  "tags": ["builtin"]
 }

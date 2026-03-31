@@ -5,5 +5,14 @@
   "dependencies": [
     "capos.core.settings"
   ],
-  "entry_point": "plugin:create_plugin"
+  "entry_point": "plugin:create_plugin",
+  "permissions": [
+    "a2a.*",
+    "capabilities.execute",
+    "network.http"
+  ],
+  "events_emitted": [
+    "a2a_changed"
+  ],
+  "tags": ["builtin"]
 }

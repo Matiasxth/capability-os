@@ -5,5 +5,11 @@
   "dependencies": [
     "capos.core.settings"
   ],
-  "entry_point": "plugin:create_plugin"
+  "entry_point": "plugin:create_plugin",
+  "permissions": [
+    "voice.transcribe",
+    "voice.synthesize",
+    "network.http"
+  ],
+  "tags": ["builtin"]
 }

@@ -5,5 +5,16 @@
   "dependencies": [
     "capos.core.settings"
   ],
-  "entry_point": "plugin:create_plugin"
+  "entry_point": "plugin:create_plugin",
+  "permissions": [
+    "network.http",
+    "browser.navigate",
+    "event_bus.emit",
+    "agents.execute",
+    "capabilities.execute"
+  ],
+  "events_emitted": [
+    "whatsapp_message"
+  ],
+  "tags": ["builtin", "channel"]
 }

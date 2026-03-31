@@ -21,6 +21,20 @@ class PluginManifest:
     auto_start: bool = True
     sdk_min_version: str = ""
 
+    # v2 — permissions & capabilities
+    permissions: list[str] = field(default_factory=list)
+    required_services: list[str] = field(default_factory=list)
+    provided_services: list[str] = field(default_factory=list)
+    events_emitted: list[str] = field(default_factory=list)
+    events_consumed: list[str] = field(default_factory=list)
+    config_schema: dict[str, Any] = field(default_factory=dict)
+
+    # v2 — marketplace metadata
+    license: str = ""
+    homepage: str = ""
+    tags: list[str] = field(default_factory=list)
+    optional_dependencies: list[str] = field(default_factory=list)
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> PluginManifest:
         return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})

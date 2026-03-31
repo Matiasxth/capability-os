@@ -5,5 +5,18 @@
   "dependencies": [
     "capos.core.settings"
   ],
-  "entry_point": "plugin:create_plugin"
+  "entry_point": "plugin:create_plugin",
+  "permissions": [
+    "mcp.*",
+    "tools.register",
+    "capabilities.register",
+    "network.http"
+  ],
+  "provided_services": [
+    "MCPClientManagerContract"
+  ],
+  "events_emitted": [
+    "mcp_changed"
+  ],
+  "tags": ["builtin"]
 }

@@ -3,5 +3,22 @@
   "name": "Core Services",
   "version": "1.0.0",
   "dependencies": [],
-  "entry_point": "plugin:create_plugin"
+  "entry_point": "plugin:create_plugin",
+  "permissions": [
+    "settings.read",
+    "settings.write",
+    "tools.register",
+    "capabilities.register",
+    "filesystem.read"
+  ],
+  "provided_services": [
+    "SettingsProvider",
+    "ToolRegistryContract",
+    "ToolRuntimeContract",
+    "CapabilityRegistryContract",
+    "SecurityServiceContract",
+    "HealthServiceContract",
+    "MetricsCollectorContract"
+  ],
+  "tags": ["builtin", "core"]
 }

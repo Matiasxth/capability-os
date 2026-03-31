@@ -5,5 +5,16 @@
   "dependencies": [
     "capos.core.settings"
   ],
-  "entry_point": "plugin:create_plugin"
+  "entry_point": "plugin:create_plugin",
+  "permissions": [
+    "settings.read",
+    "filesystem.read"
+  ],
+  "provided_services": [
+    "IntegrationRegistryContract"
+  ],
+  "events_emitted": [
+    "integration_changed"
+  ],
+  "tags": ["builtin"]
 }

@@ -5,5 +5,16 @@
   "dependencies": [
     "capos.core.settings"
   ],
-  "entry_point": "plugin:create_plugin"
+  "entry_point": "plugin:create_plugin",
+  "permissions": [
+    "capabilities.read",
+    "capabilities.execute",
+    "settings.read"
+  ],
+  "provided_services": [
+    "LLMClientContract",
+    "IntentInterpreterContract",
+    "CapabilityEngineContract"
+  ],
+  "tags": ["builtin", "core"]
 }

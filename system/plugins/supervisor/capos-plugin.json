@@ -6,5 +6,20 @@
     "capos.core.settings",
     "capos.core.agent"
   ],
-  "entry_point": "plugin:create_plugin"
+  "entry_point": "plugin:create_plugin",
+  "permissions": [
+    "supervisor.*",
+    "agents.execute",
+    "tools.register",
+    "filesystem.read",
+    "filesystem.write"
+  ],
+  "provided_services": [
+    "SupervisorDaemonContract"
+  ],
+  "events_emitted": [
+    "supervisor_alert",
+    "supervisor_action"
+  ],
+  "tags": ["builtin", "core"]
 }

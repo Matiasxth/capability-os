@@ -5,5 +5,11 @@
   "dependencies": [
     "capos.core.settings"
   ],
-  "entry_point": "plugin:create_plugin"
+  "entry_point": "plugin:create_plugin",
+  "permissions": [
+    "capabilities.execute",
+    "filesystem.read",
+    "filesystem.write"
+  ],
+  "tags": ["builtin"]
 }

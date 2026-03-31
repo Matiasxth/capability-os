@@ -5,5 +5,17 @@
   "dependencies": [
     "capos.core.settings"
   ],
-  "entry_point": "plugin:create_plugin"
+  "entry_point": "plugin:create_plugin",
+  "permissions": [
+    "tools.register",
+    "filesystem.read",
+    "filesystem.write"
+  ],
+  "provided_services": [
+    "SkillRegistryContract"
+  ],
+  "events_emitted": [
+    "skill_created"
+  ],
+  "tags": ["builtin"]
 }

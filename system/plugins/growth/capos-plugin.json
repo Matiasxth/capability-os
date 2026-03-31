@@ -6,5 +6,15 @@
     "capos.core.settings",
     "capos.core.capabilities"
   ],
-  "entry_point": "plugin:create_plugin"
+  "entry_point": "plugin:create_plugin",
+  "permissions": [
+    "capabilities.register",
+    "tools.register",
+    "execution.subprocess",
+    "filesystem.write"
+  ],
+  "events_emitted": [
+    "growth_update"
+  ],
+  "tags": ["builtin"]
 }

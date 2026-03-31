@@ -5,5 +5,24 @@
   "dependencies": [
     "capos.core.settings"
   ],
-  "entry_point": "plugin:create_plugin"
+  "entry_point": "plugin:create_plugin",
+  "permissions": [
+    "memory.read",
+    "memory.write",
+    "memory.semantic",
+    "memory.markdown",
+    "filesystem.read",
+    "filesystem.write"
+  ],
+  "provided_services": [
+    "ExecutionHistoryContract",
+    "MemoryManagerContract",
+    "SemanticMemoryContract",
+    "MarkdownMemoryContract"
+  ],
+  "events_emitted": [
+    "memory_cleared",
+    "preferences_updated"
+  ],
+  "tags": ["builtin", "core"]
 }

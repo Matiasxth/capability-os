@@ -5,5 +5,17 @@
   "dependencies": [
     "capos.core.settings"
   ],
-  "entry_point": "plugin:create_plugin"
+  "entry_point": "plugin:create_plugin",
+  "permissions": [
+    "workspaces.read",
+    "workspaces.write",
+    "filesystem.read"
+  ],
+  "provided_services": [
+    "WorkspaceRegistryContract"
+  ],
+  "events_emitted": [
+    "workspace_changed"
+  ],
+  "tags": ["builtin", "core"]
 }
