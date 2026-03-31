@@ -11,7 +11,7 @@ __pycache__/
 .tmp_tests/
 tests/unit/.tmp_runtime/
 artifacts/
-workspace/
+/workspace/
 errors/
 
 # Settings with secrets
