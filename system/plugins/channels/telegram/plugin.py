@@ -20,6 +20,7 @@ class TelegramChannelPlugin:
         self.connector = None
         self.executor = None
         self.polling_worker = None
+        self._worker_process = None
         self._settings: dict[str, Any] = {}
         self._ctx: Any = None
 
@@ -57,12 +58,29 @@ class TelegramChannelPlugin:
         router.add("GET", "/integrations/telegram/polling/status", integration_handlers.telegram_polling_status)
 
     def start(self) -> None:
+        if not self._settings.get("polling_enabled", False):
+            return
+
+        # Try Redis worker first (separate process, non-blocking)
+        try:
+            from system.infrastructure.message_queue import create_queue
+            queue = create_queue(self._ctx.plugin_settings("capos.core.settings") if self._ctx else {})
+            if queue.is_redis:
+                from system.infrastructure.worker_process import WorkerProcess
+                self._worker_process = WorkerProcess(
+                    name="telegram_worker",
+                    queue=queue,
+                    script="system/workers/telegram_worker.py",
+                )
+                self._worker_process.start()
+                return
+        except Exception:
+            pass
+
+        # Fallback: in-process thread (original behavior)
         from system.integrations.installed.telegram_bot_connector.connector import (
             TelegramPollingWorker,
         )
-
-        if not self._settings.get("polling_enabled", False):
-            return
 
         interpreter = self._ctx.get_optional(IntentInterpreterContract)
         engine = self._ctx.get_optional(CapabilityEngineContract)
@@ -83,6 +101,9 @@ class TelegramChannelPlugin:
         self.polling_worker.start()
 
     def stop(self) -> None:
+        if self._worker_process is not None:
+            self._worker_process.stop()
+            self._worker_process = None
         if self.polling_worker is not None:
             self.polling_worker.stop()
 
