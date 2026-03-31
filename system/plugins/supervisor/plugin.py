@@ -33,6 +33,7 @@ class SupervisorPlugin:
         self.supervisor: Any = None
         self.skill_creator: Any = None
         self._event_bus: Any = None
+        self._worker_process: Any = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -90,15 +91,34 @@ class SupervisorPlugin:
 
     def start(self) -> None:
         """Start the supervisor daemon."""
+        # Try Redis worker first
+        try:
+            from system.infrastructure.message_queue import create_queue
+            queue = create_queue({})
+            if queue.is_redis:
+                from system.infrastructure.worker_process import WorkerProcess
+                self._worker_process = WorkerProcess(
+                    name="supervisor_worker", queue=queue, script="system/workers/supervisor_worker.py",
+                )
+                self._worker_process.start()
+                logger.info("Supervisor started as Redis worker")
+                return
+        except Exception:
+            pass
+
+        # Fallback: in-process threads
         if self.supervisor is not None:
             try:
                 self.supervisor.start(self._event_bus)
-                logger.info("SupervisorDaemon started")
+                logger.info("SupervisorDaemon started (in-process)")
             except Exception:
                 logger.exception("Failed to start SupervisorDaemon")
 
     def stop(self) -> None:
         """Stop the supervisor daemon."""
+        if self._worker_process is not None:
+            self._worker_process.stop()
+            self._worker_process = None
         if self.supervisor is not None:
             try:
                 self.supervisor.stop()

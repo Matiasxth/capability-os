@@ -27,6 +27,7 @@ class SchedulerPlugin:
     def __init__(self) -> None:
         self.task_queue: Any = None
         self.scheduler: Any = None
+        self._worker_process: Any = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -100,15 +101,34 @@ class SchedulerPlugin:
 
     def start(self) -> None:
         """Start the proactive scheduler."""
+        # Try Redis worker first
+        try:
+            from system.infrastructure.message_queue import create_queue
+            queue = create_queue({})
+            if queue.is_redis:
+                from system.infrastructure.worker_process import WorkerProcess
+                self._worker_process = WorkerProcess(
+                    name="scheduler_worker", queue=queue, script="system/workers/scheduler_worker.py",
+                )
+                self._worker_process.start()
+                logger.info("Scheduler started as Redis worker")
+                return
+        except Exception:
+            pass
+
+        # Fallback: in-process threads (original behavior)
         if self.scheduler is not None:
             try:
                 self.scheduler.start()
-                logger.info("ProactiveScheduler started")
+                logger.info("ProactiveScheduler started (in-process)")
             except Exception:
                 logger.exception("Failed to start ProactiveScheduler")
 
     def stop(self) -> None:
         """Stop the proactive scheduler."""
+        if self._worker_process is not None:
+            self._worker_process.stop()
+            self._worker_process = None
         if self.scheduler is not None:
             try:
                 self.scheduler.stop()
