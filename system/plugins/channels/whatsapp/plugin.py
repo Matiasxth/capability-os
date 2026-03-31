@@ -28,6 +28,7 @@ class WhatsAppChannelPlugin:
         self.connector = None       # WhatsAppBackendManager
         self.executor = None        # Phase10WhatsAppCapabilityExecutor
         self.polling_worker = None  # WhatsAppReplyWorker
+        self._worker_process = None
         self._settings: dict[str, Any] = {}
         self._ctx: Any = None
 
@@ -107,13 +108,27 @@ class WhatsAppChannelPlugin:
         router.add("GET", "/integrations/whatsapp/reply-status", integration_handlers.whatsapp_reply_status)
 
     def start(self) -> None:
+        # Try Redis worker first (reply processing in separate process)
+        try:
+            from system.infrastructure.message_queue import create_queue
+            queue = create_queue(self._ctx.plugin_settings("capos.core.settings") if self._ctx else {})
+            if queue.is_redis:
+                from system.infrastructure.worker_process import WorkerProcess
+                self._worker_process = WorkerProcess(
+                    name="whatsapp_worker", queue=queue, script="system/workers/whatsapp_worker.py",
+                )
+                self._worker_process.start()
+                return
+        except Exception:
+            pass
+
+        # Fallback: in-process reply worker (original behavior)
         from system.integrations.installed.whatsapp_web_connector.whatsapp_reply_worker import (
             WhatsAppReplyWorker,
         )
 
         interpreter = self._ctx.get_optional(IntentInterpreterContract)
         if interpreter is None:
-            # Cannot start reply worker without an interpreter
             return
 
         engine = self._ctx.get_optional(CapabilityEngineContract)
@@ -135,6 +150,9 @@ class WhatsAppChannelPlugin:
         self.polling_worker.start()
 
     def stop(self) -> None:
+        if self._worker_process is not None:
+            self._worker_process.stop()
+            self._worker_process = None
         if self.polling_worker is not None:
             self.polling_worker.stop()
         if self.connector is not None:
