@@ -2,7 +2,7 @@ import { get, post, put, del } from "../client.js";
 
 export const auth = {
   status: () => get("/auth/status"),
-  setup: (username, password) => post("/auth/setup", { username, password }),
+  setup: (username, password, displayName) => post("/auth/setup", { username, password, display_name: displayName || username }),
   login: (username, password) => post("/auth/login", { username, password }),
   me: () => get("/auth/me"),
   listUsers: () => get("/auth/users"),

@@ -51,7 +51,7 @@ export default function Login() {
     setError("");
     setBusy(true);
     try {
-      await sdk.auth.setup(username.trim(), password);
+      await sdk.auth.setup(username.trim(), password, displayName.trim());
       // Auto-login after setup
       await login(username.trim(), password);
       window.location.replace("/");
