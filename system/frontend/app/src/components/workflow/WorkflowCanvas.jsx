@@ -32,6 +32,7 @@ export default function WorkflowCanvas({
   onEdgesChange,
   onConnect,
   onNodeSelect,
+  onAddNode,
 }) {
   const wrapperRef = useRef(null);
   const rfRef = useRef(null);
@@ -70,9 +71,9 @@ export default function WorkflowCanvas({
         data: { label: DEFAULT_LABELS[type] || type },
       };
 
-      onNodesChange([{ type: "add", item: newNode }]);
+      onAddNode(newNode);
     },
-    [onNodesChange]
+    [onAddNode]
   );
 
   const onNodeClick = useCallback(

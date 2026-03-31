@@ -275,6 +275,7 @@ export default function WorkflowEditor() {
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}
                 onNodeSelect={setSelectedNode}
+                onAddNode={(node) => setNodes((prev) => [...prev, node])}
               />
             ) : (
               <div className="wf-empty-canvas">
