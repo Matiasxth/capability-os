@@ -71,10 +71,12 @@ class PolicyEngine:
         self,
         rules: list[PolicyRule] | None = None,
         default_effect: str = "deny",
+        audit_logger: Any = None,
     ) -> None:
         self._rules = sorted(rules or [], key=lambda r: -r.get("priority", 0))
         self._default = default_effect
         self._audit_log: list[dict[str, Any]] = []
+        self._audit_logger = audit_logger
 
     # ------------------------------------------------------------------
     # Loading
@@ -261,8 +263,8 @@ class PolicyEngine:
         user_role: str,
         decision: PolicyDecision,
     ) -> None:
-        """Record an audit entry."""
-        self._audit_log.append({
+        """Record an audit entry to both internal log and external AuditLogger."""
+        entry = {
             "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "permission": permission,
             "plugin_id": plugin_id,
@@ -270,6 +272,21 @@ class PolicyEngine:
             "allowed": decision["allowed"],
             "rule_id": decision["rule_id"],
             "reason": decision["reason"],
-        })
+        }
+        self._audit_log.append(entry)
         if len(self._audit_log) > 5000:
             self._audit_log = self._audit_log[-2500:]
+
+        # Forward to AuditLogger if available
+        if self._audit_logger is not None:
+            try:
+                self._audit_logger.log_policy_decision(
+                    permission=permission,
+                    plugin_id=plugin_id,
+                    user_role=user_role,
+                    allowed=decision["allowed"],
+                    rule_id=decision.get("rule_id", ""),
+                    reason=decision.get("reason", ""),
+                )
+            except Exception:
+                pass

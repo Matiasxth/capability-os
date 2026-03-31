@@ -81,10 +81,13 @@ class CapabilityOSUIBridgeService:
         self.settings_service = SettingsService(self.workspace_root)
         runtime_settings = self.settings_service.load_settings()
 
-        # ── Load policy engine ──
+        # ── Load audit logger + policy engine ──
+        from system.sdk.audit import AuditLogger
         from system.sdk.policy import PolicyEngine
+        self.audit_logger = AuditLogger()
         policies_path = self.project_root / "system" / "core" / "security" / "policies.json"
         policy_engine = PolicyEngine.from_file(policies_path)
+        policy_engine._audit_logger = self.audit_logger
 
         # ── Initialize ServiceContainer with all plugins ──
         from system.container import ServiceContainer
