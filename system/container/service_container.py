@@ -27,12 +27,14 @@ class ServiceContainer:
         settings: dict[str, Any],
         event_bus: Any,
         strict_contracts: bool = False,
+        policy_engine: Any = None,
     ) -> None:
         self._workspace_root = Path(workspace_root).resolve()
         self._project_root = Path(project_root).resolve()
         self._settings = settings
         self._event_bus = event_bus
         self._strict = strict_contracts
+        self._policy_engine = policy_engine
 
         self._plugins: dict[str, Any] = {}
         self._manifests: dict[str, PluginManifest] = {}
@@ -142,6 +144,10 @@ class ServiceContainer:
         plugin = self._plugins[pid]
         self._states[pid] = PluginState.INITIALIZING
         try:
+            # Resolve plugin tags from manifest for policy enforcement
+            manifest = self._manifests.get(pid)
+            plugin_tags = manifest.tags if manifest and hasattr(manifest, "tags") else []
+
             ctx = PluginContext(
                 workspace_root=self._workspace_root,
                 project_root=self._project_root,
@@ -149,6 +155,9 @@ class ServiceContainer:
                 service_getter=self.get_service,
                 service_registrar=self.register_service,
                 event_bus=self._event_bus,
+                policy_engine=self._policy_engine,
+                plugin_id=pid,
+                plugin_tags=plugin_tags,
             )
             plugin.initialize(ctx)
             self._states[pid] = PluginState.INITIALIZED

@@ -81,6 +81,11 @@ class CapabilityOSUIBridgeService:
         self.settings_service = SettingsService(self.workspace_root)
         runtime_settings = self.settings_service.load_settings()
 
+        # ── Load policy engine ──
+        from system.sdk.policy import PolicyEngine
+        policies_path = self.project_root / "system" / "core" / "security" / "policies.json"
+        policy_engine = PolicyEngine.from_file(policies_path)
+
         # ── Initialize ServiceContainer with all plugins ──
         from system.container import ServiceContainer
         from system.core.ui_bridge.event_bus import event_bus
@@ -90,7 +95,9 @@ class CapabilityOSUIBridgeService:
             project_root=self.project_root,
             settings=runtime_settings,
             event_bus=event_bus,
+            policy_engine=policy_engine,
         )
+        self.policy_engine = policy_engine
 
         # Auto-discover and register all plugins from system/plugins/
         from system.container.plugin_loader import PluginLoader

@@ -83,6 +83,16 @@ class PluginDependencyError(SDKError):
 # Tool execution
 # ---------------------------------------------------------------------------
 
+class PermissionDeniedError(SDKError):
+    """Plugin attempted an action it doesn't have permission for."""
+
+    def __init__(self, plugin_id: str, permission: str, reason: str = ""):
+        self.plugin_id = plugin_id
+        self.permission = permission
+        self.reason = reason
+        super().__init__(f"Plugin '{plugin_id}' denied '{permission}'" + (f": {reason}" if reason else ""))
+
+
 class ToolExecutionSDKError(SDKError):
     """Tool execution failed with structured context."""
 

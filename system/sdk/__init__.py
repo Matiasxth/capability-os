@@ -8,4 +8,4 @@ from .plugin_types import BasePlugin, ToolPlugin, ChannelPlugin, MemoryPlugin, A
 from .lifecycle import PluginState
 from .context import PluginContext
 from .manifest import PluginManifest
-from .errors import SDKError, ServiceNotFoundError, ContractViolationError
+from .errors import SDKError, ServiceNotFoundError, ContractViolationError, PermissionDeniedError
