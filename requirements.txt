@@ -6,8 +6,8 @@ uvicorn>=0.29
 pytest>=7.4
 pytest-cov>=4.0
 
-# Optional — accelerated vector search (falls back to JSON without it)
-# sqlite-vec>=0.1
+# Accelerated vector search (100x faster semantic memory)
+sqlite-vec>=0.1
 
 # Optional — browser automation (only needed for browser tools)
 # playwright>=1.40
