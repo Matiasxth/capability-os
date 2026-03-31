@@ -47,6 +47,8 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(() => {
     sdk.session.clearToken();
+    sdk.session.clearChatMessages();
+    localStorage.removeItem("capos_username");
     setToken(null);
     setUser(null);
     window.location.replace("/login");

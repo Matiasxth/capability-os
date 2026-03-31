@@ -1,9 +1,12 @@
-import { get, post, put, del } from "../client.js";
+import { get, post, put, del, publicGet, publicPost } from "../client.js";
 
 export const auth = {
-  status: () => get("/auth/status"),
-  setup: (username, password, displayName) => post("/auth/setup", { username, password, display_name: displayName || username }),
-  login: (username, password) => post("/auth/login", { username, password }),
+  // Public endpoints (no token, no 401 redirect)
+  status: () => publicGet("/auth/status"),
+  setup: (username, password, displayName) => publicPost("/auth/setup", { username, password, display_name: displayName || username }),
+  login: (username, password) => publicPost("/auth/login", { username, password }),
+
+  // Authenticated endpoints
   me: () => get("/auth/me"),
   listUsers: () => get("/auth/users"),
   createUser: (user) => post("/auth/users", user),

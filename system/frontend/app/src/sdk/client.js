@@ -34,7 +34,10 @@ export async function request(method, path, body, options = {}) {
 
   if (response.status === 401) {
     clearToken();
-    window.location.replace("/login");
+    // Only redirect if not already on login page (prevents loop)
+    if (!window.location.pathname.startsWith("/login")) {
+      window.location.replace("/login");
+    }
     throw new Error("Session expired");
   }
 
@@ -54,6 +57,29 @@ export const post = (path, body, opts) => request("POST", path, body, opts);
 export const put = (path, body, opts) => request("PUT", path, body, opts);
 export const del = (path, opts) => request("DELETE", path, undefined, opts);
 export const delWithBody = (path, body, opts) => request("DELETE", path, body, opts);
+
+/**
+ * Public request — no auth header, no 401 redirect.
+ * Use for /auth/status, /auth/login, /auth/setup.
+ */
+export async function publicRequest(method, path, body) {
+  const headers = { "Content-Type": "application/json" };
+  const fetchOpts = { method, headers };
+  if (body !== undefined) {
+    fetchOpts.body = typeof body === "string" ? body : JSON.stringify(body);
+  }
+  const response = await fetch(`${BASE_URL}${path}`, fetchOpts);
+  const payload = await response.json();
+  if (!response.ok) {
+    const error = new Error(payload.error_message || payload.detail || "Request failed.");
+    error.payload = payload;
+    error.status = response.status;
+    throw error;
+  }
+  return payload;
+}
+export const publicGet = (path) => publicRequest("GET", path);
+export const publicPost = (path, body) => publicRequest("POST", path, body);
 
 /**
  * Unified SSE (Server-Sent Events) streaming parser.

@@ -33,6 +33,7 @@ function AuthenticatedApp() {
   const [booting, setBooting] = useState(true);
   const [ncOpen, setNcOpen] = useState(false);
   const [ncEvents, setNcEvents] = useState([]);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   // Listen for real-time events via SDK event bus + push notifications
   useEffect(() => {
@@ -117,12 +118,26 @@ function AuthenticatedApp() {
             {ncEvents.length > 0 && <span style={{position:"absolute",top:0,right:0,width:6,height:6,borderRadius:"50%",background:"var(--accent)"}} />}
           </button>
           <div className={`dot ${apiOnline ? "dot-success" : "dot-error"}`} />
-          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#888", cursor: "pointer" }} onClick={logout} title="Logout">
-            <div style={{ width: 22, height: 22, borderRadius: 6, background: "#1e1e2e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: "#00ff88" }}>
-              {userName.charAt(0).toUpperCase()}
+          <div style={{ position: "relative" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#888", cursor: "pointer" }} onClick={() => setUserMenuOpen(p => !p)}>
+              <div style={{ width: 22, height: 22, borderRadius: 6, background: "#1e1e2e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: "#00ff88" }}>
+                {userName.charAt(0).toUpperCase()}
+              </div>
+              <span>{userName}</span>
+              {user?.role && <span style={{ fontSize: 9, opacity: 0.5 }}>{user.role}</span>}
             </div>
-            <span>{userName}</span>
-            {user?.role && <span style={{ fontSize: 9, opacity: 0.5 }}>{user.role}</span>}
+            {userMenuOpen && <>
+              <div style={{ position: "fixed", inset: 0, zIndex: 998 }} onClick={() => setUserMenuOpen(false)} />
+              <div style={{ position: "absolute", top: "100%", right: 0, marginTop: 6, background: "var(--bg-elevated, #1a1a2e)", border: "1px solid var(--border, #333)", borderRadius: 8, padding: 4, minWidth: 160, zIndex: 999, boxShadow: "0 8px 24px rgba(0,0,0,0.5)" }}>
+                <div style={{ padding: "8px 12px", fontSize: 11, color: "var(--text-dim, #888)", borderBottom: "1px solid var(--border, #333)" }}>
+                  <div style={{ fontWeight: 600, color: "var(--text, #eee)" }}>{userName}</div>
+                  <div style={{ marginTop: 2 }}>{user?.role || "user"}</div>
+                </div>
+                <button onClick={() => { setUserMenuOpen(false); logout(); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 12px", fontSize: 11, background: "none", border: "none", color: "var(--error, #ff4444)", cursor: "pointer", borderRadius: 4, textAlign: "left" }} onMouseEnter={e => e.target.style.background = "rgba(255,68,68,0.1)"} onMouseLeave={e => e.target.style.background = "none"}>
+                  Logout
+                </button>
+              </div>
+            </>}
           </div>
         </div>
       </header>
