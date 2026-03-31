@@ -27,7 +27,27 @@ system/frontend/app/dist/
 system/whatsapp_worker/node_modules/
 system/whatsapp_worker/session/
 
+# Debug images
+wa_debug*.png
+whatsapp_debug*.png
+
+# Chrome debug profile
+.chrome-debug-profile/
+
+# WhatsApp browser session data
+system/whatsapp_worker/browser-session/
+
+# Runtime data
+agents.json
+memory/MEMORY.md
+memory/metrics.json
+memory/traces/
+skills/
+queue.json
+
+# Coverage
+.coverage
+
 # OS/editor
 .DS_Store
 Thumbs.db
-
