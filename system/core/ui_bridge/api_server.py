@@ -118,13 +118,13 @@ class CapabilityOSUIBridgeService:
             self.container.register_service(LLMClientContract, llm_client)
 
         # Initialize all plugins (dependency-ordered)
-        print("── Initializing plugins ──", flush=True)
+        print("-- Initializing plugins --", flush=True)
         init_errors = self.container.initialize_all()
         for err in init_errors:
             print(f"  INIT ERROR: {err}", flush=True)
 
         # Start plugins with background services
-        print("── Starting plugins ──", flush=True)
+        print("-- Starting plugins --", flush=True)
         start_errors = self.container.start_all()
         for err in start_errors:
             print(f"  START ERROR: {err}", flush=True)

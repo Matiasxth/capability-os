@@ -23,7 +23,10 @@ def run_serve(host: str = "0.0.0.0", port: int = 8000, sync: bool = False) -> No
     print(dim(f"  Port: {port}"))
     print()
 
-    # Import and run the entrypoint
+    # Import and run the entrypoint (file has hyphen: docker-entrypoint.py)
     sys.path.insert(0, str(project_root))
-    from docker_entrypoint import main
-    main()
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("docker_entrypoint", str(project_root / "docker-entrypoint.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    mod.main()
