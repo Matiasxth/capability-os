@@ -6,8 +6,8 @@ vi.mock("../session.js", () => ({
   clearToken: vi.fn(),
 }));
 
-const { request, get, post, put, del, streamSSE } = await import("../client.js");
-const { getToken, clearToken } = await import("../session.js");
+import { request, get, post, put, del, streamSSE } from "../client.js";
+import { getToken, clearToken } from "../session.js";
 
 describe("client", () => {
   beforeEach(() => {
@@ -73,12 +73,13 @@ describe("client", () => {
     });
 
     it("clears token and redirects on 401", async () => {
+      const replaceFn = vi.fn();
       delete window.location;
-      window.location = { replace: vi.fn() };
+      window.location = { replace: replaceFn, href: "" };
       global.fetch.mockResolvedValue({ ok: false, status: 401, json: () => Promise.resolve({}) });
       await expect(get("/auth-fail")).rejects.toThrow("Session expired");
       expect(clearToken).toHaveBeenCalled();
-      expect(window.location.replace).toHaveBeenCalledWith("/login");
+      expect(replaceFn).toHaveBeenCalledWith("/login");
     });
 
     it("omits auth header when no token", async () => {
