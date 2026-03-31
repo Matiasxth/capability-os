@@ -155,6 +155,14 @@ def main() -> None:
     ws_port_str = os.environ.get("WS_PORT", "")
     ws_port = int(ws_port_str) if ws_port_str.isdigit() else None
 
+    # Check if port is already in use (prevents double-launch issues)
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as _s:
+        if _s.connect_ex((host if host != "0.0.0.0" else "127.0.0.1", port)) == 0:
+            print(f"\n  CapOS is already running on http://{host}:{port}")
+            print(f"  Open your browser to http://127.0.0.1:{port}\n")
+            return
+
     service = CapabilityOSUIBridgeService(workspace_root=WORKSPACE_ROOT)
 
     # Start error notifier
