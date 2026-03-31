@@ -31,7 +31,7 @@ def main() -> None:
     # serve
     serve_p = sub.add_parser("serve", help="Start the CapOS server")
     serve_p.add_argument("--port", "-p", type=int, default=8000)
-    serve_p.add_argument("--host", default="0.0.0.0")
+    serve_p.add_argument("--host", default="127.0.0.1")
     serve_p.add_argument("--sync", action="store_true", help="Force sync server (no uvicorn)")
 
     # plugins

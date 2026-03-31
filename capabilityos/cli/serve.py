@@ -8,7 +8,7 @@ from pathlib import Path
 from .formatter import header, dim, success
 
 
-def run_serve(host: str = "0.0.0.0", port: int = 8000, sync: bool = False) -> None:
+def run_serve(host: str = "127.0.0.1", port: int = 8000, sync: bool = False) -> None:
     project_root = Path(__file__).resolve().parents[2]
 
     # Set environment for docker-entrypoint
