@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useNodesState, useEdgesState, addEdge } from "@xyflow/react";
+import { useNodesState, useEdgesState, addEdge, ReactFlowProvider } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import WorkflowCanvas from "../components/workflow/WorkflowCanvas";
 import NodePalette from "../components/workflow/NodePalette";
@@ -268,15 +268,17 @@ export default function WorkflowEditor() {
           <NodePalette />
           <div className="wf-canvas-center">
             {selectedId ? (
-              <WorkflowCanvas
-                nodes={nodes}
-                edges={edges}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
-                onConnect={onConnect}
-                onNodeSelect={setSelectedNode}
-                onAddNode={(node) => setNodes((prev) => [...prev, node])}
-              />
+              <ReactFlowProvider>
+                <WorkflowCanvas
+                  nodes={nodes}
+                  edges={edges}
+                  onNodesChange={onNodesChange}
+                  onEdgesChange={onEdgesChange}
+                  onConnect={onConnect}
+                  onNodeSelect={setSelectedNode}
+                  onAddNode={(node) => setNodes((prev) => [...prev, node])}
+                />
+              </ReactFlowProvider>
             ) : (
               <div className="wf-empty-canvas">
                 <div className="wf-empty-icon">&#9881;</div>

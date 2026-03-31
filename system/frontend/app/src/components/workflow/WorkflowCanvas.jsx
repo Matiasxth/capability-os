@@ -5,6 +5,7 @@ import {
   Background,
   MiniMap,
   addEdge,
+  useReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { nodeTypes } from "./CustomNodes";
@@ -35,7 +36,7 @@ export default function WorkflowCanvas({
   onAddNode,
 }) {
   const wrapperRef = useRef(null);
-  const rfRef = useRef(null);
+  const { screenToFlowPosition } = useReactFlow();
 
   const handleConnect = useCallback(
     (params) => {
@@ -55,13 +56,9 @@ export default function WorkflowCanvas({
       const type = e.dataTransfer.getData("application/reactflow");
       if (!type) return;
 
-      const bounds = wrapperRef.current.getBoundingClientRect();
-      const rf = rfRef.current;
-      if (!rf) return;
-
-      const position = rf.screenToFlowPosition({
-        x: e.clientX - bounds.left,
-        y: e.clientY - bounds.top,
+      const position = screenToFlowPosition({
+        x: e.clientX,
+        y: e.clientY,
       });
 
       const newNode = {
@@ -73,7 +70,7 @@ export default function WorkflowCanvas({
 
       onAddNode(newNode);
     },
-    [onAddNode]
+    [onAddNode, screenToFlowPosition]
   );
 
   const onNodeClick = useCallback(
@@ -90,7 +87,6 @@ export default function WorkflowCanvas({
   return (
     <div className="wf-canvas-wrapper" ref={wrapperRef}>
       <ReactFlow
-        ref={rfRef}
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
