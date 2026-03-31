@@ -1,0 +1,86 @@
+{
+  "version": "1.0.0",
+  "default_effect": "deny",
+  "rules": [
+    {
+      "id": "builtin-full-access",
+      "description": "Built-in plugins have full access to all permissions",
+      "target": {"tags": ["builtin"]},
+      "permissions": ["*"],
+      "effect": "allow",
+      "priority": 100
+    },
+    {
+      "id": "external-deny-execution",
+      "description": "External plugins cannot run subprocesses or Docker containers",
+      "target": {"tags": ["external"]},
+      "permissions": ["execution.subprocess", "execution.docker"],
+      "effect": "deny",
+      "priority": 90
+    },
+    {
+      "id": "external-deny-users",
+      "description": "External plugins cannot manage users",
+      "target": {"tags": ["external"]},
+      "permissions": ["users.manage"],
+      "effect": "deny",
+      "priority": 90
+    },
+    {
+      "id": "external-deny-plugins",
+      "description": "External plugins cannot install or reload other plugins",
+      "target": {"tags": ["external"]},
+      "permissions": ["plugins.install", "plugins.reload"],
+      "effect": "deny",
+      "priority": 90
+    },
+    {
+      "id": "external-allow-basic",
+      "description": "External plugins can read filesystem, use network, and emit events",
+      "target": {"tags": ["external"]},
+      "permissions": ["filesystem.read", "network.http", "event_bus.emit", "event_bus.subscribe", "memory.read", "settings.read"],
+      "effect": "allow",
+      "priority": 80
+    },
+    {
+      "id": "viewer-deny-write",
+      "description": "Viewers cannot perform write operations",
+      "target": {"user_roles": ["viewer"]},
+      "permissions": ["filesystem.write", "filesystem.delete", "execution.*", "settings.write", "users.manage", "plugins.*"],
+      "effect": "deny",
+      "priority": 70
+    },
+    {
+      "id": "viewer-allow-read",
+      "description": "Viewers can read everything",
+      "target": {"user_roles": ["viewer"]},
+      "permissions": ["filesystem.read", "memory.read", "settings.read", "workspaces.read", "agents.read", "capabilities.read", "tools.read"],
+      "effect": "allow",
+      "priority": 60
+    },
+    {
+      "id": "user-allow-standard",
+      "description": "Standard users get normal access",
+      "target": {"user_roles": ["user"]},
+      "permissions": ["filesystem.*", "network.*", "memory.*", "agents.*", "capabilities.*", "tools.*", "workspaces.*", "workflows.*", "scheduler.*", "browser.*", "voice.*", "event_bus.*"],
+      "effect": "allow",
+      "priority": 50
+    },
+    {
+      "id": "admin-allow-all",
+      "description": "Admins get full access except owner-only operations",
+      "target": {"user_roles": ["admin"]},
+      "permissions": ["*"],
+      "effect": "allow",
+      "priority": 40
+    },
+    {
+      "id": "owner-allow-all",
+      "description": "Owner gets unrestricted access",
+      "target": {"user_roles": ["owner"]},
+      "permissions": ["*"],
+      "effect": "allow",
+      "priority": 30
+    }
+  ]
+}
