@@ -2,10 +2,10 @@ import React, { useState } from "react";
 import sdk from "../sdk";
 
 const PROVIDERS = {
-  groq: { label: "Groq", desc: "Free & fast", rec: true, provider: "openai", base_url: "https://api.groq.com/openai/v1", models: ["llama-3.1-70b-versatile","llama-3.1-8b-instant","mixtral-8x7b-32768","gemma2-9b-it"], needsKey: true },
-  ollama: { label: "Ollama", desc: "Local & private", provider: "ollama", base_url: "http://localhost:11434", models: [], needsKey: false },
+  anthropic: { label: "Anthropic", desc: "Claude models", rec: true, provider: "anthropic", base_url: "https://api.anthropic.com", models: ["claude-sonnet-4-20250514","claude-haiku-4-5-20251001"], needsKey: true },
   openai: { label: "OpenAI", desc: "GPT models", provider: "openai", base_url: "https://api.openai.com/v1", models: ["gpt-4o","gpt-4o-mini","gpt-3.5-turbo"], needsKey: true },
-  anthropic: { label: "Anthropic", desc: "Claude models", provider: "anthropic", base_url: "https://api.anthropic.com", models: ["claude-sonnet-4-20250514","claude-haiku-4-5-20251001"], needsKey: true },
+  groq: { label: "Groq", desc: "Free & fast", provider: "openai", base_url: "https://api.groq.com/openai/v1", models: ["llama-3.1-70b-versatile","llama-3.1-8b-instant","mixtral-8x7b-32768","gemma2-9b-it"], needsKey: true },
+  ollama: { label: "Ollama", desc: "Local & private", provider: "ollama", base_url: "http://localhost:11434", models: [], needsKey: false },
   gemini: { label: "Google Gemini", desc: "Free tier available", provider: "gemini", base_url: "https://generativelanguage.googleapis.com", models: ["gemini-2.0-flash","gemini-1.5-pro"], needsKey: true },
   deepseek: { label: "DeepSeek", desc: "Cost-effective", provider: "deepseek", base_url: "https://api.deepseek.com/v1", models: ["deepseek-chat","deepseek-reasoner"], needsKey: true },
 };
@@ -15,9 +15,9 @@ export default function Onboarding({ onComplete }) {
   const [name, setName] = useState("");
   const [focused, setFocused] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [provider, setProvider] = useState("groq");
+  const [provider, setProvider] = useState("anthropic");
   const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState("llama-3.1-70b-versatile");
+  const [model, setModel] = useState("claude-sonnet-4-20250514");
   const [ollamaUrl, setOllamaUrl] = useState("http://localhost:11434");
   const [ollamaModel, setOllamaModel] = useState("llama3.1:8b");
 

@@ -4,6 +4,8 @@ import "@xyflow/react/dist/style.css";
 import WorkflowCanvas from "../components/workflow/WorkflowCanvas";
 import NodePalette from "../components/workflow/NodePalette";
 import NodeConfigPanel from "../components/workflow/NodeConfigPanel";
+import WorkflowTemplates from "../components/workflow/WorkflowTemplates";
+import WorkflowAIChat from "../components/workflow/WorkflowAIChat";
 import sdk from "../sdk";
 
 /* ── Status badge color map ── */
@@ -190,6 +192,41 @@ export default function WorkflowEditor() {
     }
   }, [newName, newDesc, loadWorkflows, selectWorkflow]);
 
+  /* ── Create from template ── */
+  const handleUseTemplate = useCallback(async (template) => {
+    try {
+      const resp = await sdk.workflows.create(template.name, template.desc);
+      const wf = resp.workflow || resp;
+      await sdk.workflows.update(wf.id, { nodes: template.nodes, edges: template.edges });
+      await loadWorkflows();
+      selectWorkflow(wf.id);
+    } catch (e) {
+      setError(e.message);
+    }
+  }, [loadWorkflows, selectWorkflow]);
+
+  /* ── AI-generated workflow ── */
+  const handleAIGenerate = useCallback(async (wf) => {
+    try {
+      if (selectedId) {
+        // Apply to current workflow
+        setNodes(wf.nodes || []);
+        setEdges(wf.edges || []);
+        if (wf.name) setWfName(wf.name);
+        if (wf.description) setWfDesc(wf.description);
+      } else {
+        // Create new workflow from AI output
+        const resp = await sdk.workflows.create(wf.name || "AI Workflow", wf.description || "");
+        const created = resp.workflow || resp;
+        await sdk.workflows.update(created.id, { nodes: wf.nodes, edges: wf.edges });
+        await loadWorkflows();
+        selectWorkflow(created.id);
+      }
+    } catch (e) {
+      setError(e.message);
+    }
+  }, [selectedId, setNodes, setEdges, loadWorkflows, selectWorkflow]);
+
   /* ── Delete workflow ── */
   const handleDelete = useCallback(async (id) => {
     if (!window.confirm("Delete this workflow?")) return;
@@ -319,11 +356,15 @@ export default function WorkflowEditor() {
             ) : (
               <div className="wf-empty-canvas">
                 <div className="wf-empty-icon">&#9881;</div>
-                <div className="wf-empty-text">Select or create a workflow to begin</div>
+                <div className="wf-empty-text">Select a workflow or start from a template</div>
+                <div style={{ marginTop: 16, maxWidth: 360 }}>
+                  <WorkflowTemplates onUseTemplate={handleUseTemplate} />
+                </div>
               </div>
             )}
           </div>
           <NodeConfigPanel node={selectedNode} onChange={handleNodeDataChange} />
+          <WorkflowAIChat onGenerate={handleAIGenerate} />
         </div>
 
         {/* Run result panel */}

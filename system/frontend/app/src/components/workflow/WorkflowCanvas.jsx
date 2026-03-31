@@ -24,6 +24,11 @@ const DEFAULT_LABELS = {
   transform: "Transform",
   delay: "Delay",
   output: "Output",
+  http: "HTTP Request",
+  notification: "Notification",
+  script: "Script",
+  prompt: "AI Prompt",
+  file: "File",
 };
 
 export default function WorkflowCanvas({
@@ -121,6 +126,11 @@ export default function WorkflowCanvas({
               transform: "#f97316",
               delay: "#6b7280",
               output: "#ec4899",
+              http: "#10b981",
+              notification: "#f43f5e",
+              script: "#8b5cf6",
+              prompt: "#0ea5e9",
+              file: "#d97706",
             };
             return accentMap[n.type] || "#888";
           }}

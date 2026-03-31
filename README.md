@@ -89,14 +89,14 @@ docker compose up --build
 Set your provider in Settings or via environment variables:
 
 ```bash
-# Groq (free, recommended)
-LLM_PROVIDER=openai LLM_BASE_URL=https://api.groq.com/openai/v1 OPENAI_API_KEY=gsk_...
+# Anthropic (recommended)
+LLM_PROVIDER=anthropic ANTHROPIC_API_KEY=sk-ant-...
 
 # OpenAI
 LLM_PROVIDER=openai OPENAI_API_KEY=sk-...
 
-# Anthropic
-LLM_PROVIDER=anthropic ANTHROPIC_API_KEY=sk-ant-...
+# Groq (free tier available)
+LLM_PROVIDER=openai LLM_BASE_URL=https://api.groq.com/openai/v1 OPENAI_API_KEY=gsk_...
 
 # Ollama (local, no key needed)
 LLM_PROVIDER=ollama

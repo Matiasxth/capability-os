@@ -75,7 +75,7 @@ describe("client", () => {
     it("clears token and redirects on 401", async () => {
       const replaceFn = vi.fn();
       delete window.location;
-      window.location = { replace: replaceFn, href: "" };
+      window.location = { replace: replaceFn, href: "", pathname: "/" };
       global.fetch.mockResolvedValue({ ok: false, status: 401, json: () => Promise.resolve({}) });
       await expect(get("/auth-fail")).rejects.toThrow("Session expired");
       expect(clearToken).toHaveBeenCalled();

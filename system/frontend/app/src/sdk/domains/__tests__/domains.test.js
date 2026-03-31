@@ -8,6 +8,9 @@ vi.mock("../../client.js", () => ({
   del: vi.fn(() => Promise.resolve({})),
   delWithBody: vi.fn(() => Promise.resolve({})),
   request: vi.fn(() => Promise.resolve({})),
+  publicGet: vi.fn(() => Promise.resolve({})),
+  publicPost: vi.fn(() => Promise.resolve({})),
+  publicRequest: vi.fn(() => Promise.resolve({})),
   streamSSE: vi.fn(async function* () {}),
 }));
 
@@ -158,9 +161,9 @@ describe("SDK domains", () => {
   });
 
   describe("auth", () => {
-    it("login() calls POST /auth/login", async () => {
+    it("login() calls publicPost /auth/login", async () => {
       await auth.login("user", "pass");
-      expect(client.post).toHaveBeenCalledWith("/auth/login", { username: "user", password: "pass" });
+      expect(client.publicPost).toHaveBeenCalledWith("/auth/login", { username: "user", password: "pass" });
     });
 
     it("me() calls GET /auth/me", async () => {

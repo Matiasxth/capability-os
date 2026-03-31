@@ -124,6 +124,61 @@ export const OutputNode = memo(function OutputNode({ data, selected }) {
   );
 });
 
+/* ── HTTP Request Node ── */
+export const HttpNode = memo(function HttpNode({ data, selected }) {
+  return (
+    <NodeShell accent="#10b981" icon="🌐" label={data.label || "HTTP Request"} selected={selected}>
+      <Handle type="target" position={Position.Top} style={{ background: "#10b981" }} />
+      <Handle type="source" position={Position.Bottom} style={{ background: "#10b981" }} />
+      <div className="wf-node-detail">{data.method || "GET"} {data.url ? data.url.slice(0, 30) : "No URL"}</div>
+    </NodeShell>
+  );
+});
+
+/* ── Notification Node ── */
+export const NotificationNode = memo(function NotificationNode({ data, selected }) {
+  return (
+    <NodeShell accent="#f43f5e" icon="🔔" label={data.label || "Notification"} selected={selected}>
+      <Handle type="target" position={Position.Top} style={{ background: "#f43f5e" }} />
+      <Handle type="source" position={Position.Bottom} style={{ background: "#f43f5e" }} />
+      <div className="wf-node-detail">{data.channel || "ui"}: {data.message ? data.message.slice(0, 30) : "No message"}</div>
+    </NodeShell>
+  );
+});
+
+/* ── Script Node ── */
+export const ScriptNode = memo(function ScriptNode({ data, selected }) {
+  return (
+    <NodeShell accent="#8b5cf6" icon="📜" label={data.label || "Script"} selected={selected}>
+      <Handle type="target" position={Position.Top} style={{ background: "#8b5cf6" }} />
+      <Handle type="source" position={Position.Bottom} style={{ background: "#8b5cf6" }} />
+      <div className="wf-node-detail">{data.language || "python"}: {data.code ? data.code.split("\n")[0].slice(0, 30) : "No code"}</div>
+    </NodeShell>
+  );
+});
+
+/* ── AI Prompt Node ── */
+export const PromptNode = memo(function PromptNode({ data, selected }) {
+  return (
+    <NodeShell accent="#0ea5e9" icon="🧠" label={data.label || "AI Prompt"} selected={selected}>
+      <Handle type="target" position={Position.Top} style={{ background: "#0ea5e9" }} />
+      <Handle type="source" position={Position.Bottom} style={{ background: "#0ea5e9" }} />
+      <div className="wf-node-detail">{data.prompt ? data.prompt.slice(0, 40) : "No prompt"}</div>
+    </NodeShell>
+  );
+});
+
+/* ── File Node ── */
+export const FileNode = memo(function FileNode({ data, selected }) {
+  return (
+    <NodeShell accent="#d97706" icon="📁" label={data.label || "File"} selected={selected}>
+      <Handle type="target" position={Position.Top} style={{ background: "#d97706" }} />
+      <Handle type="source" position={Position.Bottom} style={{ background: "#d97706" }} />
+      <div className="wf-node-detail">{data.operation || "read"}: {data.path || "No path"}</div>
+    </NodeShell>
+  );
+});
+
 /* ── Export map for ReactFlow ── */
 export const nodeTypes = {
   trigger: TriggerNode,
@@ -134,4 +189,9 @@ export const nodeTypes = {
   transform: TransformNode,
   delay: DelayNode,
   output: OutputNode,
+  http: HttpNode,
+  notification: NotificationNode,
+  script: ScriptNode,
+  prompt: PromptNode,
+  file: FileNode,
 };
