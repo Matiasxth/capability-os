@@ -6,8 +6,14 @@ uvicorn>=0.29
 pytest>=7.4
 pytest-cov>=4.0
 
-# Browser automation (optional — only needed for browser tools/capabilities)
+# Optional — accelerated vector search (falls back to JSON without it)
+# sqlite-vec>=0.1
+
+# Optional — browser automation (only needed for browser tools)
 # playwright>=1.40
 
-# optional: used by execution_list_processes with fallback to tasklist/ps
+# Optional — process listing (falls back to tasklist/ps)
 # psutil>=5.9
+
+# Optional — speech-to-text
+# openai-whisper>=20231117
