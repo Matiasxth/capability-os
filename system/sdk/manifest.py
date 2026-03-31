@@ -35,6 +35,23 @@ class PluginManifest:
     tags: list[str] = field(default_factory=list)
     optional_dependencies: list[str] = field(default_factory=list)
 
+    def parsed_dependencies(self) -> list[tuple[str, str]]:
+        """Parse dependencies into (plugin_id, version_constraint) tuples.
+
+        Supports: ``"capos.core.settings"`` (no constraint),
+        ``"capos.core.settings>=1.0.0"``, ``"capos.core.agent>=1.0.0,<2.0.0"``
+        """
+        result = []
+        for dep in self.dependencies:
+            for op in (">=", "<=", "==", "!=", ">", "<"):
+                if op in dep:
+                    idx = dep.index(op)
+                    result.append((dep[:idx].strip(), dep[idx:].strip()))
+                    break
+            else:
+                result.append((dep.strip(), ""))
+        return result
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> PluginManifest:
         return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})

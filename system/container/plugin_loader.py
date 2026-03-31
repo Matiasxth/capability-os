@@ -5,12 +5,47 @@ import importlib
 import importlib.util
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
 from system.sdk.manifest import PluginManifest
 
 logger = logging.getLogger("capos.loader")
+
+
+def _parse_ver(v: str) -> tuple[int, ...]:
+    """Parse a version string into a tuple of ints."""
+    return tuple(int(x) for x in re.split(r"[.\-]", v)[:3] if x.isdigit()) or (0,)
+
+
+def _version_satisfies(version: str, constraint: str) -> bool:
+    """Check if a version satisfies a constraint string.
+
+    Supports: ``>=1.0.0``, ``<2.0.0``, ``==1.0.0``, ``>=1.0.0,<2.0.0``
+    """
+    ver = _parse_ver(version)
+    for part in constraint.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        for op in (">=", "<=", "==", "!=", ">", "<"):
+            if part.startswith(op):
+                target = _parse_ver(part[len(op):])
+                if op == ">=" and not (ver >= target):
+                    return False
+                elif op == "<=" and not (ver <= target):
+                    return False
+                elif op == "==" and not (ver == target):
+                    return False
+                elif op == "!=" and not (ver != target):
+                    return False
+                elif op == ">" and not (ver > target):
+                    return False
+                elif op == "<" and not (ver < target):
+                    return False
+                break
+    return True
 
 
 class PluginLoader:
@@ -96,6 +131,29 @@ class PluginLoader:
             logger.info(f"Loaded plugin: {manifest.id}")
             return (plugin, manifest)
         return None
+
+    @staticmethod
+    def check_dependency_versions(
+        manifest: PluginManifest,
+        loaded_plugins: dict[str, Any],
+    ) -> list[str]:
+        """Verify dependency version constraints are satisfied.
+
+        Returns list of violation messages (empty = all OK).
+        """
+        violations = []
+        for dep_id, constraint in manifest.parsed_dependencies():
+            if not constraint:
+                continue  # No version constraint
+            plugin = loaded_plugins.get(dep_id)
+            if plugin is None:
+                continue  # Missing dep checked elsewhere
+            plugin_version = getattr(plugin, "version", "0.0.0")
+            if not _version_satisfies(plugin_version, constraint):
+                violations.append(
+                    f"{dep_id}: requires {constraint}, found {plugin_version}"
+                )
+        return violations
 
     @staticmethod
     def _load_from_module(subdir: Path) -> tuple[Any, PluginManifest] | None:
