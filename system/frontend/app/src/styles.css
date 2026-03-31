@@ -575,13 +575,16 @@ pre{background:#060608;border:1px solid var(--border);border-radius:var(--radius
 .wf-palette-card-desc{font-size:10px;color:var(--text-muted);line-height:1.3}
 
 /* ── Custom Nodes ── */
-.wf-node{background:var(--bg-surface);border-radius:var(--radius-md);min-width:160px;max-width:220px;transition:box-shadow var(--dur-fast)}
+.wf-node{background:var(--bg-surface);border-radius:var(--radius-md);min-width:160px;max-width:220px;transition:box-shadow var(--dur-fast),border-color var(--dur-fast);cursor:pointer}
+.wf-node:hover{box-shadow:0 0 16px rgba(0,255,136,0.15)}
 .wf-node-header{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:var(--radius-md) var(--radius-md) 0 0}
 .wf-node-icon{font-size:14px}
 .wf-node-label{font-size:12px;font-weight:600;color:var(--text)}
 .wf-node-body{padding:6px 10px 8px}
 .wf-node-detail{font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wf-node-handles-label{display:flex;justify-content:space-between;font-size:9px;margin-top:4px;padding:0 4px}
+.wf-cfg-input:focus-visible,.wf-cfg-textarea:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.wf-palette-card:hover{transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,0.3)}
 
 /* ── Node Config Panel ── */
 .wf-config-panel{width:240px;min-width:200px;background:var(--bg-surface);border-left:1px solid var(--border);overflow-y:auto;padding:14px 12px;flex-shrink:0}

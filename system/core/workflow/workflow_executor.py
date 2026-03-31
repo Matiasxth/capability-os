@@ -21,9 +21,10 @@ class WorkflowExecutionError(RuntimeError):
 class WorkflowExecutor:
     """Executes a workflow graph by walking nodes in topological order."""
 
-    def __init__(self, tool_runtime: Any, agent_loop: Any | None = None) -> None:
+    def __init__(self, tool_runtime: Any, agent_loop: Any | None = None, llm: Any | None = None) -> None:
         self._tool_runtime = tool_runtime
         self._agent_loop = agent_loop
+        self._llm = llm
 
     # ------------------------------------------------------------------
     # Public
@@ -210,6 +211,18 @@ class WorkflowExecutor:
             return self._exec_transform(data, context)
         elif ntype == "output":
             return self._exec_output(data, context)
+        elif ntype == "loop":
+            return self._exec_loop(node, data, context, edges)
+        elif ntype == "http":
+            return self._exec_http(data, context)
+        elif ntype == "notification":
+            return self._exec_notification(data, context)
+        elif ntype == "script":
+            return self._exec_script(data, context)
+        elif ntype == "prompt":
+            return self._exec_prompt(data, context)
+        elif ntype == "file":
+            return self._exec_file(data, context)
         else:
             logger.warning("Unknown node type: %s — treating as no-op", ntype)
             return {"skipped": True, "reason": f"unknown type '{ntype}'"}
@@ -294,6 +307,132 @@ class WorkflowExecutor:
         template = data.get("template", "")
         text = self._apply_template(template, context)
         return {"text": text}
+
+    # ------------------------------------------------------------------
+    # New node type handlers
+    # ------------------------------------------------------------------
+
+    def _exec_loop(self, node: dict, data: dict, context: dict, edges: list) -> Any:
+        """Iterate over a collection or fixed count."""
+        iterations = data.get("iterations")
+        collection_expr = data.get("collection", "")
+        results = []
+        if collection_expr:
+            try:
+                from system.core.strategy.safe_expression import safe_eval
+                items = safe_eval(collection_expr, {"result": context.get("previous_result")})
+                if hasattr(items, "__iter__"):
+                    results = list(items)
+            except Exception as exc:
+                logger.warning("Loop collection eval failed: %s", exc)
+        elif iterations:
+            results = list(range(int(iterations)))
+        return {"items": results, "count": len(results)}
+
+    def _exec_http(self, data: dict, context: dict) -> dict:
+        """Make an HTTP request."""
+        import json as _json
+        from urllib.request import Request, urlopen
+        method = data.get("method", "GET")
+        url = self._apply_template(data.get("url", ""), context)
+        if not url:
+            raise WorkflowExecutionError("HTTP node missing 'url'")
+        headers = {}
+        if data.get("headers_json"):
+            try:
+                headers = _json.loads(data["headers_json"])
+            except Exception:
+                pass
+        body = None
+        if data.get("body_json"):
+            body_str = self._apply_template(data["body_json"], context)
+            body = body_str.encode("utf-8")
+            headers.setdefault("Content-Type", "application/json")
+        req = Request(url, data=body, headers=headers, method=method)
+        try:
+            with urlopen(req, timeout=30) as resp:
+                content = resp.read().decode("utf-8", errors="replace")
+                try:
+                    return {"status": resp.status, "body": _json.loads(content)}
+                except Exception:
+                    return {"status": resp.status, "body": content}
+        except Exception as exc:
+            return {"status": 0, "error": str(exc)}
+
+    def _exec_notification(self, data: dict, context: dict) -> dict:
+        """Send notification to a channel."""
+        channel = data.get("channel", "ui")
+        message = self._apply_template(data.get("message", ""), context)
+        if not message:
+            return {"sent": False, "reason": "empty message"}
+        try:
+            from system.core.ui_bridge.event_bus import event_bus
+            event_bus.emit("notification", {"channel": channel, "message": message, "recipient": data.get("recipient")})
+        except Exception:
+            pass
+        return {"sent": True, "channel": channel, "message": message}
+
+    def _exec_script(self, data: dict, context: dict) -> Any:
+        """Execute a script in sandbox."""
+        language = data.get("language", "python")
+        code = data.get("code", "")
+        if not code:
+            raise WorkflowExecutionError("Script node missing 'code'")
+        prev = context.get("previous_result", {})
+        if language == "python":
+            safe_globals = {"__builtins__": {}, "result": prev, "str": str, "int": int, "float": float, "list": list, "dict": dict, "len": len, "range": range, "print": lambda *a: None}
+            local_vars = {}
+            try:
+                exec(code, safe_globals, local_vars)
+                return local_vars.get("output", local_vars) or {"executed": True}
+            except Exception as exc:
+                return {"error": str(exc)}
+        return {"error": f"Unsupported language: {language}"}
+
+    def _exec_prompt(self, data: dict, context: dict) -> dict:
+        """Send prompt to LLM."""
+        prompt = self._apply_template(data.get("prompt", ""), context)
+        if not prompt:
+            raise WorkflowExecutionError("Prompt node missing 'prompt'")
+        if self._llm is None:
+            raise WorkflowExecutionError("LLM client not available")
+        try:
+            response = self._llm.chat(prompt, system=data.get("system_prompt"), model=data.get("model"))
+            return {"response": response.get("content") or response.get("text") or str(response)}
+        except Exception as exc:
+            return {"error": str(exc)}
+
+    def _exec_file(self, data: dict, context: dict) -> dict:
+        """Read/write/append file operations."""
+        from pathlib import Path
+        operation = data.get("operation", "read")
+        path_str = self._apply_template(data.get("path", ""), context)
+        if not path_str:
+            raise WorkflowExecutionError("File node missing 'path'")
+        path = Path(path_str)
+        try:
+            if operation == "read":
+                return {"content": path.read_text(encoding="utf-8"), "path": str(path)}
+            elif operation == "write":
+                content = self._apply_template(data.get("content", ""), context)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(content, encoding="utf-8")
+                return {"written": True, "path": str(path), "bytes": len(content)}
+            elif operation == "append":
+                content = self._apply_template(data.get("content", ""), context)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                with open(path, "a", encoding="utf-8") as f:
+                    f.write(content)
+                return {"appended": True, "path": str(path), "bytes": len(content)}
+            elif operation == "list":
+                if path.is_dir():
+                    items = [{"name": p.name, "is_dir": p.is_dir()} for p in sorted(path.iterdir())]
+                    return {"items": items, "count": len(items), "path": str(path)}
+                return {"error": f"Not a directory: {path}"}
+            else:
+                return {"error": f"Unknown operation: {operation}"}
+        except Exception as exc:
+            return {"error": str(exc)}
 
     # ------------------------------------------------------------------
     # Helpers

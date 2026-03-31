@@ -150,10 +150,31 @@ function AuthenticatedApp() {
   );
 }
 
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidCatch(error, info) { console.error("App crash:", error, info); }
+  render() {
+    if (this.state.hasError) {
+      return (<div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0a0a0a", color: "#e0e0e0", fontFamily: "system-ui" }}>
+        <div style={{ textAlign: "center", maxWidth: 400, padding: 32 }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>&#9888;</div>
+          <h2 style={{ color: "#ff4444", margin: "0 0 12px" }}>Something went wrong</h2>
+          <p style={{ fontSize: 13, color: "#888", marginBottom: 20 }}>{this.state.error?.message || "An unexpected error occurred"}</p>
+          <button onClick={() => window.location.reload()} style={{ padding: "10px 24px", fontSize: 13, fontWeight: 600, background: "linear-gradient(135deg, #00f0ff, #00c8dd)", color: "#06060e", border: "none", borderRadius: 8, cursor: "pointer" }}>Reload App</button>
+        </div>
+      </div>);
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   return (
-    <AuthProvider>
-      <AuthenticatedApp />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AuthenticatedApp />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

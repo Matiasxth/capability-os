@@ -11,7 +11,7 @@ import logging
 from typing import Any
 
 from system.sdk.context import PluginContext
-from system.sdk.contracts import ToolRuntimeContract, AgentLoopContract
+from system.sdk.contracts import ToolRuntimeContract, AgentLoopContract, LLMClientContract
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,7 @@ class WorkflowsPlugin:
         workspace_root = ctx.workspace_root
         tool_runtime = ctx.get_optional(ToolRuntimeContract)
         agent_loop = ctx.get_optional(AgentLoopContract)
+        llm = ctx.get_optional(LLMClientContract)
 
         # --- WorkflowRegistry ---
         try:
@@ -55,6 +56,7 @@ class WorkflowsPlugin:
             self.workflow_executor = WorkflowExecutor(
                 tool_runtime=tool_runtime,
                 agent_loop=agent_loop,
+                llm=llm,
             )
             logger.info("Created WorkflowExecutor")
         except Exception:
