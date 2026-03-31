@@ -182,6 +182,9 @@ def main() -> None:
         except ImportError:
             print("  uvicorn not available, falling back to sync server")
         except Exception as exc:
+            if "10048" in str(exc) or "address already in use" in str(exc).lower():
+                print(f"\n  ERROR: Port {port} is already in use. Stop the other server first or use --port <other>")
+                return
             print(f"  Async server failed ({exc}), falling back to sync server")
 
     # Fallback: sync ThreadingHTTPServer

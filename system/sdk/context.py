@@ -54,7 +54,7 @@ class PluginContext:
         """Like ``get_service`` but returns ``None`` instead of raising."""
         try:
             return self._get_service(contract_type)
-        except KeyError:
+        except (KeyError, Exception):
             return None
 
     def publish_service(self, contract_type: type, implementation: Any) -> None:

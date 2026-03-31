@@ -3,7 +3,9 @@
   "name": "Workflows",
   "version": "1.0.0",
   "dependencies": [
-    "capos.core.settings"
+    "capos.core.settings",
+    "capos.core.capabilities",
+    "capos.core.agent"
   ],
   "entry_point": "plugin:create_plugin",
   "permissions": [

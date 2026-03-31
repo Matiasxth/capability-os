@@ -3,7 +3,8 @@
   "name": "Capabilities",
   "version": "1.0.0",
   "dependencies": [
-    "capos.core.settings"
+    "capos.core.settings",
+    "capos.core.memory"
   ],
   "entry_point": "plugin:create_plugin",
   "permissions": [
