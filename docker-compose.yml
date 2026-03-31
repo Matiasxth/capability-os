@@ -13,6 +13,21 @@ services:
       - TOKEN=${BROWSER_TOKEN:-capos_browser_secret}
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    container_name: capos-redis
+    expose:
+      - "6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
   capability-os:
     build: .
     container_name: capability-os
@@ -42,10 +57,14 @@ services:
       - WS_PORT=8001
       # Browser (connects to Chrome service)
       - BROWSER_CDP_URL=ws://chrome:3000
+      # Redis
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
       - chrome
+      - redis
     restart: unless-stopped
 
 volumes:
   workspace:
   artifacts:
+  redis_data:
