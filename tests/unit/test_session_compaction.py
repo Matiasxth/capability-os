@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from datetime import datetime, timezone, timedelta
@@ -14,7 +15,7 @@ from system.core.memory.execution_history import ExecutionHistory
 class TestGetCompactableSessions(unittest.TestCase):
 
     def _create_history(self) -> tuple[ExecutionHistory, Path]:
-        tmp = tempfile.mktemp(suffix=".json")
+        fd, tmp = tempfile.mkstemp(suffix=".json"); os.close(fd)
         return ExecutionHistory(tmp), Path(tmp)
 
     def _old_timestamp(self, hours_ago: int = 48) -> str:
@@ -74,7 +75,7 @@ class TestGetCompactableSessions(unittest.TestCase):
 class TestCompactSession(unittest.TestCase):
 
     def _create_history(self) -> tuple[ExecutionHistory, Path]:
-        tmp = tempfile.mktemp(suffix=".json")
+        fd, tmp = tempfile.mkstemp(suffix=".json"); os.close(fd)
         return ExecutionHistory(tmp), Path(tmp)
 
     def test_compact_replaces_messages_with_summary(self):

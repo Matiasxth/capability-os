@@ -270,7 +270,7 @@ class WhatsAppReplyWorker:
     def _handle_message_agent(self, channel_id: str, text: str, user_name: str) -> None:
         """Use the AgentLoop for autonomous processing."""
         t0 = time.monotonic()
-        print(f"[WHATSAPP-REPLY] Agent processing: '{text[:50]}' from {user_name}", flush=True)
+        print(f"[WHATSAPP-REPLY] Agent processing message from {user_name[:20]} ({len(text)} chars)", flush=True)
         try:
             final_text = ""
             gen = self._agent_loop.run(text)
@@ -326,7 +326,7 @@ class WhatsAppReplyWorker:
             result = stt.transcribe_bytes(audio_bytes, format="ogg")
             text = result.get("text", "")
             if text:
-                print(f"[WHATSAPP-REPLY] Transcribed audio: '{text[:50]}'", flush=True)
+                print(f"[WHATSAPP-REPLY] Transcribed audio ({len(text)} chars)", flush=True)
             return text
         except Exception as exc:
             print(f"[WHATSAPP-REPLY] Audio transcription failed: {exc}", flush=True)

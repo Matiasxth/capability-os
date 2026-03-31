@@ -51,6 +51,12 @@ class JWTService:
         secret = secrets.token_hex(64)
         self._secret_path.parent.mkdir(parents=True, exist_ok=True)
         self._secret_path.write_text(secret, encoding="utf-8")
+        # Restrict file permissions (owner read/write only)
+        try:
+            import os
+            os.chmod(str(self._secret_path), 0o600)
+        except (OSError, AttributeError):
+            pass  # Windows may not support chmod
         logger.info("Generated new JWT secret at %s", self._secret_path)
         return secret
 

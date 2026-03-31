@@ -615,7 +615,7 @@ class CapabilityOSUIBridgeService:
             info = json.loads(resp.read().decode("utf-8"))
             tabs_resp = _urlopen(f"http://127.0.0.1:{cdp_port}/json/list", timeout=2)
             tabs = json.loads(tabs_resp.read().decode("utf-8"))
-            wa_tabs = [t for t in tabs if isinstance(t, dict) and "web.whatsapp.com" in (t.get("url") or "")]
+            wa_tabs = [t for t in tabs if isinstance(t, dict) and urlparse(t.get("url") or "").hostname == "web.whatsapp.com"]
             return {"connected": True, "tabs": len(tabs), "browser": info.get("Browser", ""), "port": cdp_port, "whatsapp_open": len(wa_tabs) > 0}
         except Exception:
             return {"connected": False, "tabs": 0, "browser": "", "port": cdp_port}

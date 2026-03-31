@@ -86,7 +86,14 @@ class UnifiedHandler(BaseHTTPRequestHandler):
         if not path:
             path = "index.html"
 
-        file_path = DIST_DIR / path
+        # Prevent path traversal: resolve and verify within DIST_DIR
+        file_path = (DIST_DIR / path).resolve()
+        try:
+            file_path.relative_to(DIST_DIR.resolve())
+        except ValueError:
+            self.send_error(403, "Forbidden")
+            return
+
         if not file_path.exists() or not file_path.is_file():
             # SPA fallback
             file_path = DIST_DIR / "index.html"
@@ -96,6 +103,9 @@ class UnifiedHandler(BaseHTTPRequestHandler):
             return
 
         content_type, _ = mimetypes.guess_type(str(file_path))
+        # Sanitize content_type to prevent header injection
+        if content_type:
+            content_type = content_type.split("\n")[0].split("\r")[0]
         content = file_path.read_bytes()
         self.send_response(200)
         self._cors_headers()
