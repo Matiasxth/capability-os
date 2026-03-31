@@ -186,6 +186,24 @@ First-time setup creates the owner account via `/auth/setup`.
 | **Slack** | Ready | Polling + auto-reply |
 | **Discord** | Ready | Polling + auto-reply |
 
+### Distributed Workers (Redis)
+
+Plugins with heavy I/O automatically run as separate processes when Redis is available:
+
+```
+Without Redis (personal):     With Redis (production):
+┌──────────────────┐          ┌──────────────┐    ┌────────────────┐
+│  Single Process   │          │  Main Process │◄──►│ Redis          │
+│  (all plugins)    │          │  (10 core)    │    └───────┬────────┘
+└──────────────────┘          └──────────────┘            │
+                                                ┌────────┼────────┐
+                                                │        │        │
+                                              Workers  Workers  Workers
+                                              (channels)(sched) (super)
+```
+
+Workers: Telegram, Slack, Discord, WhatsApp, Scheduler, Supervisor. Each with auto-restart, heartbeat, and graceful shutdown.
+
 ### Integrated IDE
 Monaco-based code editor with file explorer, terminal, workspace analysis, auto-clean, and README generation.
 

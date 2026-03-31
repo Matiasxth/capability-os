@@ -64,6 +64,60 @@ services:
       - redis
     restart: unless-stopped
 
+  # ── Optional: separate worker containers for horizontal scaling ──
+  # Uncomment these to run workers as separate containers.
+  # Without them, workers run in-process within capability-os.
+
+  # channel-workers:
+  #   build: .
+  #   container_name: capos-channel-workers
+  #   command: >
+  #     sh -c "
+  #       python system/workers/telegram_worker.py &
+  #       python system/workers/slack_worker.py &
+  #       python system/workers/discord_worker.py &
+  #       wait
+  #     "
+  #   environment:
+  #     - REDIS_URL=redis://redis:6379/0
+  #     - CAPOS_PROJECT_ROOT=/app
+  #   volumes:
+  #     - workspace:/data/workspace
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
+  #     capability-os:
+  #       condition: service_started
+  #   restart: unless-stopped
+
+  # scheduler-worker:
+  #   build: .
+  #   container_name: capos-scheduler
+  #   command: python system/workers/scheduler_worker.py
+  #   environment:
+  #     - REDIS_URL=redis://redis:6379/0
+  #     - CAPOS_PROJECT_ROOT=/app
+  #   volumes:
+  #     - workspace:/data/workspace
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+
+  # supervisor-worker:
+  #   build: .
+  #   container_name: capos-supervisor
+  #   command: python system/workers/supervisor_worker.py
+  #   environment:
+  #     - REDIS_URL=redis://redis:6379/0
+  #     - CAPOS_PROJECT_ROOT=/app
+  #   volumes:
+  #     - workspace:/data/workspace
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+
 volumes:
   workspace:
   artifacts:
