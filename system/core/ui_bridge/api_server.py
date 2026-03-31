@@ -117,6 +117,17 @@ class CapabilityOSUIBridgeService:
             from system.sdk.contracts import LLMClientContract
             self.container.register_service(LLMClientContract, llm_client)
 
+        # ── Message Queue (Redis or in-memory fallback) ──
+        from system.infrastructure.message_queue import create_queue
+        self.message_queue = create_queue(runtime_settings)
+        # Bridge EventBus → Redis for cross-process events
+        from system.core.ui_bridge.event_bus import event_bus
+        event_bus.set_bridge(self.message_queue)
+        if self.message_queue.is_redis:
+            print("  Redis: connected", flush=True)
+        else:
+            print("  Redis: not available (in-memory fallback)", flush=True)
+
         # Initialize all plugins (dependency-ordered)
         print("-- Initializing plugins --", flush=True)
         init_errors = self.container.initialize_all()
