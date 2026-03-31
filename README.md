@@ -32,6 +32,22 @@ Open `http://localhost:8000`. On first visit you'll see the owner setup page.
 
 Double-click **`CapabilityOS.bat`** — opens a dashboard at `http://localhost:9000` where you can start/stop/restart the system.
 
+### PWA (Installable App)
+
+On first visit, Chrome will offer to install CapOS as a desktop app. This creates a shortcut that opens CapOS in its own window (no address bar), with offline caching and push notifications.
+
+> **Note:** The PWA is just the frontend — you still need to start the backend server first. The shortcut opens `localhost:8000`, so the server must be running.
+
+**Auto-start script (Windows):** save as `CapOS.bat` on your desktop:
+
+```bat
+@echo off
+cd /d C:\path\to\capability-os
+start /min python -m capabilityos serve
+timeout /t 3 >nul
+start "" "http://localhost:8000"
+```
+
 ### Option 3: Docker
 
 ```bash
