@@ -28,9 +28,17 @@ python -m capabilityos serve
 
 Open `http://localhost:8000`. On first visit you'll see the owner setup page.
 
-### Option 2: Launcher (Windows)
+### Option 2: Launcher
 
-Double-click **`CapabilityOS.bat`** — opens a dashboard at `http://localhost:9000` where you can start/stop/restart the system.
+**Windows:** Double-click **`CapabilityOS.bat`**
+
+**Mac/Linux:**
+```bash
+chmod +x start.sh
+./start.sh                    # foreground
+./start.sh --background       # background (opens browser)
+./start.sh --port 9000        # custom port
+```
 
 ### PWA (Installable App)
 
