@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNodesState, useEdgesState, addEdge, ReactFlowProvider } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import WorkflowCanvas from "../components/workflow/WorkflowCanvas";
@@ -19,7 +19,7 @@ const STATUS_COLORS = {
 export default function WorkflowEditor() {
   /* ── Workflow list ── */
   const [workflows, setWorkflows] = useState([]);
-  const [selectedId, setSelectedId] = useState(null);
+  const [selectedId, setSelectedId] = useState(() => sessionStorage.getItem("capos_wf_selected") || null);
   const [wfName, setWfName] = useState("");
   const [wfDesc, setWfDesc] = useState("");
 
@@ -51,8 +51,17 @@ export default function WorkflowEditor() {
   }, []);
 
   useEffect(() => {
-    loadWorkflows();
-  }, [loadWorkflows]);
+    loadWorkflows().then(() => {
+      const saved = sessionStorage.getItem("capos_wf_selected");
+      if (saved) selectWorkflow(saved);
+    });
+  }, []);
+
+  /* ── Persist selected workflow ID ── */
+  useEffect(() => {
+    if (selectedId) sessionStorage.setItem("capos_wf_selected", selectedId);
+    else sessionStorage.removeItem("capos_wf_selected");
+  }, [selectedId]);
 
   /* ── Select & load a workflow ── */
   const selectWorkflow = useCallback(async (id) => {
@@ -68,7 +77,8 @@ export default function WorkflowEditor() {
       return;
     }
     try {
-      const wf = await sdk.workflows.get(id);
+      const resp = await sdk.workflows.get(id);
+      const wf = resp.workflow || resp;
       setSelectedId(id);
       setWfName(wf.name || "");
       setWfDesc(wf.description || "");
@@ -107,42 +117,69 @@ export default function WorkflowEditor() {
     if (!selectedId) return;
     setStatus("saving");
     try {
-      await sdk.workflows.update(selectedId, {
+      const resp = await sdk.workflows.update(selectedId, {
         name: wfName,
         description: wfDesc,
         nodes,
         edges,
       });
+      // Confirm persistence from server response
+      const saved = resp.workflow || resp;
+      if (saved.nodes) setNodes(saved.nodes);
+      if (saved.edges) setEdges(saved.edges);
       setStatus("saved");
       setTimeout(() => setStatus((s) => (s === "saved" ? "idle" : s)), 2000);
     } catch (e) {
       setStatus("error");
       setError(e.message);
     }
-  }, [selectedId, wfName, wfDesc, nodes, edges]);
+  }, [selectedId, wfName, wfDesc, nodes, edges, setNodes, setEdges]);
+
+  /* ── Auto-save after 2s of inactivity ── */
+  const autoSaveRef = useRef(null);
+  const nodeCountRef = useRef(0);
+  useEffect(() => {
+    if (!selectedId || nodes.length === 0) return;
+    // Skip initial load (don't auto-save when loading from server)
+    if (nodeCountRef.current === 0) { nodeCountRef.current = nodes.length; return; }
+    nodeCountRef.current = nodes.length;
+    if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
+    autoSaveRef.current = setTimeout(() => handleSave(), 2000);
+    return () => { if (autoSaveRef.current) clearTimeout(autoSaveRef.current); };
+  }, [nodes, edges, selectedId]);
 
   /* ── Run ── */
   const handleRun = useCallback(async () => {
     if (!selectedId) return;
+    // Save before run
+    await handleSave();
     setStatus("running");
     setRunResult(null);
     setShowRunPanel(true);
     try {
       const result = await sdk.workflows.run(selectedId);
       setRunResult(result);
-      setStatus("success");
-      setTimeout(() => setStatus((s) => (s === "success" ? "idle" : s)), 3000);
+      // Highlight nodes with execution results
+      if (result.results) {
+        setNodes(nds => nds.map(n => ({
+          ...n,
+          data: { ...n.data, _runStatus: result.results[n.id]?.status || null },
+        })));
+      }
+      setStatus(result.status === "success" ? "success" : "error");
+      setTimeout(() => setStatus((s) => (s === "success" || s === "error" ? "idle" : s)), 3000);
     } catch (e) {
       setRunResult({ error: e.message });
       setStatus("error");
     }
-  }, [selectedId]);
+  }, [selectedId, handleSave, setNodes]);
 
   /* ── Create workflow ── */
   const handleCreate = useCallback(async () => {
     if (!newName.trim()) return;
     try {
-      const wf = await sdk.workflows.create(newName.trim(), newDesc.trim());
+      const resp = await sdk.workflows.create(newName.trim(), newDesc.trim());
+      const wf = resp.workflow || resp;
       setNewName("");
       setNewDesc("");
       setCreateDialogOpen(false);
