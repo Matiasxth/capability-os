@@ -1,5 +1,27 @@
 # Capability OS
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue?style=for-the-badge" alt="Platform"/>
+  <img src="https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python"/>
+  <img src="https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React"/>
+  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License"/>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/LLM-OpenAI%20%7C%20Anthropic%20%7C%20Groq%20%7C%20Gemini%20%7C%20DeepSeek%20%7C%20Ollama-FF6F00?style=flat-square" alt="LLM Providers"/>
+  <img src="https://img.shields.io/badge/Plugins-21-00ff88?style=flat-square" alt="Plugins"/>
+  <img src="https://img.shields.io/badge/Endpoints-180+-5588ff?style=flat-square" alt="Endpoints"/>
+  <img src="https://img.shields.io/badge/PWA-Installable-a855f7?style=flat-square&logo=pwa&logoColor=white" alt="PWA"/>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/WhatsApp-3%20backends-25D366?style=flat-square&logo=whatsapp&logoColor=white" alt="WhatsApp"/>
+  <img src="https://img.shields.io/badge/Telegram-Bot%20API-2CA5E0?style=flat-square&logo=telegram&logoColor=white" alt="Telegram"/>
+  <img src="https://img.shields.io/badge/Slack-Bot-4A154B?style=flat-square&logo=slack&logoColor=white" alt="Slack"/>
+  <img src="https://img.shields.io/badge/Discord-Bot-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord"/>
+  <img src="https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker"/>
+</p>
+
 **AI-powered operating system with Plugin SDK, visual workflows, multi-user auth, and autonomous agents.**
 
 <p align="center">
