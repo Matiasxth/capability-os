@@ -1,12 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import {
-  chatMessage, clearAllMemory, deleteHistoryEntry, executeCapability,
-  getExecution, getExecutionEvents, getMemoryContext, getMemoryHistory,
-  listCapabilities, planIntent, saveChatSession, streamChat,
-  runAgent, confirmAgentAction, streamAgent,
-  listWorkspaces, addWorkspace, updateWorkspace, updateWorkspaceStatus, removeWorkspace, getSettings,
-  listAgents,
-} from "../api";
+import sdk from "../sdk";
 import ChatInput from "../components/ChatInput";
 import ChatThread from "../components/ChatThread";
 import AgentStepView from "../components/AgentStepView";
@@ -20,8 +13,8 @@ import ProjectSidebar from "../components/ProjectSidebar";
 import NewProjectModal from "../components/NewProjectModal";
 import ToastContainer from "../components/ToastContainer";
 import { useToast } from "../hooks/useToast";
-import { useWebSocket } from "../hooks/useWebSocket";
 import { useWorkspaceState } from "../state/useWorkspaceState";
+import { HISTORY_EVENTS, EVENT_LABELS } from "../sdk/eventTypes";
 
 /* Template resolution */
 const TMPL = /^\{\{([a-zA-Z0-9_.]+)\}\}$/;
@@ -40,7 +33,7 @@ export default function Workspace({ activeWorkspace, userName }) {
   const [planExecuted,setPlanExecuted]=useState(false);
   const [errorMessage,setErrorMessage]=useState("");
   const [history,setHistory]=useState([]);
-  const [messages,setMessages]=useState([]);
+  const [messages,setMessages]=useState(()=>sdk.session.restoreChatMessages());
   const [suggestedAction,setSuggestedAction]=useState(null);
   const [currentSessionId,setCurrentSessionId]=useState(()=>"chat_"+Date.now());
   const [deletingId,setDeletingId]=useState(null);
@@ -66,15 +59,15 @@ export default function Workspace({ activeWorkspace, userName }) {
 
   // ── Load workspaces & project states ──
   useEffect(()=>{
-    listWorkspaces().then(r=>{setWorkspaces(r.workspaces||[]);if(!activeProjectId&&r.default_id)setActiveProjectId(r.default_id)}).catch(()=>{});
-    getSettings().then(r=>{const s=r.settings||r;setProjectStates(s.project_states||[])}).catch(()=>{});
-    listAgents().then(r=>{const a=r.agents||[];setAgents(a);if(!activeAgentId&&a.length)setActiveAgentId(a[0].id)}).catch(()=>{});
+    sdk.workspaces.list().then(r=>{setWorkspaces(r.workspaces||[]);if(!activeProjectId&&r.default_id)setActiveProjectId(r.default_id)}).catch(()=>{});
+    sdk.system.settings.get().then(r=>{const s=r.settings||r;setProjectStates(s.project_states||[])}).catch(()=>{});
+    sdk.agents.list().then(r=>{const a=r.agents||[];setAgents(a);if(!activeAgentId&&a.length)setActiveAgentId(a[0].id)}).catch(()=>{});
   },[]);
 
   // ── History loading ──
   const historyIdsRef=useRef("");
   function loadHistory(force){
-    return getMemoryHistory(null, activeProjectId).then(r=>{
+    return sdk.memory.history(null, activeProjectId).then(r=>{
       const valid=(r.history||[]).filter(h=>h.intent&&h.intent.trim().length>0&&h.intent!=="session"&&h.intent!=="New session");
       const mapped=valid.slice(0,20).map(h=>({id:h.execution_id,intent:h.intent,status:h.status==="ready"?"success":h.status,duration_ms:h.duration_ms,time:h.timestamp,plan_steps:h.plan_steps||null,step_runs:h.step_runs||null,error_message:h.error_message||null,failed_step:h.failed_step||null,final_output:h.key_outputs||{},chat_response:h.chat_response||null,chat_messages:h.chat_messages||null,message_count:h.message_count||0,isChat:h.capability_id==="chat",hasExecution:!!h.has_execution}));
       const newIds=mapped.map(h=>h.id+":"+(h.message_count||0)+":"+(h.time||"")).join(",");
@@ -95,39 +88,33 @@ export default function Workspace({ activeWorkspace, userName }) {
 
   // ── Init ──
   useEffect(()=>{let o=false;
-    listCapabilities().then(r=>{if(!o)setCapabilities(r.capabilities||[])}).catch(()=>{});
+    sdk.capabilities.list().then(r=>{if(!o)setCapabilities(r.capabilities||[])}).catch(()=>{});
     loadHistory(true);
-    getMemoryContext().then(r=>{if(!o)setFreqCaps((r.context?.frequent_capabilities||[]).slice(0,6))}).catch(()=>{});
+    sdk.memory.context().then(r=>{if(!o)setFreqCaps((r.context?.frequent_capabilities||[]).slice(0,6))}).catch(()=>{});
     return()=>{o=true};
   },[]);
 
   // ── Reload history when active workspace changes ──
   useEffect(()=>{if(activeProjectId)loadHistory(true)},[activeProjectId]);
 
-  // ── WebSocket ──
-  const HISTORY_EVENTS=["telegram_message","whatsapp_message","slack_message","discord_message","session_updated","execution_complete","memory_cleared"];
-  const TOAST_EVENTS={
-    settings_updated:"Settings updated",
-    config_imported:"Configuration imported",
-    workspace_changed:"Workspace updated",
-    growth_update:"Growth system updated",
-    integration_changed:"Integration updated",
-    mcp_changed:"MCP updated",
-    a2a_changed:"A2A updated",
-    browser_changed:"Browser updated",
-    preferences_updated:"Preferences saved",
-  };
-  const handleWsEvent=useCallback((event)=>{
-    if(!event||!event.type)return;
-    if(HISTORY_EVENTS.includes(event.type)){loadHistory()}
-    if(TOAST_EVENTS[event.type]){addToast(TOAST_EVENTS[event.type]+(event.data?.action?" — "+event.data.action:""),"success")}
-    if(event.type==="error"&&event.data?.message){addToast("Error: "+event.data.message.slice(0,80),"error")}
-  },[]);
-  const{connected:wsConnected}=useWebSocket(handleWsEvent);
-  useEffect(()=>{const ms=wsConnected?30000:5000;const id=setInterval(()=>loadHistory(),ms);return()=>clearInterval(id)},[wsConnected]);
+  // ── Event-driven updates via SDK event bus (replaces polling) ──
+  const [wsConnected, setWsConnected] = useState(sdk.events.isConnected());
+  useEffect(() => {
+    const handler = (event) => {
+      if (!event || !event.type) return;
+      if (HISTORY_EVENTS.includes(event.type)) loadHistory();
+      if (EVENT_LABELS[event.type]) addToast(EVENT_LABELS[event.type] + (event.data?.action ? " — " + event.data.action : ""), "success");
+      if (event.type === "error" && event.data?.message) addToast("Error: " + event.data.message.slice(0, 80), "error");
+    };
+    sdk.events.on("*", handler);
+    const unsubConn = sdk.events.onConnectionChange(setWsConnected);
+    // Safety-net fallback: poll every 60s only if WS is disconnected
+    const fallbackId = setInterval(() => { if (!sdk.events.isConnected()) loadHistory(); }, 60000);
+    return () => { sdk.events.off("*", handler); unsubConn(); clearInterval(fallbackId); };
+  }, []);
 
-  // ── Messages ──
-  useEffect(()=>{messagesRef.current=messages;if(threadRef.current)threadRef.current.scrollTop=threadRef.current.scrollHeight},[messages]);
+  // ── Messages — persist to sessionStorage on every change ──
+  useEffect(()=>{messagesRef.current=messages;if(threadRef.current)threadRef.current.scrollTop=threadRef.current.scrollHeight;sdk.session.saveChatMessages(messages)},[messages]);
   function addMsg(role,content,meta){setMessages(p=>[...p,{id:Date.now()+Math.random(),role,content,meta,ts:new Date()}])}
   function showToast(msg,type="info"){addToast(msg,type)}
 
@@ -148,7 +135,7 @@ export default function Workspace({ activeWorkspace, userName }) {
         return{role:m.role==="user"?"user":"assistant",content:typeof m.content==="string"?m.content:JSON.stringify(m.content),type:"chat"};
       });
       const intentText=firstUser.content;const sid=currentSessionId;
-      saveChatSession(sid,intentText,compact,lastDur,activeProjectId).then(()=>{
+      sdk.memory.saveChatSession(sid,intentText,compact,lastDur,activeProjectId).then(()=>{
         const entry={id:sid,intent:intentText,status:lastStatus,duration_ms:lastDur,time:new Date().toISOString(),isChat:!hasExec,hasExecution:hasExec,chat_messages:compact,message_count:compact.length};
         setHistory(p=>{const idx=p.findIndex(h=>h.id===sid);if(idx>=0){const u=[...p];u[idx]=entry;return u}return[entry,...p].slice(0,10)});
       }).catch(()=>{});
@@ -208,7 +195,7 @@ export default function Workspace({ activeWorkspace, userName }) {
         const events=[];
         let finalText="";
         let sid=null;
-        for await(const ev of streamAgent(q,agentSessionId,hist,activeAgentId,activeProjectId)){
+        for await(const ev of sdk.agents.stream(q,agentSessionId,hist,activeAgentId,activeProjectId)){
           events.push(ev);
           if(ev.session_id)sid=ev.session_id;
           // Update UI in real-time
@@ -251,17 +238,17 @@ export default function Workspace({ activeWorkspace, userName }) {
     addMsg("system","Thinking...",{loading:true});
     try{
       const hist=getConversationHistory(messages);
-      const cls=await chatMessage(q,userName,hist).catch(()=>({type:"action"}));
+      const cls=await sdk.capabilities.chat(q,userName,hist).catch(()=>({type:"action"}));
       if(cls.type==="chat"){
         let streamed="";
-        try{for await(const chunk of streamChat(q,userName,hist)){streamed+=chunk;setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now(),role:"system",content:streamed,meta:{},ts:new Date()};return c})}}catch{if(!streamed)streamed=cls.response||"How can I help?"}
+        try{for await(const chunk of sdk.capabilities.streamChat(q,userName,hist)){streamed+=chunk;setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now(),role:"system",content:streamed,meta:{},ts:new Date()};return c})}}catch{if(!streamed)streamed=cls.response||"How can I help?"}
         if(!streamed)streamed=cls.response||"How can I help?";
         setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now(),role:"system",content:streamed,meta:{},ts:new Date()};return c});
         setSuggestedAction(null);sessionDirtyRef.current=true;setLoadingPlan(false);return;
       }
       const actionIntent=(cls.suggested_action&&suggestedAction)?suggestedAction:q;setSuggestedAction(null);
       setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now()+.1,role:"system",content:"Analyzing...",meta:{loading:true},ts:new Date()};return c});
-      const r=await planIntent(actionIntent,hist);setPlan(r);setPlanValidationErrors(Array.isArray(r.errors)?r.errors:[]);setPlanExecuted(false);
+      const r=await sdk.capabilities.plan(actionIntent,hist);setPlan(r);setPlanValidationErrors(Array.isArray(r.errors)?r.errors:[]);setPlanExecuted(false);
       setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now(),role:"system",content:"plan",meta:{plan:r},ts:new Date()};return c});
       sessionDirtyRef.current=true;
       if(autoExecute&&r?.steps?.length>0&&(!Array.isArray(r.errors)||r.errors.length===0)){autoExecTimerRef.current=setTimeout(()=>{autoExecTimerRef.current=null;runPlan()},800)}
@@ -279,7 +266,7 @@ export default function Workspace({ activeWorkspace, userName }) {
     setPendingConfirmation(null);
     addMsg("system","Continuing...",{loading:true});
     try{
-      const r=await confirmAgentAction(sid,confirmationId,true,password);
+      const r=await sdk.agents.confirm(sid,confirmationId,true,password);
       setAgentEvents(r.events||[]);
       if(r.status==="awaiting_confirmation"&&r.confirmation){
         setPendingConfirmation({...r.confirmation,session_id:sid});
@@ -299,7 +286,7 @@ export default function Workspace({ activeWorkspace, userName }) {
     const sid=pendingConfirmation.session_id;
     const cid=pendingConfirmation.confirmation_id;
     setPendingConfirmation(null);
-    confirmAgentAction(sid,cid,false).then(r=>{
+    sdk.agents.confirm(sid,cid,false).then(r=>{
       const finalText=r.final_text||"Action denied.";
       setMessages(p=>[...p,{id:Date.now(),role:"system",content:finalText,meta:{},ts:new Date()}]);
     }).catch(()=>{});
@@ -314,10 +301,10 @@ export default function Workspace({ activeWorkspace, userName }) {
       const run={step_id:step.step_id,capability:step.capability,status:"running",execution_id:null,final_output:{},error_code:null,error_message:null};runs.push(run);
       setExecution(p=>({...p,status:"running",current_step:step.step_id,step_runs:[...runs]}));
       try{
-        const res=await executeCapability(step.capability,resolve(step.inputs||{},ctx));
+        const res=await sdk.capabilities.execute(step.capability,resolve(step.inputs||{},ctx));
         run.execution_id=res.execution_id||null;run.status=res.status;run.final_output=res.final_output||{};run.error_code=res.error_code||null;run.error_message=res.error_message||null;
         let latest=res;
-        if(res.execution_id){latest=await getExecution(res.execution_id);const ev=await getExecutionEvents(res.execution_id);agg.push(...(ev.events||[]).map(e=>({...e,step_id:step.step_id})));setLogs([...agg])}
+        if(res.execution_id){latest=await sdk.capabilities.getExecution(res.execution_id);const ev=await sdk.capabilities.getExecutionEvents(res.execution_id);agg.push(...(ev.events||[]).map(e=>({...e,step_id:step.step_id})));setLogs([...agg])}
         else{agg.push(...(res.runtime?.logs||[]).map(e=>({...e,step_id:step.step_id})));setLogs([...agg])}
         ctx.steps[step.step_id]={outputs:latest.final_output||{}};Object.assign(ctx.state,latest.final_output||{});fo=latest.final_output||{};
         if(res.status!=="success"){st="error";fail=step.step_id;ec=res.error_code||"execution_error";em=res.error_message||`Step '${step.step_id}' failed.`;run.status="error";break}
@@ -344,17 +331,17 @@ export default function Workspace({ activeWorkspace, userName }) {
   }
 
   function handleNewSession(){
-    flushSession();setMessages([]);setPlan(null);setExecution(null);setErrorMessage("");setSuggestedAction(null);setPlanExecuted(false);
+    flushSession();setMessages([]);sdk.session.clearChatMessages();setPlan(null);setExecution(null);setErrorMessage("");setSuggestedAction(null);setPlanExecuted(false);
     sessionDirtyRef.current=false;setCurrentSessionId("chat_"+Date.now());setActiveSessionId(null);activeSessionRef.current=null;
   }
 
   function handleDeleteSession(id){
     if(!id)return;setDeletingId(id);
-    setTimeout(()=>{deleteHistoryEntry(id).then(()=>{setHistory(p=>p.filter(x=>x.id!==id));showToast("Session deleted")}).catch(()=>{showToast("Failed to delete")}).finally(()=>setDeletingId(null))},220);
+    setTimeout(()=>{sdk.memory.deleteHistory(id).then(()=>{setHistory(p=>p.filter(x=>x.id!==id));showToast("Session deleted")}).catch(()=>{showToast("Failed to delete")}).finally(()=>setDeletingId(null))},220);
   }
 
   function handleClearAll(){
-    clearAllMemory().catch(()=>{});setHistory([]);setMessages([]);setPlan(null);setExecution(null);setConfirmClear(false);showToast("All sessions cleared");
+    sdk.memory.clearAll().catch(()=>{});setHistory([]);setMessages([]);setPlan(null);setExecution(null);setConfirmClear(false);showToast("All sessions cleared");
   }
 
   const stepRuns=execution?.step_runs||[];
@@ -364,12 +351,12 @@ export default function Workspace({ activeWorkspace, userName }) {
     <div className={`conv-layout${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
       {!sidebarCollapsed && <ProjectSidebar
         workspaces={workspaces} activeProjectId={activeProjectId} projectStates={projectStates}
-        agents={agents} onUpdateAgents={async(wsId,ids)=>{try{await updateWorkspace(wsId,{agent_ids:ids});setWorkspaces(w=>w.map(ws=>ws.id===wsId?{...ws,agent_ids:ids}:ws))}catch{}}}
+        agents={agents} onUpdateAgents={async(wsId,ids)=>{try{await sdk.workspaces.update(wsId,{agent_ids:ids});setWorkspaces(w=>w.map(ws=>ws.id===wsId?{...ws,agent_ids:ids}:ws))}catch{}}}
         history={history} userName={userName} wsConnected={wsConnected}
         onSelectProject={id=>{setActiveProjectId(id)}}
         onNewProject={()=>setShowNewProject(true)}
-        onUpdateStatus={async(wsId,status)=>{try{await updateWorkspaceStatus(wsId,status);setWorkspaces(w=>w.map(ws=>ws.id===wsId?{...ws,status}:ws))}catch{}}}
-        onDeleteProject={async(wsId)=>{try{await removeWorkspace(wsId);setWorkspaces(w=>w.filter(ws=>ws.id!==wsId));if(activeProjectId===wsId)setActiveProjectId(null)}catch{}}}
+        onUpdateStatus={async(wsId,status)=>{try{await sdk.workspaces.updateStatus(wsId,status);setWorkspaces(w=>w.map(ws=>ws.id===wsId?{...ws,status}:ws))}catch{}}}
+        onDeleteProject={async(wsId)=>{try{await sdk.workspaces.remove(wsId);setWorkspaces(w=>w.filter(ws=>ws.id!==wsId));if(activeProjectId===wsId)setActiveProjectId(null)}catch{}}}
         onNewSession={handleNewSession} onRestoreSession={restoreSession}
         onDeleteSession={handleDeleteSession} onClearAll={handleClearAll}
       />}
@@ -408,9 +395,9 @@ export default function Workspace({ activeWorkspace, userName }) {
         states={projectStates}
         onCreate={async(p)=>{
           try{
-            const r=await addWorkspace(p.name,p.path,"write","*","#00ff88");
+            const r=await sdk.workspaces.add(p.name,p.path,"write","*","#00ff88");
             if(r.workspace){
-              await updateWorkspaceStatus(r.workspace.id,p.status);
+              await sdk.workspaces.updateStatus(r.workspace.id,p.status);
               const ws={...r.workspace,status:p.status};
               setWorkspaces(prev=>[...prev,ws]);
               setActiveProjectId(ws.id);

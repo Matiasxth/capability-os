@@ -1,17 +1,10 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-
-const API = import.meta.env.VITE_API_BASE_URL || "";
-
-function authHeaders(token) {
-  const h = { "Content-Type": "application/json" };
-  if (token) h["Authorization"] = `Bearer ${token}`;
-  return h;
-}
+import sdk from "../sdk";
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(() => localStorage.getItem("capos_token") || null);
+  const [token, setToken] = useState(() => sdk.session.getToken());
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -19,21 +12,19 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let cancelled = false;
     async function validate() {
-      const stored = localStorage.getItem("capos_token");
+      const stored = sdk.session.getToken();
       if (!stored) {
         setLoading(false);
         return;
       }
       try {
-        const res = await fetch(`${API}/auth/me`, { headers: authHeaders(stored) });
-        if (!res.ok) throw new Error("invalid");
-        const data = await res.json();
+        const data = await sdk.auth.me();
         if (!cancelled) {
           setUser(data.user || data);
           setToken(stored);
         }
       } catch {
-        localStorage.removeItem("capos_token");
+        sdk.session.clearToken();
         if (!cancelled) {
           setToken(null);
           setUser(null);
@@ -46,24 +37,16 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = useCallback(async (username, password) => {
-    const res = await fetch(`${API}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.detail || data.error_message || "Login failed");
-    }
+    const data = await sdk.auth.login(username, password);
     const tk = data.access_token || data.token;
-    localStorage.setItem("capos_token", tk);
+    sdk.session.setToken(tk);
     setToken(tk);
     setUser(data.user || null);
     return data;
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem("capos_token");
+    sdk.session.clearToken();
     setToken(null);
     setUser(null);
     window.location.replace("/login");

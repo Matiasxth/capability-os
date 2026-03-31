@@ -1,17 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  disableIntegration,
-  enableIntegration,
-  executeCapability,
-  getCapability,
-  getExecution,
-  getExecutionEvents,
-  getIntegration,
-  interpretText,
-  listCapabilities,
-  listIntegrations,
-  validateIntegration
-} from "../api";
+import sdk from "../sdk";
 
 const VISIBLE_STATUS_BY_INTERNAL = {
   available: "listo",
@@ -88,8 +76,8 @@ export default function AdvancedPanel() {
       setErrorMessage("");
       try {
         const [capabilityResponse, integrationResponse] = await Promise.all([
-          listCapabilities(),
-          listIntegrations()
+          sdk.capabilities.list(),
+          sdk.integrations.list()
         ]);
         setCapabilities(capabilityResponse.capabilities || []);
         setIntegrations(integrationResponse.integrations || []);
@@ -115,7 +103,7 @@ export default function AdvancedPanel() {
       setLoadingDetail(true);
       setErrorMessage("");
       try {
-        const response = await getCapability(selectedCapabilityId);
+        const response = await sdk.capabilities.get(selectedCapabilityId);
         const capability = response.capability;
         setSelectedCapability(capability);
         const nextInputs = {};
@@ -147,7 +135,7 @@ export default function AdvancedPanel() {
       setLoadingIntegrationDetail(true);
       setErrorMessage("");
       try {
-        const response = await getIntegration(selectedIntegrationId);
+        const response = await sdk.integrations.get(selectedIntegrationId);
         setSelectedIntegration(response.integration || null);
       } catch (error) {
         setErrorMessage(error.message || "No se pudo cargar el detalle de integración.");
@@ -183,21 +171,21 @@ export default function AdvancedPanel() {
 
   async function refreshExecution(executionId) {
     const [executionResponse, eventsResponse] = await Promise.all([
-      getExecution(executionId),
-      getExecutionEvents(executionId)
+      sdk.capabilities.getExecution(executionId),
+      sdk.capabilities.getExecutionEvents(executionId)
     ]);
     setExecution(executionResponse);
     setEvents(eventsResponse.events || []);
   }
 
   async function refreshIntegrations(selectedId = selectedIntegrationId) {
-    const listResponse = await listIntegrations();
+    const listResponse = await sdk.integrations.list();
     const integrationItems = listResponse.integrations || [];
     setIntegrations(integrationItems);
     if (!selectedId) {
       return;
     }
-    const detailResponse = await getIntegration(selectedId);
+    const detailResponse = await sdk.integrations.get(selectedId);
     setSelectedIntegration(detailResponse.integration || null);
   }
 
@@ -206,11 +194,11 @@ export default function AdvancedPanel() {
     setErrorMessage("");
     try {
       if (action === "validate") {
-        await validateIntegration(integrationId);
+        await sdk.integrations.validate(integrationId);
       } else if (action === "enable") {
-        await enableIntegration(integrationId);
+        await sdk.integrations.enable(integrationId);
       } else if (action === "disable") {
-        await disableIntegration(integrationId);
+        await sdk.integrations.disable(integrationId);
       }
       await refreshIntegrations(integrationId);
       setSelectedIntegrationId(integrationId);
@@ -233,7 +221,7 @@ export default function AdvancedPanel() {
     setErrorMessage("");
     try {
       const parsedInputs = buildInputs(selectedCapability, rawInputs);
-      const executeResponse = await executeCapability(selectedCapability.id, parsedInputs);
+      const executeResponse = await sdk.capabilities.execute(selectedCapability.id, parsedInputs);
       setExecution(executeResponse);
       setEvents(executeResponse.runtime?.logs || []);
 
@@ -253,7 +241,7 @@ export default function AdvancedPanel() {
     setInterpreting(true);
     setErrorMessage("");
     try {
-      const response = await interpretText(nlText);
+      const response = await sdk.capabilities.interpret(nlText);
       setSuggestionResponse(response);
       const suggestedCapability = response?.suggestion?.capability;
       if (response?.suggestion?.type === "capability" && typeof suggestedCapability === "string") {
@@ -279,7 +267,7 @@ export default function AdvancedPanel() {
     setExecuting(true);
     setErrorMessage("");
     try {
-      const executeResponse = await executeCapability(suggestion.capability, suggestion.inputs || {});
+      const executeResponse = await sdk.capabilities.execute(suggestion.capability, suggestion.inputs || {});
       setExecution(executeResponse);
       setEvents(executeResponse.runtime?.logs || []);
       if (executeResponse.execution_id) {

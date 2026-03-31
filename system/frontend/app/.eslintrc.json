@@ -1,0 +1,36 @@
+{
+  "env": { "browser": true, "es2022": true },
+  "parserOptions": { "ecmaVersion": "latest", "sourceType": "module", "ecmaFeatures": { "jsx": true } },
+  "rules": {
+    "no-restricted-imports": ["error", {
+      "patterns": [
+        { "group": ["**/api", "**/api.js"], "message": "Import from sdk instead: import sdk from './sdk' or '../sdk'" }
+      ]
+    }],
+    "no-restricted-syntax": ["warn",
+      {
+        "selector": "CallExpression[callee.name='fetch']",
+        "message": "Use sdk methods instead of raw fetch(). All HTTP calls go through sdk/client.js."
+      },
+      {
+        "selector": "MemberExpression[object.name='localStorage'][property.name='getItem'][parent.parent.arguments.0.value='capos_token']",
+        "message": "Use sdk.session.getToken() instead of direct localStorage access for auth tokens."
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["src/sdk/**/*.js"],
+      "rules": {
+        "no-restricted-syntax": "off"
+      }
+    },
+    {
+      "files": ["**/*.test.*", "**/test/**"],
+      "rules": {
+        "no-restricted-syntax": "off",
+        "no-restricted-imports": "off"
+      }
+    }
+  ]
+}

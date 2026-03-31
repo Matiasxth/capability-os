@@ -143,6 +143,29 @@ First-time setup creates the owner account via `/auth/setup`.
 ### Integrated IDE
 Monaco-based code editor with file explorer, terminal, workspace analysis, auto-clean, and README generation.
 
+### Frontend SDK
+All frontend-to-backend communication goes through a centralized SDK layer (`src/sdk/`):
+
+```js
+import sdk from "./sdk";
+
+// HTTP (auth injected automatically)
+const caps = await sdk.capabilities.list();
+await sdk.system.settings.save({ llm: { model: "gpt-4o" } });
+
+// Streaming with JWT auth
+for await (const chunk of sdk.capabilities.streamChat("hello", "User")) { ... }
+
+// Real-time events (replaces polling)
+sdk.events.on("telegram_message", (e) => console.log(e.data.text));
+sdk.events.on("*", handler); // wildcard
+
+// Session persistence
+sdk.session.saveChatMessages(messages); // survives page refresh
+```
+
+13 domain modules: `agents`, `capabilities`, `integrations`, `memory`, `system`, `workspaces`, `mcp`, `a2a`, `workflows`, `skills`, `growth`, `auth`. See [Frontend Architecture](docs/FRONTEND_ARCHITECTURE.md).
+
 ### Supervisor
 Background system that monitors health, detects capability gaps, audits security, and can invoke Claude Code for auto-repair.
 
@@ -569,7 +592,21 @@ capability-os/
 
 ## Changelog
 
-### v3.0 (Current)
+### v3.1 (Current)
+- **Frontend SDK** -- single gateway to backend (HTTP + SSE + WebSocket), 13 domain modules
+- **ControlCenter refactored** -- 848 lines split into 16 independent section components
+- **Session persistence** -- chat survives page refresh (sessionStorage)
+- **Event-driven UI** -- sdk.events replaces polling, typed event catalog (24 types)
+- **PWA support** -- installable app, Service Worker caching, push notifications
+- **8 messaging channels** -- WhatsApp, Telegram, Slack, Discord + Signal, Matrix, Teams, Email, Webhook (UI ready)
+- **ChannelCard component** -- add a new channel in 12 lines of config
+- **55 frontend tests** -- SDK core, domains, component integration tests
+- **GitHub Actions CI** -- automated test + build on push/PR
+- **Boundary enforcement** -- ESLint rules ban raw fetch() and direct localStorage access
+- **Streaming auth fix** -- SSE endpoints now send JWT (was missing before)
+- **NotificationCenter** -- real-time activity feed with tab filters
+
+### v3.0
 - **Plugin SDK** -- typed Protocol contracts, ServiceContainer with Kahn's topological sort
 - **21 plugins** -- modular architecture replacing the monolith
 - **Multi-user auth** -- JWT, 4 roles (owner/admin/user/viewer), login page

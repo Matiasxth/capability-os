@@ -1,15 +1,5 @@
 import React, { useEffect, useState } from "react";
-import {
-  getPendingGaps,
-  generateCapabilityForGap,
-  approveGap,
-  rejectGap,
-  getPendingOptimizations,
-  approveOptimization,
-  rejectOptimization,
-  approveProposal,
-  rejectProposal,
-} from "../../api";
+import sdk from "../../sdk";
 
 export default function SelfImprovementPanel() {
   const [gaps, setGaps] = useState([]);
@@ -24,8 +14,8 @@ export default function SelfImprovementPanel() {
     setError("");
     try {
       const [gapRes, optRes] = await Promise.all([
-        getPendingGaps(),
-        getPendingOptimizations(),
+        sdk.growth.gaps.pending(),
+        sdk.growth.optimizations.pending(),
       ]);
       setGaps(gapRes.gaps || []);
       setOptimizations(optRes.proposals || []);
@@ -68,10 +58,10 @@ export default function SelfImprovementPanel() {
           </div>
           <small>{gap.sample_intent}</small>
           <div style={{ display: "flex", gap: "0.5rem" }}>
-            <button type="button" onClick={() => handleAction(() => generateCapabilityForGap(gap.gap_ids[0]), `Generated proposal for ${gap.capability_id}`)}>
+            <button type="button" onClick={() => handleAction(() => sdk.growth.gaps.generate(gap.gap_ids[0]), `Generated proposal for ${gap.capability_id}`)}>
               Generate
             </button>
-            <button type="button" onClick={() => handleAction(() => rejectGap(gap.gap_ids[0]), `Dismissed gap ${gap.capability_id}`)}>
+            <button type="button" onClick={() => handleAction(() => sdk.growth.gaps.reject(gap.gap_ids[0]), `Dismissed gap ${gap.capability_id}`)}>
               Ignore
             </button>
           </div>
@@ -97,10 +87,10 @@ export default function SelfImprovementPanel() {
             </pre>
           </details>
           <div style={{ display: "flex", gap: "0.5rem" }}>
-            <button type="button" onClick={() => handleAction(() => approveOptimization(opt.id, opt.proposed_contract), `Applied optimization for ${opt.capability_id}`)}>
+            <button type="button" onClick={() => handleAction(() => sdk.growth.optimizations.approve(opt.id, opt.proposed_contract), `Applied optimization for ${opt.capability_id}`)}>
               Approve
             </button>
-            <button type="button" onClick={() => handleAction(() => rejectOptimization(opt.id), `Discarded optimization for ${opt.capability_id}`)}>
+            <button type="button" onClick={() => handleAction(() => sdk.growth.optimizations.reject(opt.id), `Discarded optimization for ${opt.capability_id}`)}>
               Discard
             </button>
           </div>

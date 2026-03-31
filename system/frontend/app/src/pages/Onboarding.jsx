@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { setMemoryPreferences, saveSettings } from "../api";
+import sdk from "../sdk";
 
 const PROVIDERS = {
   groq: { label: "Groq", desc: "Free & fast", rec: true, provider: "openai", base_url: "https://api.groq.com/openai/v1", models: ["llama-3.1-70b-versatile","llama-3.1-8b-instant","mixtral-8x7b-32768","gemma2-9b-it"], needsKey: true },
@@ -25,7 +25,7 @@ export default function Onboarding({ onComplete }) {
     e.preventDefault();
     if (!name.trim()) return;
     setSaving(true);
-    try { await setMemoryPreferences({ name: name.trim() }); } catch {}
+    try { await sdk.memory.setPreferences({ name: name.trim() }); } catch {}
     setSaving(false);
     setStep(2);
   }
@@ -41,7 +41,7 @@ export default function Onboarding({ onComplete }) {
         api_key: p.needsKey ? apiKey : "",
         timeout_ms: 30000,
       };
-      try { await saveSettings({ llm }); } catch {}
+      try { await sdk.system.settings.save({ llm }); } catch {}
     }
     setSaving(false);
     setStep(3);

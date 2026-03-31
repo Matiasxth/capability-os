@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getMetrics } from "../../api";
+import sdk from "../../sdk";
 
 export default function MetricsPanel() {
   const [metrics, setMetrics] = useState(null);
@@ -10,7 +10,7 @@ export default function MetricsPanel() {
     setLoading(true);
     setError("");
     try {
-      const response = await getMetrics();
+      const response = await sdk.memory.metrics();
       setMetrics(response.metrics || null);
     } catch (err) {
       setError(err.payload?.error_message || err.message || "Failed to load metrics.");

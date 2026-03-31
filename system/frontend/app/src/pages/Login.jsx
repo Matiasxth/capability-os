@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-
-const API = import.meta.env.VITE_API_BASE_URL || "";
+import sdk from "../sdk";
 
 export default function Login() {
   const { login } = useAuth();
@@ -19,8 +18,7 @@ export default function Login() {
     let cancelled = false;
     async function check() {
       try {
-        const res = await fetch(`${API}/auth/status`);
-        const data = await res.json();
+        const data = await sdk.auth.status();
         if (!cancelled) {
           setMode(data.owner_exists ? "login" : "setup");
         }
@@ -53,17 +51,7 @@ export default function Login() {
     setError("");
     setBusy(true);
     try {
-      const res = await fetch(`${API}/auth/setup`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: username.trim(),
-          password,
-          display_name: displayName.trim(),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || data.error_message || "Setup failed");
+      await sdk.auth.setup(username.trim(), password);
       // Auto-login after setup
       await login(username.trim(), password);
       window.location.replace("/");

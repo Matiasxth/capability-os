@@ -1,12 +1,5 @@
 import React, { useEffect, useState } from "react";
-import {
-  getMCPServers,
-  addMCPServer,
-  removeMCPServer,
-  discoverMCPTools,
-  getMCPTools,
-  installMCPTool,
-} from "../../api";
+import sdk from "../../sdk";
 
 export default function MCPPanel() {
   const [servers, setServers] = useState([]);
@@ -25,7 +18,7 @@ export default function MCPPanel() {
     setLoading(true);
     setError("");
     try {
-      const [srvRes, toolRes] = await Promise.all([getMCPServers(), getMCPTools()]);
+      const [srvRes, toolRes] = await Promise.all([sdk.mcp.servers.list(), sdk.mcp.tools.list()]);
       setServers(srvRes.servers || []);
       setTools(toolRes.tools || []);
     } catch (err) {
@@ -54,7 +47,7 @@ export default function MCPPanel() {
     const config = { id: newId, transport: newTransport };
     if (newTransport === "stdio") config.command = newCommand.split(/\s+/);
     else config.url = newUrl;
-    await handleAction(() => addMCPServer(config), `Server '${newId}' added.`);
+    await handleAction(() => sdk.mcp.servers.add(config), `Server '${newId}' added.`);
     setNewId("");
     setNewCommand("");
     setNewUrl("");
@@ -97,10 +90,10 @@ export default function MCPPanel() {
             <span style={{ marginLeft: "0.5rem", color: "#888" }}>{srv.tools_discovered} tools</span>
           </div>
           <div style={{ display: "flex", gap: "0.5rem" }}>
-            <button type="button" onClick={() => handleAction(() => discoverMCPTools(srv.server_id), `Discovered tools from ${srv.server_id}`)}>
+            <button type="button" onClick={() => handleAction(() => sdk.mcp.servers.discover(srv.server_id), `Discovered tools from ${srv.server_id}`)}>
               Discover Tools
             </button>
-            <button type="button" onClick={() => handleAction(() => removeMCPServer(srv.server_id), `Removed ${srv.server_id}`)}>
+            <button type="button" onClick={() => handleAction(() => sdk.mcp.servers.remove(srv.server_id), `Removed ${srv.server_id}`)}>
               Remove
             </button>
           </div>
@@ -116,7 +109,7 @@ export default function MCPPanel() {
             <strong>{tool.tool_id}</strong>
             <span style={{ marginLeft: "0.5rem", color: "#888" }}>{tool.server_id}</span>
           </div>
-          <button type="button" onClick={() => handleAction(() => installMCPTool(tool.tool_id), `Proposal created for ${tool.tool_id}`)}>
+          <button type="button" onClick={() => handleAction(() => sdk.mcp.tools.install(tool.tool_id), `Proposal created for ${tool.tool_id}`)}>
             Install as Capability
           </button>
         </div>

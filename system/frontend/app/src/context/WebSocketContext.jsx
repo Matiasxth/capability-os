@@ -1,5 +1,5 @@
-import React, { createContext, useCallback, useContext, useRef, useState } from "react";
-import { useWebSocket } from "../hooks/useWebSocket";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import sdk from "../sdk";
 
 const WebSocketContext = createContext();
 
@@ -7,21 +7,21 @@ const MAX_EVENTS = 100;
 
 export function WebSocketProvider({ children }) {
   const [events, setEvents] = useState([]);
-  const listenersRef = useRef(new Set());
+  const [connected, setConnected] = useState(sdk.events.isConnected());
 
-  const handleEvent = useCallback((event) => {
-    if (!event || !event.type) return;
-    setEvents(prev => [event, ...prev].slice(0, MAX_EVENTS));
-    listenersRef.current.forEach(fn => {
-      try { fn(event); } catch {}
-    });
+  useEffect(() => {
+    const handler = (event) => {
+      if (!event || !event.type) return;
+      setEvents(prev => [event, ...prev].slice(0, MAX_EVENTS));
+    };
+    sdk.events.on("*", handler);
+    const unsub = sdk.events.onConnectionChange(setConnected);
+    return () => { sdk.events.off("*", handler); unsub(); };
   }, []);
 
-  const { connected } = useWebSocket(handleEvent);
-
   const subscribe = useCallback((fn) => {
-    listenersRef.current.add(fn);
-    return () => listenersRef.current.delete(fn);
+    sdk.events.on("*", fn);
+    return () => sdk.events.off("*", fn);
   }, []);
 
   return (

@@ -4,14 +4,7 @@ import "@xyflow/react/dist/style.css";
 import WorkflowCanvas from "../components/workflow/WorkflowCanvas";
 import NodePalette from "../components/workflow/NodePalette";
 import NodeConfigPanel from "../components/workflow/NodeConfigPanel";
-import {
-  listWorkflows,
-  createWorkflow,
-  getWorkflow,
-  updateWorkflow,
-  deleteWorkflow,
-  runWorkflow,
-} from "../api";
+import sdk from "../sdk";
 
 /* ── Status badge color map ── */
 const STATUS_COLORS = {
@@ -48,7 +41,7 @@ export default function WorkflowEditor() {
   /* ── Load workflow list ── */
   const loadWorkflows = useCallback(async () => {
     try {
-      const data = await listWorkflows();
+      const data = await sdk.workflows.list();
       setWorkflows(data.workflows || data || []);
     } catch (e) {
       setError(e.message);
@@ -75,7 +68,7 @@ export default function WorkflowEditor() {
       return;
     }
     try {
-      const wf = await getWorkflow(id);
+      const wf = await sdk.workflows.get(id);
       setSelectedId(id);
       setWfName(wf.name || "");
       setWfDesc(wf.description || "");
@@ -114,7 +107,7 @@ export default function WorkflowEditor() {
     if (!selectedId) return;
     setStatus("saving");
     try {
-      await updateWorkflow(selectedId, {
+      await sdk.workflows.update(selectedId, {
         name: wfName,
         description: wfDesc,
         nodes,
@@ -135,7 +128,7 @@ export default function WorkflowEditor() {
     setRunResult(null);
     setShowRunPanel(true);
     try {
-      const result = await runWorkflow(selectedId);
+      const result = await sdk.workflows.run(selectedId);
       setRunResult(result);
       setStatus("success");
       setTimeout(() => setStatus((s) => (s === "success" ? "idle" : s)), 3000);
@@ -149,7 +142,7 @@ export default function WorkflowEditor() {
   const handleCreate = useCallback(async () => {
     if (!newName.trim()) return;
     try {
-      const wf = await createWorkflow(newName.trim(), newDesc.trim());
+      const wf = await sdk.workflows.create(newName.trim(), newDesc.trim());
       setNewName("");
       setNewDesc("");
       setCreateDialogOpen(false);
@@ -164,7 +157,7 @@ export default function WorkflowEditor() {
   const handleDelete = useCallback(async (id) => {
     if (!window.confirm("Delete this workflow?")) return;
     try {
-      await deleteWorkflow(id);
+      await sdk.workflows.delete(id);
       if (selectedId === id) {
         setSelectedId(null);
         setNodes([]);

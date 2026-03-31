@@ -3,15 +3,7 @@ import FileExplorer from "./FileExplorer";
 import CodeEditor from "./CodeEditor";
 import Terminal from "./Terminal";
 
-const API = import.meta.env.VITE_API_BASE_URL || "";
-
-async function api(path, opts = {}) {
-  const h = { "Content-Type": "application/json" };
-  const token = localStorage.getItem("capos_token");
-  if (token) h["Authorization"] = `Bearer ${token}`;
-  const r = await fetch(`${API}${path}`, { headers: h, ...opts });
-  return r.json();
-}
+import sdk from "../../sdk";
 
 export default function EditorLayout({ wsId, workspaces = [] }) {
   const [activeWsId, setActiveWsId] = useState(wsId);
@@ -24,7 +16,7 @@ export default function EditorLayout({ wsId, workspaces = [] }) {
 
   const loadTree = useCallback(async () => {
     try {
-      const r = activeWsId ? await api(`/files/tree/${activeWsId}`) : await api("/files/tree");
+      const r = activeWsId ? await sdk.system.files.tree(activeWsId) : await sdk.system.files.tree();
       setTree(r.items || []);
     } catch {}
   }, [activeWsId]);
@@ -33,7 +25,7 @@ export default function EditorLayout({ wsId, workspaces = [] }) {
 
   const handleSelectFile = async (item) => {
     try {
-      const r = await api(`/files/read?path=${encodeURIComponent(item.path)}&ws=${activeWsId || ""}`);
+      const r = await sdk.system.files.read(item.path, activeWsId);
       setOpenFile({ path: item.path, content: r.content || "", language: r.language || "plaintext" });
     } catch {}
   };
@@ -41,13 +33,13 @@ export default function EditorLayout({ wsId, workspaces = [] }) {
   const handleSave = async (content) => {
     if (!openFile) return;
     try {
-      await api("/files/write", { method: "POST", body: JSON.stringify({ path: openFile.path, content, ws_id: activeWsId || "" }) });
+      await sdk.system.files.write(openFile.path, content, activeWsId);
       setOpenFile(f => ({ ...f, content }));
     } catch {}
   };
 
   const handleTerminal = async (command) => {
-    return api("/files/terminal", { method: "POST", body: JSON.stringify({ command, ws_id: activeWsId || "" }) });
+    return sdk.system.files.terminal(command, activeWsId);
   };
 
   const handleWsChange = (id) => {

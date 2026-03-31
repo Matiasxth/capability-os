@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { streamExecution } from "../api";
+import sdk from "../sdk";
 
 /**
  * Hook for streaming capability execution events via SSE.
@@ -15,7 +15,7 @@ export function useExecutionStream() {
     setResult(null);
     setStatus("running");
     try {
-      for await (const event of streamExecution(capabilityId, inputs)) {
+      for await (const event of sdk.capabilities.streamExecution(capabilityId, inputs)) {
         if (event.done) {
           setResult(event.result);
           setStatus(event.result?.status === "error" ? "error" : "done");
