@@ -249,10 +249,10 @@ Three-cycle task system: Quick (30min), Deep (4h), Daily. Supports cron-style sc
 ## Architecture
 
 ```
-                        HTTP / WebSocket
+                        HTTP / WebSocket (same port 8000)
                               |
                     +---------+---------+
-                    |   ASGI (uvicorn)  |  ThreadPool(32) + SSE streaming
+                    |   ASGI (uvicorn)  |  ThreadPool(32) + SSE + WS native
                     +---------+---------+
                               |
                     +---------+---------+
@@ -273,17 +273,19 @@ Three-cycle task system: Quick (30min), Deep (4h), Daily. Supports cron-style sc
          |Plugins  |   | (bridge)  |◄─►| (queue)  |
          |(in-proc)|   +-----+-----+   +----+-----+
          +---------+         |              |
-                        +----+----+    +----+-----+
-                        |WebSocket|    | 6 Worker |
-                        | Server  |    | Processes|
-                        |(200 max)|    +----------+
-                        +---------+    | telegram |
-                                       | slack    |
-                                       | discord  |
-                                       | whatsapp |
-                                       | scheduler|
-                                       | supervisor|
-                                       +----------+
+              |         +----+----+    +----+-----+
+     +--------+------+  |WebSocket|    | 6 Worker |
+     |  Infrastructure|  | (ASGI) |    | Processes|
+     +--------+------+  +---------+    +----------+
+              |                        | telegram |
+     +--------+--------+              | slack    |
+     | PostgreSQL/SQLite|              | discord  |
+     | (9 tables,       |              | whatsapp |
+     |  9 repositories) |              | scheduler|
+     +---------+--------+              | supervisor|
+     | ToolPool | LLMPool|              +----------+
+     | (8 wkrs) | (httpx)|
+     +----------+--------+
 ```
 
 ### Plugin Dependency Graph
@@ -517,6 +519,9 @@ python -m capabilityos <command> [options]
     "api_key": "YOUR_KEY",
     "timeout_ms": 30000
   },
+  "database": {
+    "url": "postgresql://user:pass@localhost:5432/capos"
+  },
   "redis": {
     "enabled": true,
     "url": "redis://127.0.0.1:6379/0"
@@ -582,7 +587,10 @@ python -m capabilityos <command> [options]
 ### Requirements
 - Python 3.12+
 - Node.js 18+
-- Redis (optional — system works without it, but enables distributed workers)
+- Redis (optional — enables distributed workers, event bridge, cache)
+- PostgreSQL (optional — falls back to SQLite with WAL mode)
+- Optional: `pip install httpx` (connection-pooled LLM calls with retry)
+- Optional: `pip install psycopg[binary]` (PostgreSQL driver)
 - Optional: `pip install playwright && python -m playwright install chromium`
 
 ### Install Dependencies
@@ -592,6 +600,8 @@ cd system/frontend/app && npm install && npm run build && cd ../../..
 ```
 
 Core Python dependencies: `bcrypt`, `PyJWT`, `uvicorn`, `redis`, `anthropic`, `sqlite-vec`
+
+Optional: `psycopg[binary]` (PostgreSQL), `httpx` (connection-pooled LLM calls)
 
 ### Run Tests
 ```bash
@@ -612,7 +622,8 @@ capability-os/
 +-- system/
 |   +-- sdk/                        # Plugin SDK (contracts, context, lifecycle)
 |   +-- container/                  # ServiceContainer, plugin loader, hot-reload
-|   +-- infrastructure/             # Redis queues, worker processes, event bridge
+|   +-- infrastructure/             # DB, repos, Redis, workers, tool pool, LLM pool
+|   |   +-- repositories/          # 9 DB repositories (PG/SQLite)
 |   +-- workers/                    # Channel/scheduler/supervisor worker scripts
 |   +-- plugins/                    # 22 built-in plugins
 |   |   +-- core_services/          # Settings, registries, security
@@ -674,7 +685,12 @@ capability-os/
 ## Changelog
 
 ### v3.2 (Current)
-- **Distributed workers** -- 6 plugins (Telegram, Slack, Discord, WhatsApp, Scheduler, Supervisor) run as Redis-backed subprocesses with auto-restart and heartbeat. Falls back to in-process without Redis.
+- **PostgreSQL/SQLite database** -- 9 tables, 9 repositories, auto-schema creation. All JSON storage migrated with automatic data migration and JSON fallback backup
+- **Database.upsert()** -- cross-backend upsert (ON CONFLICT for PG, INSERT OR REPLACE for SQLite)
+- **Tool Execution Pool** -- dedicated ThreadPoolExecutor (8 workers) separates tool execution from HTTP handlers with per-security-level timeouts (30/60/120s)
+- **LLM Connection Pool** -- httpx-based HTTP pool with connection reuse, exponential backoff retry (3 attempts), and semaphore-limited concurrency (4 max). Falls back to urllib
+- **WebSocket ASGI consolidation** -- native WebSocket on same port 8000 via ASGI, standalone ws_server.py only as sync fallback
+- **Distributed workers** -- 6 plugins (Telegram, Slack, Discord, WhatsApp, Scheduler, Supervisor) run as Redis-backed subprocesses with auto-restart and heartbeat. Falls back to in-process without Redis
 - **5 LLM providers** -- Anthropic (SDK), OpenAI, Gemini, DeepSeek, Ollama all fully functional with tool calling
 - **Redis infrastructure** -- MessageQueue, EventBridge, WorkerProcess, WorkerRegistry, RedisCache
 - **Agent sessions in Redis** -- survive process restarts, enable cross-process recovery

@@ -48,7 +48,9 @@ class CoreServicesPlugin:
         project_root = ctx.project_root
 
         # --- SettingsService ---
-        settings_service = SettingsService(workspace_root=workspace_root)
+        from system.sdk.contracts import DatabaseContract
+        db = ctx.get_optional(DatabaseContract)
+        settings_service = SettingsService(workspace_root=workspace_root, db=db)
         ctx.publish_service(SettingsProvider, settings_service)
         logger.info("Published SettingsProvider")
 
@@ -71,8 +73,10 @@ class CoreServicesPlugin:
             "Published ToolRegistryContract (%d contracts)", len(tool_registry)
         )
 
-        # --- ToolRuntime ---
-        tool_runtime = ToolRuntime(tool_registry, workspace_root=workspace_root)
+        # --- ToolRuntime (with dedicated execution pool) ---
+        from system.infrastructure.tool_pool import ToolExecutionPool
+        tool_pool = ToolExecutionPool()
+        tool_runtime = ToolRuntime(tool_registry, workspace_root=workspace_root, tool_pool=tool_pool)
         register_phase3_real_tools(tool_runtime, workspace_root)
         ctx.publish_service(ToolRuntimeContract, tool_runtime)
         logger.info("Published ToolRuntimeContract")

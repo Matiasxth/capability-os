@@ -42,8 +42,11 @@ class WorkflowsPlugin:
         try:
             from system.core.workflow import WorkflowRegistry
 
+            from system.sdk.contracts import DatabaseContract
+            db = ctx.get_optional(DatabaseContract)
             self.workflow_registry = WorkflowRegistry(
                 workspace_root=workspace_root,
+                db=db,
             )
             logger.info("Created WorkflowRegistry")
         except Exception:

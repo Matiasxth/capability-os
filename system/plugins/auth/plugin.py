@@ -35,8 +35,10 @@ class AuthPlugin:
         workspace_root = ctx.workspace_root
 
         # --- UserRegistry ---
+        from system.sdk.contracts import DatabaseContract
+        db = ctx.get_optional(DatabaseContract)
         users_path = workspace_root / "users.json"
-        self.user_registry = UserRegistry(storage_path=users_path)
+        self.user_registry = UserRegistry(storage_path=users_path, db=db)
         logger.info(
             "UserRegistry initialized (%d users, owner=%s)",
             len(self.user_registry.list_users()),

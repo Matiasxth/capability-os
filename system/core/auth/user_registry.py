@@ -66,10 +66,17 @@ class UserRegistry:
         automatically.
     """
 
-    def __init__(self, storage_path: Path | str) -> None:
+    def __init__(self, storage_path: Path | str, db: Any = None) -> None:
         self._path = Path(storage_path)
         self._lock = RLock()
         self._users: dict[str, dict[str, Any]] = {}
+        self._repo: Any = None
+        if db is not None:
+            try:
+                from system.infrastructure.repositories.user_repo import UserRepository
+                self._repo = UserRepository(db)
+            except Exception:
+                pass
         self._load()
 
     # ------------------------------------------------------------------
@@ -77,12 +84,32 @@ class UserRegistry:
     # ------------------------------------------------------------------
 
     def _load(self) -> None:
+        # Try DB first
+        if self._repo is not None:
+            try:
+                rows = self._repo.list_all()
+                if rows:
+                    for u in rows:
+                        if isinstance(u, dict) and "id" in u:
+                            self._users[u["id"]] = u
+                    logger.info("Loaded %d users from database", len(self._users))
+                    return
+            except Exception:
+                pass
+        # Fallback: JSON file
         if self._path.exists():
             try:
                 data = json.loads(self._path.read_text(encoding="utf-8"))
                 if isinstance(data, dict):
                     self._users = data
                     logger.info("Loaded %d users from %s", len(self._users), self._path)
+                # Migrate JSON data into DB
+                if self._repo is not None and self._users:
+                    for user in self._users.values():
+                        try:
+                            self._repo.add(user)
+                        except Exception:
+                            pass
             except Exception:
                 logger.exception("Failed to load users from %s", self._path)
                 self._users = {}
@@ -90,6 +117,14 @@ class UserRegistry:
             self._users = {}
 
     def _save(self) -> None:
+        # Write to DB if available
+        if self._repo is not None:
+            try:
+                for user in self._users.values():
+                    self._repo.add(user)
+            except Exception:
+                pass
+        # Always write JSON as backup
         self._path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self._path.with_suffix(".tmp")
         tmp.write_text(json.dumps(self._users, indent=2, ensure_ascii=False), encoding="utf-8")

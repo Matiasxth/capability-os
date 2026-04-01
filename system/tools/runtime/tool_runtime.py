@@ -15,11 +15,12 @@ class ToolExecutionError(RuntimeError):
 class ToolRuntime:
     """Runtime dispatcher for registered tool handlers (stub or real)."""
 
-    def __init__(self, tool_registry: ToolRegistry, workspace_root: str | Path | None = None):
+    def __init__(self, tool_registry: ToolRegistry, workspace_root: str | Path | None = None, tool_pool: Any = None):
         self.tool_registry = tool_registry
         self.workspace_root = Path(workspace_root or Path.cwd()).resolve()
         self._handlers: dict[str, Callable[..., Any]] = {}
         self._aliases: dict[str, str] = {}
+        self._pool: Any = tool_pool
 
     def register_handler(self, tool_id: str, handler: Callable[..., Any]) -> None:
         if not callable(handler):
@@ -52,7 +53,7 @@ class ToolRuntime:
         resolved = self.resolve_action(tool_id)
         return self.tool_registry.get(resolved) is not None
 
-    def execute(self, action: str, params: dict[str, Any]) -> Any:
+    def execute(self, action: str, params: dict[str, Any], security_level: int = 1) -> Any:
         resolved_action = self.resolve_action(action)
         tool_contract = self.tool_registry.get(resolved_action)
         if tool_contract is None:
@@ -62,17 +63,23 @@ class ToolRuntime:
         if handler is None:
             raise ToolExecutionError(f"Tool '{action}' has no registered handler in this phase.")
 
-        try:
+        def _run_handler() -> Any:
             payload = deepcopy(params)
             arity = _callable_arity(handler)
             if arity <= 1:
-                result = handler(payload)
+                return handler(payload)
             elif arity == 2:
-                result = handler(payload, deepcopy(tool_contract))
+                return handler(payload, deepcopy(tool_contract))
             else:
                 context = {"workspace_root": str(self.workspace_root)}
-                result = handler(payload, deepcopy(tool_contract), context)
-        except Exception as exc:  # pragma: no cover - wrapped for engine assertions
+                return handler(payload, deepcopy(tool_contract), context)
+
+        try:
+            if self._pool is not None:
+                result = self._pool.submit(_run_handler, security_level=security_level)
+            else:
+                result = _run_handler()
+        except Exception as exc:
             raise ToolExecutionError(f"Tool '{action}' failed: {exc}") from exc
 
         return deepcopy(result)

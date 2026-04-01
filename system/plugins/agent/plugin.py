@@ -51,9 +51,12 @@ class AgentPlugin:
         # --- AgentRegistry ---
         try:
             from system.core.agent.agent_registry import AgentRegistry
+            from system.sdk.contracts import DatabaseContract
 
+            db = ctx.get_optional(DatabaseContract)
             self.agent_registry = AgentRegistry(
                 data_path=workspace_root / "agents.json",
+                db=db,
             )
             ctx.publish_service(AgentRegistryContract, self.agent_registry)
             logger.info("Published AgentRegistryContract")

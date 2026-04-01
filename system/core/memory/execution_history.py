@@ -21,11 +21,18 @@ _DEFAULT_MAX_ENTRIES = 500
 class ExecutionHistory:
     """Thread-safe persistent execution history."""
 
-    def __init__(self, data_path: str | Path, max_entries: int = _DEFAULT_MAX_ENTRIES):
+    def __init__(self, data_path: str | Path, max_entries: int = _DEFAULT_MAX_ENTRIES, db: Any = None):
         self._path = Path(data_path).resolve()
         self._max = max(1, int(max_entries))
         self._lock = RLock()
         self._entries: list[dict[str, Any]] = []
+        self._repo: Any = None
+        if db is not None:
+            try:
+                from system.infrastructure.repositories import ExecutionRepository
+                self._repo = ExecutionRepository(db)
+            except Exception:
+                pass
         self._load()
 
     # ------------------------------------------------------------------
@@ -289,6 +296,16 @@ class ExecutionHistory:
 
     def _load(self) -> None:
         with self._lock:
+            # Try DB first
+            if self._repo is not None:
+                try:
+                    rows = self._repo.get_recent(self._max)
+                    if rows:
+                        self._entries = rows
+                        return
+                except Exception:
+                    pass
+            # Fallback: JSON file
             if not self._path.exists():
                 self._entries = []
                 return
@@ -298,10 +315,25 @@ class ExecutionHistory:
                     self._entries = [e for e in raw["history"] if isinstance(e, dict)]
                 else:
                     self._entries = []
+                # Migrate JSON data into DB
+                if self._repo is not None and self._entries:
+                    for entry in self._entries:
+                        try:
+                            self._repo.insert(entry)
+                        except Exception:
+                            pass
             except (json.JSONDecodeError, OSError):
                 self._entries = []
 
     def _save(self) -> None:
+        # Write to DB if available
+        if self._repo is not None:
+            try:
+                for entry in self._entries[:5]:  # only persist recent changes
+                    self._repo.insert(entry)
+            except Exception:
+                pass
+        # Always write JSON as backup
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
             payload = {"history": self._entries}

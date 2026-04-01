@@ -28,10 +28,17 @@ SCHEDULE_INTERVALS = {
 class TaskQueue:
     """Persistent task queue with scheduling."""
 
-    def __init__(self, data_path: str | Path) -> None:
+    def __init__(self, data_path: str | Path, db: Any = None) -> None:
         self._path = Path(data_path).resolve()
         self._lock = RLock()
         self._tasks: dict[str, dict[str, Any]] = {}
+        self._repo: Any = None
+        if db is not None:
+            try:
+                from system.infrastructure.repositories.queue_repo import QueueRepository
+                self._repo = QueueRepository(db)
+            except Exception:
+                pass
         self._load()
 
     def add(
@@ -148,6 +155,18 @@ class TaskQueue:
 
     def _load(self) -> None:
         with self._lock:
+            # Try DB first
+            if self._repo is not None:
+                try:
+                    rows = self._repo.list_all()
+                    if rows:
+                        for t in rows:
+                            if isinstance(t, dict) and "id" in t:
+                                self._tasks[t["id"]] = t
+                        return
+                except Exception:
+                    pass
+            # Fallback: JSON file
             if not self._path.exists():
                 self._tasks = {}
                 return
@@ -156,10 +175,25 @@ class TaskQueue:
                 for t in raw.get("tasks", []):
                     if isinstance(t, dict) and "id" in t:
                         self._tasks[t["id"]] = t
+                # Migrate JSON data into DB
+                if self._repo is not None and self._tasks:
+                    for task in self._tasks.values():
+                        try:
+                            self._repo.add(task)
+                        except Exception:
+                            pass
             except (json.JSONDecodeError, OSError):
                 self._tasks = {}
 
     def _save(self) -> None:
+        # Write to DB if available
+        if self._repo is not None:
+            try:
+                for task in self._tasks.values():
+                    self._repo.add(task)
+            except Exception:
+                pass
+        # Always write JSON as backup
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
             payload = {"tasks": list(self._tasks.values())}

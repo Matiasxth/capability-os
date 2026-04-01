@@ -120,12 +120,22 @@ class CapabilityOSUIBridgeService:
         # ── Message Queue (Redis or in-memory fallback) ──
         from system.infrastructure.message_queue import create_queue
         self.message_queue = create_queue(runtime_settings)
-        # Bridge EventBus → Redis for cross-process events
-        from system.core.ui_bridge.event_bus import event_bus
-        event_bus.set_bridge(self.message_queue)
+        # EventBridge: bidirectional EventBus ↔ Redis (outbound + inbound)
+        from system.infrastructure.event_bridge import EventBridge
+        self._event_bridge = EventBridge(event_bus, self.message_queue)
+        self._event_bridge.start()
+        # Job Queue for async task execution
+        from system.infrastructure.job_queue import JobQueue
+        self.job_queue = JobQueue(self.message_queue)
         # Redis cache layer for storage acceleration
         from system.infrastructure.redis_cache import RedisCache
         self.redis_cache = RedisCache(self.message_queue)
+
+        # ── Database (PostgreSQL or SQLite fallback) ──
+        from system.infrastructure.database import create_database
+        from system.sdk.contracts import DatabaseContract
+        self.database = create_database(runtime_settings, self.workspace_root)
+        self.container.register_service(DatabaseContract, self.database)
         if self.message_queue.is_redis:
             print("  Redis: connected (cache + events + workers)", flush=True)
         else:

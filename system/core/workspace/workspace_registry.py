@@ -24,11 +24,18 @@ VALID_ACCESS = {"write", "read", "none"}
 class WorkspaceRegistry:
     """Manages the set of registered workspaces."""
 
-    def __init__(self, data_path: str | Path):
+    def __init__(self, data_path: str | Path, db: Any = None):
         self._path = Path(data_path).resolve()
         self._lock = RLock()
         self._workspaces: dict[str, dict[str, Any]] = {}
         self._default_id: str | None = None
+        self._repo: Any = None
+        if db is not None:
+            try:
+                from system.infrastructure.repositories import WorkspaceRepository
+                self._repo = WorkspaceRepository(db)
+            except Exception:
+                pass
         self._load()
 
     # ------------------------------------------------------------------
@@ -159,6 +166,19 @@ class WorkspaceRegistry:
 
     def _load(self) -> None:
         with self._lock:
+            # Try DB first
+            if self._repo is not None:
+                try:
+                    rows = self._repo.list_all()
+                    if rows:
+                        for item in rows:
+                            if isinstance(item, dict) and "id" in item:
+                                self._workspaces[item["id"]] = item
+                        self._default_id = self._repo.get_default_id()
+                        return
+                except Exception:
+                    pass
+            # Fallback: JSON file
             if not self._path.exists():
                 self._workspaces = {}
                 self._default_id = None
@@ -170,11 +190,33 @@ class WorkspaceRegistry:
                         if isinstance(item, dict) and "id" in item:
                             self._workspaces[item["id"]] = item
                     self._default_id = raw.get("default_workspace_id")
+                # Migrate JSON data into DB
+                if self._repo is not None and self._workspaces:
+                    for ws in self._workspaces.values():
+                        try:
+                            self._repo.add(ws)
+                        except Exception:
+                            pass
+                    if self._default_id:
+                        try:
+                            self._repo.set_default(self._default_id)
+                        except Exception:
+                            pass
             except (json.JSONDecodeError, OSError):
                 self._workspaces = {}
                 self._default_id = None
 
     def _save(self) -> None:
+        # Write to DB if available
+        if self._repo is not None:
+            try:
+                for ws in self._workspaces.values():
+                    self._repo.add(ws)
+                if self._default_id:
+                    self._repo.set_default(self._default_id)
+            except Exception:
+                pass
+        # Always write JSON as backup
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
             payload = {

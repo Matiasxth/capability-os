@@ -155,6 +155,8 @@ def create_agent(service: Any, payload: Any, **kw: Any):
             language=p.get("language", "auto"),
             max_iterations=p.get("max_iterations", 10),
         )
+        from system.core.ui_bridge.event_bus import event_bus
+        event_bus.emit("agent_changed", {"action": "created", "agent_id": agent.get("id", "")})
         return _resp(HTTPStatus.CREATED, {"status": "success", "agent": agent})
     except ValueError as exc:
         return _resp(HTTPStatus.BAD_REQUEST, {"status": "error", "error": str(exc)})
@@ -174,6 +176,8 @@ def update_agent(service: Any, payload: Any, agent_id: str = "", **kw: Any):
         return _resp(HTTPStatus.SERVICE_UNAVAILABLE, {"status": "error", "error": "Agent registry not available"})
     try:
         agent = service.agent_registry.update(agent_id, **(payload or {}))
+        from system.core.ui_bridge.event_bus import event_bus
+        event_bus.emit("agent_changed", {"action": "updated", "agent_id": agent_id})
         return _resp(HTTPStatus.OK, {"status": "success", "agent": agent})
     except (KeyError, ValueError) as exc:
         return _resp(HTTPStatus.BAD_REQUEST, {"status": "error", "error": str(exc)})
@@ -234,6 +238,8 @@ def delete_agent(service: Any, payload: Any, agent_id: str = "", **kw: Any):
         return _resp(HTTPStatus.SERVICE_UNAVAILABLE, {"status": "error", "error": "Agent registry not available"})
     try:
         service.agent_registry.remove(agent_id)
+        from system.core.ui_bridge.event_bus import event_bus
+        event_bus.emit("agent_changed", {"action": "deleted", "agent_id": agent_id})
         return _resp(HTTPStatus.OK, {"status": "success", "removed": agent_id})
     except ValueError as exc:
         return _resp(HTTPStatus.BAD_REQUEST, {"status": "error", "error": str(exc)})

@@ -40,6 +40,10 @@ class MessageQueue(Protocol):
         """Subscribe to a pub/sub channel. Yields messages as they arrive."""
         ...
 
+    def psubscribe(self, pattern: str) -> Iterator[dict]:
+        """Subscribe to channels matching a glob pattern. Yields messages."""
+        ...
+
     def health_check(self) -> bool:
         """Return True if the queue backend is healthy."""
         ...
@@ -76,12 +80,37 @@ class RedisQueue:
     def subscribe(self, channel: str) -> Iterator[dict]:
         pubsub = self._client.pubsub()
         pubsub.subscribe(channel)
-        for msg in pubsub.listen():
-            if msg["type"] == "message":
-                try:
-                    yield json.loads(msg["data"])
-                except (json.JSONDecodeError, TypeError):
-                    continue
+        try:
+            for msg in pubsub.listen():
+                if msg["type"] == "message":
+                    try:
+                        yield json.loads(msg["data"])
+                    except (json.JSONDecodeError, TypeError):
+                        continue
+        finally:
+            try:
+                pubsub.unsubscribe()
+                pubsub.close()
+            except Exception:
+                pass
+
+    def psubscribe(self, pattern: str) -> Iterator[dict]:
+        """Subscribe to channels matching a glob pattern (e.g. ``capos:events:*``)."""
+        pubsub = self._client.pubsub()
+        pubsub.psubscribe(pattern)
+        try:
+            for msg in pubsub.listen():
+                if msg["type"] == "pmessage":
+                    try:
+                        yield json.loads(msg["data"])
+                    except (json.JSONDecodeError, TypeError):
+                        continue
+        finally:
+            try:
+                pubsub.punsubscribe()
+                pubsub.close()
+            except Exception:
+                pass
 
     def health_check(self) -> bool:
         try:
@@ -156,6 +185,44 @@ class InMemoryQueue:
                 try:
                     self._channels[channel].remove(_handler)
                 except ValueError:
+                    pass
+
+    def psubscribe(self, pattern: str) -> Iterator[dict]:
+        """Pattern subscribe for in-memory queue. Matches channels using fnmatch."""
+        import fnmatch
+        q: deque = deque()
+        event = threading.Event()
+
+        def _handler(channel: str, msg: dict) -> None:
+            if fnmatch.fnmatch(channel, pattern):
+                q.append(msg)
+                event.set()
+
+        # Register on a special wildcard key
+        with self._lock:
+            self._channels[f"__pattern:{pattern}"].append(_handler)
+
+        # Also hook into publish() — override needed
+        original_publish = self.publish
+
+        def _patched_publish(channel: str, message: dict) -> None:
+            original_publish(channel, message)
+            _handler(channel, message)
+
+        self.publish = _patched_publish  # type: ignore[assignment]
+
+        try:
+            while True:
+                event.wait(timeout=1.0)
+                while q:
+                    yield q.popleft()
+                event.clear()
+        finally:
+            self.publish = original_publish  # type: ignore[assignment]
+            with self._lock:
+                try:
+                    self._channels[f"__pattern:{pattern}"].remove(_handler)
+                except (ValueError, KeyError):
                     pass
 
     def health_check(self) -> bool:

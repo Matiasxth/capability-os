@@ -29,10 +29,17 @@ class IntegrationNotFoundError(IntegrationRegistryError):
 class IntegrationRegistry:
     """Persistent dynamic state for discovered integrations."""
 
-    def __init__(self, data_path: str | Path):
+    def __init__(self, data_path: str | Path, db: Any = None):
         self.data_path = Path(data_path).resolve()
         self._lock = RLock()
         self._entries: dict[str, dict[str, Any]] = {}
+        self._repo: Any = None
+        if db is not None:
+            try:
+                from system.infrastructure.repositories.integration_repo import IntegrationRepository
+                self._repo = IntegrationRepository(db)
+            except Exception:
+                pass
         self._load()
 
     def list_integrations(self) -> list[dict[str, Any]]:
@@ -145,6 +152,20 @@ class IntegrationRegistry:
 
     def _load(self) -> None:
         with self._lock:
+            # Try DB first
+            if self._repo is not None:
+                try:
+                    rows = self._repo.list_all()
+                    if rows:
+                        for item in rows:
+                            if isinstance(item, dict) and "id" in item:
+                                if "metadata" not in item:
+                                    item["metadata"] = {}
+                                self._entries[item["id"]] = item
+                        return
+                except Exception:
+                    pass
+            # Fallback: JSON file
             if not self.data_path.exists():
                 self.data_path.parent.mkdir(parents=True, exist_ok=True)
                 self._entries = {}
@@ -184,8 +205,23 @@ class IntegrationRegistry:
                     else {},
                 }
             self._entries = loaded
+            # Migrate JSON data into DB
+            if self._repo is not None and self._entries:
+                for entry in self._entries.values():
+                    try:
+                        self._repo.add(entry)
+                    except Exception:
+                        pass
 
     def _save_locked(self) -> None:
+        # Write to DB if available
+        if self._repo is not None:
+            try:
+                for entry in self._entries.values():
+                    self._repo.add(entry)
+            except Exception:
+                pass
+        # Always write JSON as backup
         self.data_path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
             "integrations": [

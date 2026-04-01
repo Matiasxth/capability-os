@@ -19,6 +19,8 @@ Complete reference for all events in Capability OS. Events flow from the backend
   - [A2A](#a2a)
   - [Browser](#browser)
   - [Supervisor](#supervisor)
+  - [Workflows](#workflows)
+  - [Agents](#agents)
   - [Scheduler](#scheduler)
   - [Auth](#auth)
   - [Errors](#errors)
@@ -323,6 +325,48 @@ Events from the autonomous supervisor system.
 
 ---
 
+### Workflows
+
+Events from the workflow execution engine.
+
+#### `notification`
+
+| | |
+|---|---|
+| **Type string** | `notification` |
+| **Payload** | `channel` (target channel: `"ui"`, `"telegram"`, `"slack"`, etc.), `message`, optionally `recipient` |
+| **Emitter** | `system/core/workflow/workflow_executor.py` (notification node handler) |
+| **When** | A workflow notification node sends a message to a channel |
+
+#### `workflow_completed`
+
+| | |
+|---|---|
+| **Type string** | `workflow_completed` |
+| **Payload** | `workflow_id`, `status` (`"success"`), `node_count`, `duration_ms` |
+| **Emitter** | `system/core/workflow/workflow_executor.py` |
+| **When** | A workflow finishes executing all nodes successfully (both sequential and parallel modes) |
+
+---
+
+### Agents
+
+Events from the agent registry (CRUD operations on custom agents).
+
+#### `agent_changed`
+
+| | |
+|---|---|
+| **Type string** | `agent_changed` |
+| **Payload** | `action`, `agent_id` |
+| **Emitter** | `system/core/ui_bridge/handlers/agent_handlers.py` |
+| **When** | A custom agent definition is created, updated, or deleted |
+
+**Possible `action` values:**
+- `"created"`, `"updated"`, `"deleted"`
+
+---
+
 ### Scheduler
 
 Events from the task scheduler.
@@ -558,6 +602,9 @@ class MyPlugin:
 | `supervisor_alert` | Supervisor | Supervisor detection |
 | `supervisor_action` | Supervisor | User action on supervisor item |
 | `skill_created` | Supervisor | Auto-skill creation |
+| `notification` | Workflows | Workflow notification sent |
+| `workflow_completed` | Workflows | Workflow execution finished |
+| `agent_changed` | Agents | Agent definition CRUD |
 | `scheduler_cycle` | Scheduler | Scheduled task completed |
 | `auth_setup_complete` | Auth | Owner account created |
 | `error` | Errors | Unhandled system error |

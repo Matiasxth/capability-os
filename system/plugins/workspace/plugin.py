@@ -41,9 +41,12 @@ class WorkspacePlugin:
         # --- WorkspaceRegistry ---
         try:
             from system.core.workspace import WorkspaceRegistry
+            from system.sdk.contracts import DatabaseContract
 
+            db = ctx.get_optional(DatabaseContract)
             self.workspace_registry = WorkspaceRegistry(
                 data_path=workspace_root / "workspaces.json",
+                db=db,
             )
             ctx.publish_service(WorkspaceRegistryContract, self.workspace_registry)
             logger.info("Published WorkspaceRegistryContract")

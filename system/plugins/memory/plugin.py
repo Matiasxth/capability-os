@@ -70,9 +70,12 @@ class MemoryPlugin:
         workspace = ctx.workspace_root
         memory_dir = workspace / "memory"
 
-        # 1. ExecutionHistory
+        # 1. ExecutionHistory (DB-backed when available)
+        from system.sdk.contracts import DatabaseContract
+        db = ctx.get_optional(DatabaseContract)
         self.execution_history = ExecutionHistory(
             data_path=memory_dir / "history.json",
+            db=db,
         )
 
         # 2. MemoryManager

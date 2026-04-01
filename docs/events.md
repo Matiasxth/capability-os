@@ -99,6 +99,21 @@ Actions: `worker_restarted`, `chrome_launched`, `cdp_connected`
 | `supervisor_action` | `{action, result}` | `supervisor_handlers.py` |
 | `skill_created` | `{tool_id, auto: bool}` | `skill_creator.py` — new skill hot-loaded |
 
+## Workflows
+
+| Event | Payload | Source |
+|-------|---------|--------|
+| `notification` | `{channel, message, recipient?}` | `workflow_executor.py` — notification node sends to channel |
+| `workflow_completed` | `{workflow_id, status, node_count, duration_ms}` | `workflow_executor.py` — workflow finished successfully |
+
+## Agents
+
+| Event | Payload | Source |
+|-------|---------|--------|
+| `agent_changed` | `{action, agent_id}` | `agent_handlers.py` |
+
+Actions: `created`, `updated`, `deleted`
+
 ## Scheduler
 
 | Event | Payload | Source |
@@ -142,7 +157,7 @@ sdk.events.onConnectionChange((connected) => { ... });
 
 ## Summary
 
-- **24 event types** across 14 categories
-- **56+ emission points** in the backend
+- **26 event types** across 16 categories
+- **60+ emission points** in the backend
 - All events broadcast to all connected WebSocket clients
 - Frontend SDK provides `sdk.events.on/off` for subscription

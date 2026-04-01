@@ -43,7 +43,9 @@ class IntegrationsPlugin:
                 IntegrationValidator,
             )
 
-            self.integration_registry = IntegrationRegistry(registry_data_path)
+            from system.sdk.contracts import DatabaseContract
+            db = ctx.get_optional(DatabaseContract)
+            self.integration_registry = IntegrationRegistry(registry_data_path, db=db)
 
             self.integration_loader = IntegrationLoader(
                 integrations_root, manifest_schema, self.integration_registry,

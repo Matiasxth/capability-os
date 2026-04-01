@@ -32,12 +32,19 @@ DEFAULT_AGENT = {
 
 
 class AgentRegistry:
-    """CRUD for custom agent definitions. Persisted to agents.json."""
+    """CRUD for custom agent definitions. Persisted to DB or agents.json."""
 
-    def __init__(self, data_path: str | Path) -> None:
+    def __init__(self, data_path: str | Path, db: Any = None) -> None:
         self._path = Path(data_path).resolve()
         self._lock = RLock()
         self._agents: dict[str, dict[str, Any]] = {}
+        self._repo: Any = None
+        if db is not None:
+            try:
+                from system.infrastructure.repositories import AgentRepository
+                self._repo = AgentRepository(db)
+            except Exception:
+                pass
         self._load()
         # Ensure default agent exists
         if "agt_default" not in self._agents:
@@ -129,6 +136,18 @@ class AgentRegistry:
 
     def _load(self) -> None:
         with self._lock:
+            # Try DB first
+            if self._repo is not None:
+                try:
+                    rows = self._repo.list_all()
+                    if rows:
+                        for item in rows:
+                            if isinstance(item, dict) and "id" in item:
+                                self._agents[item["id"]] = item
+                        return
+                except Exception:
+                    pass
+            # Fallback: JSON file
             if not self._path.exists():
                 self._agents = {}
                 return
@@ -138,10 +157,25 @@ class AgentRegistry:
                     for item in raw.get("agents", []):
                         if isinstance(item, dict) and "id" in item:
                             self._agents[item["id"]] = item
+                # Migrate JSON data into DB
+                if self._repo is not None and self._agents:
+                    for agent in self._agents.values():
+                        try:
+                            self._repo.add(agent)
+                        except Exception:
+                            pass
             except (json.JSONDecodeError, OSError):
                 self._agents = {}
 
     def _save(self) -> None:
+        # Write to DB if available
+        if self._repo is not None:
+            try:
+                for agent in self._agents.values():
+                    self._repo.add(agent)
+            except Exception:
+                pass
+        # Always write JSON as backup
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
             payload = {"agents": list(self._agents.values())}

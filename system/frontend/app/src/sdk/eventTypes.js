@@ -50,6 +50,13 @@ export const EVENTS = {
   SUPERVISOR_ACTION:   "supervisor_action",
   SKILL_CREATED:       "skill_created",
 
+  // ── Workflows ──
+  NOTIFICATION:        "notification",
+  WORKFLOW_COMPLETED:  "workflow_completed",
+
+  // ── Agents ──
+  AGENT_CHANGED:       "agent_changed",
+
   // ── Scheduler ──
   SCHEDULER_CYCLE:     "scheduler_cycle",
 
@@ -89,6 +96,9 @@ export const EVENT_LABELS = {
   [EVENTS.SUPERVISOR_ALERT]:    "Supervisor alert",
   [EVENTS.SKILL_CREATED]:       "Skill created",
   [EVENTS.SCHEDULER_CYCLE]:     "Scheduler cycle",
+  [EVENTS.NOTIFICATION]:        "Notification sent",
+  [EVENTS.WORKFLOW_COMPLETED]:  "Workflow completed",
+  [EVENTS.AGENT_CHANGED]:       "Agent updated",
 };
 
 /** Events → ControlCenter section mapping */
@@ -106,4 +116,6 @@ export const SECTION_FOR_EVENT = {
   [EVENTS.SUPERVISOR_ALERT]:    "supervisor",
   [EVENTS.SKILL_CREATED]:       "skills",
   [EVENTS.SCHEDULER_CYCLE]:     "scheduler",
+  [EVENTS.WORKFLOW_COMPLETED]:  "workflows",
+  [EVENTS.AGENT_CHANGED]:       "agents",
 };

@@ -23,11 +23,18 @@ def _now_iso() -> str:
 class WorkflowRegistry:
     """Manages workflow definitions with thread-safe persistence."""
 
-    def __init__(self, workspace_root: Path) -> None:
+    def __init__(self, workspace_root: Path, db: Any = None) -> None:
         self._workspace_root = Path(workspace_root)
         self._file = self._workspace_root / "workflows.json"
         self._lock = RLock()
         self._workflows: dict[str, dict[str, Any]] = {}
+        self._repo: Any = None
+        if db is not None:
+            try:
+                from system.infrastructure.repositories.workflow_repo import WorkflowRepository
+                self._repo = WorkflowRepository(db)
+            except Exception:
+                pass
         self._load()
 
     # ------------------------------------------------------------------
@@ -36,6 +43,18 @@ class WorkflowRegistry:
 
     def _load(self) -> None:
         with self._lock:
+            # Try DB first
+            if self._repo is not None:
+                try:
+                    rows = self._repo.list_all()
+                    if rows:
+                        for wf in rows:
+                            if isinstance(wf, dict) and "id" in wf:
+                                self._workflows[wf["id"]] = wf
+                        return
+                except Exception:
+                    pass
+            # Fallback: JSON file
             if self._file.exists():
                 try:
                     data = json.loads(self._file.read_text(encoding="utf-8"))
@@ -45,11 +64,26 @@ class WorkflowRegistry:
                         self._workflows = data
                     else:
                         self._workflows = {}
+                    # Migrate JSON data into DB
+                    if self._repo is not None and self._workflows:
+                        for wf in self._workflows.values():
+                            try:
+                                self._repo.add(wf)
+                            except Exception:
+                                pass
                 except Exception:
                     logger.exception("Failed to load workflows from %s", self._file)
                     self._workflows = {}
 
     def _save(self) -> None:
+        # Write to DB if available
+        if self._repo is not None:
+            try:
+                for wf in self._workflows.values():
+                    self._repo.add(wf)
+            except Exception:
+                pass
+        # Always write JSON as backup
         with self._lock:
             self._file.parent.mkdir(parents=True, exist_ok=True)
             payload = list(self._workflows.values())

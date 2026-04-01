@@ -27,12 +27,20 @@ class SettingsService:
         self,
         workspace_root: str | Path,
         settings_path: str | Path | None = None,
+        db: Any = None,
     ):
         self.workspace_root = Path(workspace_root).resolve()
         self.settings_path = Path(settings_path).resolve() if settings_path else (
             self.workspace_root / "system" / "settings.json"
         ).resolve()
         self._lock = threading.RLock()
+        self._repo: Any = None
+        if db is not None:
+            try:
+                from system.infrastructure.repositories.settings_repo import SettingsRepository
+                self._repo = SettingsRepository(db)
+            except Exception:
+                pass
 
     def load_settings(self) -> dict[str, Any]:
         raw_payload: dict[str, Any] = {}
@@ -46,6 +54,14 @@ class SettingsService:
             if not isinstance(parsed, dict):
                 raise SettingsValidationError("Settings root must be a JSON object.")
             raw_payload = parsed
+        elif self._repo is not None:
+            # JSON file missing — try loading from DB
+            try:
+                db_settings = self._repo.get_all()
+                if db_settings:
+                    raw_payload = db_settings
+            except Exception:
+                pass
 
         merged = self._build_merged_payload(raw_payload)
         return self.validate_settings(merged)
@@ -77,6 +93,13 @@ class SettingsService:
                 encoding="utf-8",
             )
             tmp.replace(self.settings_path)
+            # Persist to DB as secondary storage
+            if self._repo is not None:
+                try:
+                    for key, value in validated.items():
+                        self._repo.set(key, value)
+                except Exception:
+                    pass
         return deepcopy(validated)
 
     def validate_settings(self, payload: dict[str, Any]) -> dict[str, Any]:

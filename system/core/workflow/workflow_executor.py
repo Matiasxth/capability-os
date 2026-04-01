@@ -86,6 +86,11 @@ class WorkflowExecutor:
                     "duration_ms": self._elapsed(t0),
                 }
 
+        try:
+            from system.core.ui_bridge.event_bus import event_bus
+            event_bus.emit("workflow_completed", {"workflow_id": workflow.get("id", ""), "status": "success", "node_count": len(results), "duration_ms": self._elapsed(t0)})
+        except Exception:
+            pass
         return {
             "status": "success",
             "results": results,
@@ -178,6 +183,11 @@ class WorkflowExecutor:
                         next_ready.append(neighbor)
             ready = next_ready
 
+        try:
+            from system.core.ui_bridge.event_bus import event_bus
+            event_bus.emit("workflow_completed", {"workflow_id": "", "status": "success", "node_count": len(results), "duration_ms": self._elapsed(t0)})
+        except Exception:
+            pass
         return {
             "status": "success",
             "results": results,

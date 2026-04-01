@@ -39,9 +39,12 @@ class SchedulerPlugin:
         # --- TaskQueue ---
         try:
             from system.core.scheduler import TaskQueue
+            from system.sdk.contracts import DatabaseContract
 
+            db = ctx.get_optional(DatabaseContract)
             self.task_queue = TaskQueue(
                 data_path=workspace_root / "queue.json",
+                db=db,
             )
             logger.info("Created TaskQueue")
         except Exception:

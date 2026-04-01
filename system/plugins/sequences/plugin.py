@@ -42,9 +42,12 @@ class SequencesPlugin:
         # --- SequenceStorage ---
         try:
             from system.core.sequences import SequenceStorage
+            from system.sdk.contracts import DatabaseContract
 
+            db = ctx.get_optional(DatabaseContract)
             self.sequence_storage = SequenceStorage(
                 workspace_root=workspace_root,
+                db=db,
             )
             logger.info("Created SequenceStorage")
         except Exception:

@@ -320,6 +320,15 @@ def _read_setting(payload: dict[str, Any], field_name: str) -> str:
     return value.strip()
 
 
+def _get_pool():
+    """Get the LLM connection pool (lazy import to avoid circular deps)."""
+    try:
+        from system.infrastructure.llm_pool import get_llm_pool
+        return get_llm_pool()
+    except Exception:
+        return None
+
+
 def _http_post_json_raw(
     url: str,
     payload: dict,
@@ -327,6 +336,13 @@ def _http_post_json_raw(
     timeout_sec: float,
 ) -> dict:
     """POST JSON and return parsed response dict (not just text content)."""
+    pool = _get_pool()
+    if pool is not None:
+        try:
+            return pool.post_json(url, payload, headers, timeout_sec)
+        except Exception as exc:
+            raise LLMClientError(f"HTTP error: {exc}") from exc
+
     merged = {
         "Content-Type": "application/json",
         "User-Agent": "CapabilityOS/1.0",
@@ -351,37 +367,37 @@ def _http_post_json(
     timeout_sec: float,
     provider: str,
 ) -> str:
-    # Ensure required headers for all providers (Cloudflare blocks without User-Agent)
-    merged = {
-        "Content-Type": "application/json",
-        "User-Agent": "CapabilityOS/1.0",
-        "Accept": "application/json",
-    }
-    merged.update(headers)
-    req = Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers=merged,
-        method="POST",
-    )
-    try:
-        with urlopen(req, timeout=max(1.0, timeout_sec)) as resp:
-            raw = resp.read()
-            # Ensure proper UTF-8 decoding (some providers return latin-1 headers)
-            try:
-                body = raw.decode("utf-8")
-            except UnicodeDecodeError:
-                body = raw.decode("latin-1").encode("latin-1").decode("utf-8", errors="replace")
-    except HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        raise LLMClientError(f"{provider} HTTP error {exc.code}: {detail}") from exc
-    except URLError as exc:
-        raise LLMClientError(f"{provider} connection error: {exc.reason}") from exc
-
-    try:
-        parsed = json.loads(body)
-    except json.JSONDecodeError as exc:
-        raise LLMClientError(f"{provider} returned invalid JSON.") from exc
+    pool = _get_pool()
+    if pool is not None:
+        try:
+            parsed = pool.post_json(url, payload, headers, timeout_sec)
+        except Exception as exc:
+            raise LLMClientError(f"{provider} request failed: {exc}") from exc
+    else:
+        # Fallback: raw urllib
+        merged = {
+            "Content-Type": "application/json",
+            "User-Agent": "CapabilityOS/1.0",
+            "Accept": "application/json",
+        }
+        merged.update(headers)
+        req = Request(url, data=json.dumps(payload).encode("utf-8"), headers=merged, method="POST")
+        try:
+            with urlopen(req, timeout=max(1.0, timeout_sec)) as resp:
+                raw = resp.read()
+                try:
+                    body = raw.decode("utf-8")
+                except UnicodeDecodeError:
+                    body = raw.decode("latin-1").encode("latin-1").decode("utf-8", errors="replace")
+        except HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            raise LLMClientError(f"{provider} HTTP error {exc.code}: {detail}") from exc
+        except URLError as exc:
+            raise LLMClientError(f"{provider} connection error: {exc.reason}") from exc
+        try:
+            parsed = json.loads(body)
+        except json.JSONDecodeError as exc:
+            raise LLMClientError(f"{provider} returned invalid JSON.") from exc
 
     if provider == "openai":
         choices = parsed.get("choices")
