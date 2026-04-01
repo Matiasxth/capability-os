@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -31,6 +32,7 @@ class SettingsService:
         self.settings_path = Path(settings_path).resolve() if settings_path else (
             self.workspace_root / "system" / "settings.json"
         ).resolve()
+        self._lock = threading.RLock()
 
     def load_settings(self) -> dict[str, Any]:
         raw_payload: dict[str, Any] = {}
@@ -63,15 +65,18 @@ class SettingsService:
         if not isinstance(payload, dict):
             raise SettingsValidationError("Settings payload must be a JSON object.")
 
-        current = self.load_settings()
-        merged = self._merge_with_current(current, payload)
-        validated = self.validate_settings(merged)
+        with self._lock:
+            current = self.load_settings()
+            merged = self._merge_with_current(current, payload)
+            validated = self.validate_settings(merged)
 
-        self.settings_path.parent.mkdir(parents=True, exist_ok=True)
-        self.settings_path.write_text(
-            json.dumps(validated, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+            self.settings_path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = self.settings_path.with_suffix(".tmp")
+            tmp.write_text(
+                json.dumps(validated, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            tmp.replace(self.settings_path)
         return deepcopy(validated)
 
     def validate_settings(self, payload: dict[str, Any]) -> dict[str, Any]:

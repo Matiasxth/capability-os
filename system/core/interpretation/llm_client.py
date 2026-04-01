@@ -72,6 +72,101 @@ class OllamaAdapter:
         return _http_post_json(url, payload, headers, timeout_sec, "ollama")
 
 
+@dataclass
+class AnthropicAdapter:
+    """Anthropic Claude API adapter with SDK fallback to raw HTTP."""
+    api_key: str
+    model: str = "claude-sonnet-4-20250514"
+    base_url: str = "https://api.anthropic.com"
+
+    def complete(self, system_prompt: str, user_prompt: str, timeout_sec: float) -> str:
+        try:
+            import anthropic
+            client = anthropic.Anthropic(api_key=self.api_key, base_url=self.base_url, timeout=timeout_sec)
+            response = client.messages.create(
+                model=self.model, max_tokens=4096, system=system_prompt,
+                messages=[{"role": "user", "content": user_prompt}],
+            )
+            return response.content[0].text
+        except ImportError:
+            return self._complete_raw(system_prompt, user_prompt, timeout_sec)
+        except Exception as exc:
+            raise LLMClientError(f"anthropic error: {exc}") from exc
+
+    def complete_with_tools(self, messages: list[dict], tools: list[dict], timeout_sec: float = 30.0) -> dict:
+        try:
+            import anthropic
+            client = anthropic.Anthropic(api_key=self.api_key, base_url=self.base_url, timeout=timeout_sec)
+            anthropic_tools = [{"name": t["name"], "description": t.get("description", ""), "input_schema": t.get("parameters", {})} for t in tools]
+            response = client.messages.create(model=self.model, max_tokens=4096, messages=messages, tools=anthropic_tools)
+            result: dict[str, Any] = {"choices": [{"message": {"role": "assistant", "content": None, "tool_calls": []}}]}
+            for block in response.content:
+                if block.type == "text":
+                    result["choices"][0]["message"]["content"] = block.text
+                elif block.type == "tool_use":
+                    result["choices"][0]["message"]["tool_calls"].append({
+                        "id": block.id, "type": "function",
+                        "function": {"name": block.name, "arguments": json.dumps(block.input)},
+                    })
+            if not result["choices"][0]["message"]["tool_calls"]:
+                del result["choices"][0]["message"]["tool_calls"]
+            return result
+        except ImportError:
+            raise LLMClientError("anthropic package not installed. Run: pip install anthropic")
+
+    def _complete_raw(self, system_prompt: str, user_prompt: str, timeout_sec: float) -> str:
+        url = f"{self.base_url.rstrip('/')}/v1/messages"
+        payload = {"model": self.model, "max_tokens": 4096, "system": system_prompt, "messages": [{"role": "user", "content": user_prompt}]}
+        headers = {"x-api-key": self.api_key, "anthropic-version": "2023-06-01", "Content-Type": "application/json"}
+        raw = _http_post_json_raw(url, payload, headers, timeout_sec)
+        content = raw.get("content", [])
+        if content and isinstance(content, list):
+            return content[0].get("text", "")
+        raise LLMClientError("anthropic response missing content.")
+
+
+@dataclass
+class GeminiAdapter:
+    """Google Gemini API adapter."""
+    api_key: str
+    model: str = "gemini-2.0-flash"
+    base_url: str = "https://generativelanguage.googleapis.com"
+
+    def complete(self, system_prompt: str, user_prompt: str, timeout_sec: float) -> str:
+        url = f"{self.base_url.rstrip('/')}/v1beta/models/{self.model}:generateContent?key={self.api_key}"
+        payload = {"contents": [{"parts": [{"text": f"{system_prompt}\n\n{user_prompt}"}]}], "generationConfig": {"temperature": 0}}
+        headers = {"Content-Type": "application/json"}
+        raw = _http_post_json_raw(url, payload, headers, timeout_sec)
+        candidates = raw.get("candidates", [])
+        if candidates:
+            parts = candidates[0].get("content", {}).get("parts", [])
+            if parts:
+                return parts[0].get("text", "")
+        raise LLMClientError("gemini response missing content.")
+
+
+@dataclass
+class DeepSeekAdapter:
+    """DeepSeek API adapter (OpenAI-compatible format)."""
+    api_key: str
+    model: str = "deepseek-chat"
+    base_url: str = "https://api.deepseek.com/v1"
+
+    def complete(self, system_prompt: str, user_prompt: str, timeout_sec: float) -> str:
+        url = f"{self.base_url.rstrip('/')}/chat/completions"
+        payload = {"model": self.model, "temperature": 0, "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]}
+        headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+        return _http_post_json(url, payload, headers, timeout_sec, "openai")
+
+    def complete_with_tools(self, messages: list[dict], tools: list[dict], timeout_sec: float = 30.0) -> dict:
+        url = f"{self.base_url.rstrip('/')}/chat/completions"
+        payload: dict[str, Any] = {"model": self.model, "temperature": 0, "messages": messages}
+        if tools:
+            payload["tools"] = [{"type": "function", "function": t} for t in tools]
+        headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+        return _http_post_json_raw(url, payload, headers, timeout_sec)
+
+
 class LLMClient:
     """Decoupled LLM wrapper with provider adapters."""
 
@@ -120,6 +215,27 @@ def _build_adapter_from_env() -> LLMAdapter | None:
         base_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").strip()
         return OllamaAdapter(model=model, base_url=base_url)
 
+    if provider == "anthropic":
+        api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
+        model = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514").strip()
+        if not api_key:
+            raise LLMClientError("ANTHROPIC_API_KEY is required when LLM_PROVIDER=anthropic.")
+        return AnthropicAdapter(api_key=api_key, model=model)
+
+    if provider == "gemini":
+        api_key = os.getenv("GEMINI_API_KEY", "").strip()
+        model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash").strip()
+        if not api_key:
+            raise LLMClientError("GEMINI_API_KEY is required when LLM_PROVIDER=gemini.")
+        return GeminiAdapter(api_key=api_key, model=model)
+
+    if provider == "deepseek":
+        api_key = os.getenv("DEEPSEEK_API_KEY", "").strip()
+        model = os.getenv("DEEPSEEK_MODEL", "deepseek-chat").strip()
+        if not api_key:
+            raise LLMClientError("DEEPSEEK_API_KEY is required when LLM_PROVIDER=deepseek.")
+        return DeepSeekAdapter(api_key=api_key, model=model)
+
     return None
 
 
@@ -148,11 +264,31 @@ def _build_adapter_from_settings(
 
     if provider == "ollama":
         model = _read_setting(settings, "model") or os.getenv("OLLAMA_MODEL", "llama3.1:8b").strip()
-        base_url = _read_setting(settings, "base_url") or os.getenv(
-            "OLLAMA_BASE_URL",
-            "http://127.0.0.1:11434",
-        ).strip()
+        base_url = _read_setting(settings, "base_url") or os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").strip()
         return OllamaAdapter(model=model, base_url=base_url)
+
+    if provider == "anthropic":
+        api_key = _read_setting(settings, "api_key") or os.getenv("ANTHROPIC_API_KEY", "").strip()
+        model = _read_setting(settings, "model") or os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514").strip()
+        base_url = _read_setting(settings, "base_url") or "https://api.anthropic.com"
+        if not api_key:
+            raise LLMClientError("ANTHROPIC_API_KEY is required when LLM provider is 'anthropic'.")
+        return AnthropicAdapter(api_key=api_key, model=model, base_url=base_url)
+
+    if provider == "gemini":
+        api_key = _read_setting(settings, "api_key") or os.getenv("GEMINI_API_KEY", "").strip()
+        model = _read_setting(settings, "model") or os.getenv("GEMINI_MODEL", "gemini-2.0-flash").strip()
+        if not api_key:
+            raise LLMClientError("GEMINI_API_KEY is required when LLM provider is 'gemini'.")
+        return GeminiAdapter(api_key=api_key, model=model)
+
+    if provider == "deepseek":
+        api_key = _read_setting(settings, "api_key") or os.getenv("DEEPSEEK_API_KEY", "").strip()
+        model = _read_setting(settings, "model") or os.getenv("DEEPSEEK_MODEL", "deepseek-chat").strip()
+        base_url = _read_setting(settings, "base_url") or "https://api.deepseek.com/v1"
+        if not api_key:
+            raise LLMClientError("DEEPSEEK_API_KEY is required when LLM provider is 'deepseek'.")
+        return DeepSeekAdapter(api_key=api_key, model=model, base_url=base_url)
 
     if fallback_to_env:
         return _build_adapter_from_env()

@@ -329,10 +329,12 @@ class ToolUseAdapter:
             else:
                 oai_messages.append({"role": role, "content": m.get("content", "")})
 
-        # Rate limit check
+        # Rate limit check — enforce wait instead of rejecting
         allowed, wait_s = self._rate_limiter.check()
-        if not allowed:
-            return AgentResponse(text=f"Rate limit: espera {int(wait_s)} segundos.", stop_reason="end_turn")
+        if not allowed and wait_s > 0:
+            import time
+            time.sleep(min(wait_s, 30))  # Wait but cap at 30s
+            self._rate_limiter.check()  # Re-register after wait
 
         data = adapter.complete_with_tools(oai_messages, tools)
         choice = data.get("choices", [{}])[0]
@@ -395,10 +397,12 @@ CRITICAL RULES:
             else:
                 conv += f"\n{role}: {m.get('content', '')}\n"
 
-        # Rate limit check
+        # Rate limit check — enforce wait instead of rejecting
         allowed, wait_s = self._rate_limiter.check()
-        if not allowed:
-            return AgentResponse(text=f"Rate limit: demasiadas solicitudes. Espera {int(wait_s)} segundos.", stop_reason="end_turn")
+        if not allowed and wait_s > 0:
+            import time
+            time.sleep(min(wait_s, 30))
+            self._rate_limiter.check()
 
         try:
             response_text = self._client.complete(system_prompt=full_prompt, user_prompt=conv)
