@@ -1,23 +1,21 @@
-# Capability OS — Python dependencies
-# Core (required)
-bcrypt>=4.0
-PyJWT>=2.8
-uvicorn>=0.29
-redis>=5.0
-anthropic>=0.40
+# Capability OS v3.2 — Python dependencies
+#
+# Install: pip install -r requirements.txt
 
-# Testing
+# ── Core (required) ──
+bcrypt>=4.0                  # Password hashing for auth
+PyJWT>=2.8                   # JWT token generation/validation
+uvicorn>=0.29                # ASGI server (async HTTP)
+redis>=5.0                   # Message queue for distributed workers
+anthropic>=0.40              # Anthropic Claude SDK (recommended LLM)
+sqlite-vec>=0.1              # Accelerated vector search (100x faster)
+
+# ── Testing ──
 pytest>=7.4
 pytest-cov>=4.0
 
-# Accelerated vector search (100x faster semantic memory)
-sqlite-vec>=0.1
-
-# Optional — browser automation (only needed for browser tools)
-# playwright>=1.40
-
-# Optional — process listing (falls back to tasklist/ps)
-# psutil>=5.9
-
-# Optional — speech-to-text
-# openai-whisper>=20231117
+# ── Optional ──
+# playwright>=1.40           # Browser automation (Playwright backend)
+# psutil>=5.9                # Process listing (falls back to tasklist/ps)
+# openai-whisper>=20231117   # Speech-to-text (local Whisper model)
+# google-generativeai>=0.5   # Google Gemini SDK (alternative to raw HTTP)

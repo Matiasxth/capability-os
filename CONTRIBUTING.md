@@ -86,9 +86,26 @@ python -m pytest tests/unit/ -q
 # With coverage enforcement
 python -m pytest --cov=system.core --cov-fail-under=80 --cov-report=term-missing:skip-covered
 
-# Frontend
-cd system/frontend/app && npm test -- --run
+# Frontend (55 tests)
+cd system/frontend/app && npx vitest run
+
+# Build frontend
+cd system/frontend/app && npm run build
 ```
+
+## Documentation
+
+All documentation lives in the `wiki/` directory (10 pages):
+- [Home](wiki/Home.md) — Project overview
+- [Getting Started](wiki/Getting-Started.md) — Installation guide
+- [Architecture](wiki/Architecture.md) — System design
+- [API Reference](wiki/API-Reference.md) — 180+ endpoints
+- [Plugin Development](wiki/Plugin-Development.md) — Create plugins
+- [Frontend SDK](wiki/Frontend-SDK.md) — Frontend architecture
+- [Event Catalog](wiki/Event-Catalog.md) — 24 WebSocket events
+- [Configuration](wiki/Configuration.md) — Settings reference
+- [Channels & Integrations](wiki/Channels-and-Integrations.md) — Messaging
+- [Security](wiki/Security.md) — Auth, sandbox, hardening
 
 ## Naming conventions (spec section 27)
 

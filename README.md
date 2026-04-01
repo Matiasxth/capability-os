@@ -9,7 +9,8 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/LLM-OpenAI%20%7C%20Anthropic%20%7C%20Groq%20%7C%20Gemini%20%7C%20DeepSeek%20%7C%20Ollama-FF6F00?style=flat-square" alt="LLM Providers"/>
-  <img src="https://img.shields.io/badge/Plugins-21-00ff88?style=flat-square" alt="Plugins"/>
+  <img src="https://img.shields.io/badge/Plugins-22-00ff88?style=flat-square" alt="Plugins"/>
+  <img src="https://img.shields.io/badge/Redis-Distributed-DC382D?style=flat-square&logo=redis&logoColor=white" alt="Redis"/>
   <img src="https://img.shields.io/badge/Endpoints-180+-5588ff?style=flat-square" alt="Endpoints"/>
   <img src="https://img.shields.io/badge/PWA-Installable-a855f7?style=flat-square&logo=pwa&logoColor=white" alt="PWA"/>
 </p>
@@ -28,7 +29,7 @@
   <img src=".github/preview.png" alt="Capability OS" width="800"/>
 </p>
 
-An extensible platform built on a plugin architecture. 21 plugins manage everything from natural language understanding and tool execution to visual workflow building, multi-channel messaging, and proactive scheduling — all orchestrated by a ServiceContainer with typed Protocol contracts.
+An extensible platform built on a distributed plugin architecture. 22 plugins manage everything from natural language understanding and tool execution to visual workflow building, multi-channel messaging, and proactive scheduling. 6 plugins run as independent Redis-backed worker processes for fault isolation and scalability. 5 LLM providers supported natively (Anthropic, OpenAI, Gemini, DeepSeek, Ollama).
 
 ```
 python -m capabilityos serve       # start the server
@@ -124,7 +125,7 @@ Agent: [calls filesystem_list_directory] → scans structure
 ```
 
 ### Plugin Architecture
-21 built-in plugins running via ServiceContainer with dependency-ordered initialization, typed Protocol contracts, and hot-reload support. Create custom plugins with `capos-plugin.json` + `plugin.py`.
+22 built-in plugins running via ServiceContainer with dependency-ordered initialization, typed Protocol contracts, and hot-reload support. 6 plugins run as Redis-backed worker processes for fault isolation. Create custom plugins with `capos-plugin.json` + `plugin.py`.
 
 | Plugin | ID | Purpose |
 |--------|----|---------|
@@ -149,9 +150,10 @@ Agent: [calls filesystem_list_directory] → scans structure
 | WhatsApp | `capos.channels.whatsapp` | 3 backends: Browser, Baileys, Official API |
 | Workflows | `capos.core.workflows` | Visual workflow builder + executor |
 | Sandbox | `capos.core.sandbox` | Process (L2) + Docker (L3) sandboxes |
+| Integrations | `capos.core.integrations` | Integration registry and lifecycle |
 
 ### Visual Workflow Builder
-Drag-and-drop workflow editor powered by ReactFlow with 8 node types: Trigger, Tool, Agent, Condition, Loop, Delay, Webhook, and End. Workflows are persisted and executed via topological sort.
+Drag-and-drop workflow editor powered by ReactFlow with 13 node types: Trigger, Tool, Agent, Condition, Loop, Delay, Transform, Output, HTTP Request, Notification, Script, AI Prompt, and File. Includes 5 pre-built templates, AI workflow designer chat, auto-save, and per-node execution preview. Workflows are persisted and executed via topological sort.
 
 ### Multi-User Authentication
 JWT-based auth with 4 roles:
@@ -250,7 +252,7 @@ Three-cycle task system: Quick (30min), Deep (4h), Daily. Supports cron-style sc
                         HTTP / WebSocket
                               |
                     +---------+---------+
-                    |  UnifiedHandler   |  (ASGI uvicorn / sync fallback)
+                    |   ASGI (uvicorn)  |  ThreadPool(32) + SSE streaming
                     +---------+---------+
                               |
                     +---------+---------+
@@ -259,33 +261,29 @@ Three-cycle task system: Quick (30min), Deep (4h), Daily. Supports cron-style sc
                               |
               +---------------+---------------+
               |               |               |
-        Auth Middleware   Handler Modules   Static Files
-              |               |
-              |    +----------+----------+
-              |    | system_handlers     |
-              |    | agent_handlers      |
-              |    | capability_handlers |
-              |    | workspace_handlers  |
-              |    | memory_handlers     |
-              |    | workflow_handlers   |
-              |    | plugin_handlers     |
-              |    | scheduler_handlers  |
-              |    | supervisor_handlers |
-              |    | voice_handlers      |
-              |    | ... (19 modules)    |
-              |    +----------+----------+
+        Auth (JWT)     Handler Modules     Static Files
+              |           (19 modules)
               |               |
               |    +----------+----------+
               |    |  ServiceContainer   |  Plugin lifecycle + DI
               |    +----------+----------+
               |               |
-              |    +----------+----------+
-              |    |    21 Plugins       |  Typed Protocol contracts
-              |    +-----+---------+----+
-              |          |         |
-              |    Services    EventBus    SSE Streaming
-              |    (contracts)  (pub/sub)  (agent steps)
-              +----------+----------+
+         +----+----+   +-----+-----+   +----------+
+         |10 Core  |   | EventBus  |   |  Redis   |
+         |Plugins  |   | (bridge)  |◄─►| (queue)  |
+         |(in-proc)|   +-----+-----+   +----+-----+
+         +---------+         |              |
+                        +----+----+    +----+-----+
+                        |WebSocket|    | 6 Worker |
+                        | Server  |    | Processes|
+                        |(200 max)|    +----------+
+                        +---------+    | telegram |
+                                       | slack    |
+                                       | discord  |
+                                       | whatsapp |
+                                       | scheduler|
+                                       | supervisor|
+                                       +----------+
 ```
 
 ### Plugin Dependency Graph
@@ -366,7 +364,7 @@ POST /plugins/install  {"path": "./my-plugin"}
 POST /plugins/my-org.my-plugin/reload
 ```
 
-See [Plugin Development Guide](docs/plugin-development.md) and [SDK Reference](docs/sdk-reference.md) for full documentation.
+See the [Wiki](wiki/) for full documentation: [Plugin Development](wiki/Plugin-Development.md), [Frontend SDK](wiki/Frontend-SDK.md), [Architecture](wiki/Architecture.md), [API Reference](wiki/API-Reference.md).
 
 ---
 
@@ -513,11 +511,15 @@ python -m capabilityos <command> [options]
 ```json
 {
   "llm": {
-    "provider": "openai",
-    "base_url": "https://api.groq.com/openai/v1",
-    "model": "llama-3.3-70b-versatile",
+    "provider": "anthropic",
+    "base_url": "https://api.anthropic.com",
+    "model": "claude-sonnet-4-20250514",
     "api_key": "YOUR_KEY",
     "timeout_ms": 30000
+  },
+  "redis": {
+    "enabled": true,
+    "url": "redis://127.0.0.1:6379/0"
   },
   "browser": {
     "backend": "playwright",
@@ -580,12 +582,21 @@ python -m capabilityos <command> [options]
 ### Requirements
 - Python 3.12+
 - Node.js 18+
+- Redis (optional — system works without it, but enables distributed workers)
 - Optional: `pip install playwright && python -m playwright install chromium`
+
+### Install Dependencies
+```bash
+pip install -r requirements.txt
+cd system/frontend/app && npm install && npm run build && cd ../../..
+```
+
+Core Python dependencies: `bcrypt`, `PyJWT`, `uvicorn`, `redis`, `anthropic`, `sqlite-vec`
 
 ### Run Tests
 ```bash
 python -m pytest tests/ -v
-cd system/frontend/app && npm test -- --run
+cd system/frontend/app && npx vitest run
 ```
 
 ### Verification Agent
@@ -601,7 +612,9 @@ capability-os/
 +-- system/
 |   +-- sdk/                        # Plugin SDK (contracts, context, lifecycle)
 |   +-- container/                  # ServiceContainer, plugin loader, hot-reload
-|   +-- plugins/                    # 21 built-in plugins
+|   +-- infrastructure/             # Redis queues, worker processes, event bridge
+|   +-- workers/                    # Channel/scheduler/supervisor worker scripts
+|   +-- plugins/                    # 22 built-in plugins
 |   |   +-- core_services/          # Settings, registries, security
 |   |   +-- auth/                   # JWT, user registry, middleware
 |   |   +-- memory/                 # History, semantic, markdown
@@ -643,31 +656,46 @@ capability-os/
 |   +-- tools/                      # Tool contracts + runtime handlers
 |   +-- capabilities/               # Capability contracts + executors
 |   +-- integrations/               # Channel connectors (WA, TG, Slack, Discord)
-|   +-- frontend/app/               # React 18 + Vite + ReactFlow
+|   +-- frontend/app/               # React 18 + Vite + ReactFlow + SDK
+|   |   +-- src/sdk/                # Frontend SDK (13 domain modules)
+|   |   +-- src/components/         # UI components (16 CC sections, workflow, etc.)
 |   +-- whatsapp_worker/            # Node.js workers (Baileys + Puppeteer)
 +-- tests/                          # Unit tests
-+-- scripts/                        # verify.py, utilities
-+-- docs/                           # Architecture, SDK reference, guides
-+-- docker-compose.yml
++-- scripts/                        # verify.py, security_audit.py
++-- wiki/                           # GitHub wiki (10 pages)
++-- docker-compose.yml              # Docker with Redis + Chrome
 +-- Dockerfile
++-- start.sh                        # Mac/Linux launcher
++-- CapabilityOS.bat                # Windows launcher
 ```
 
 ---
 
 ## Changelog
 
-### v3.1 (Current)
+### v3.2 (Current)
+- **Distributed workers** -- 6 plugins (Telegram, Slack, Discord, WhatsApp, Scheduler, Supervisor) run as Redis-backed subprocesses with auto-restart and heartbeat. Falls back to in-process without Redis.
+- **5 LLM providers** -- Anthropic (SDK), OpenAI, Gemini, DeepSeek, Ollama all fully functional with tool calling
+- **Redis infrastructure** -- MessageQueue, EventBridge, WorkerProcess, WorkerRegistry, RedisCache
+- **Agent sessions in Redis** -- survive process restarts, enable cross-process recovery
+- **Settings thread safety** -- RLock + atomic file writes prevent corruption
+- **Rate limiter enforced** -- LLM rate limits now wait instead of rejecting
+- **SQLite thread safety** -- thread-local read connections for concurrent access
+- **Configurable server** -- thread pool (32 default) and WebSocket limit (200 default) via env vars
+- **13 workflow node types** -- HTTP, Notification, Script, AI Prompt, File + 8 original
+- **AI Workflow Designer** -- chat generates workflows from natural language
+- **5 workflow templates** -- Monitor+Notify, File Processing, Agent Chain, Scheduled Report, Web Scraper
+- **ErrorBoundary** -- prevents white screen of death on React errors
+- **Repo cleanup** -- 30 obsolete files removed, gitignore updated
+
+### v3.1
 - **Frontend SDK** -- single gateway to backend (HTTP + SSE + WebSocket), 13 domain modules
 - **ControlCenter refactored** -- 848 lines split into 16 independent section components
 - **Session persistence** -- chat survives page refresh (sessionStorage)
 - **Event-driven UI** -- sdk.events replaces polling, typed event catalog (24 types)
 - **PWA support** -- installable app, Service Worker caching, push notifications
 - **8 messaging channels** -- WhatsApp, Telegram, Slack, Discord + Signal, Matrix, Teams, Email, Webhook (UI ready)
-- **ChannelCard component** -- add a new channel in 12 lines of config
-- **55 frontend tests** -- SDK core, domains, component integration tests
-- **GitHub Actions CI** -- automated test + build on push/PR
-- **Boundary enforcement** -- ESLint rules ban raw fetch() and direct localStorage access
-- **Streaming auth fix** -- SSE endpoints now send JWT (was missing before)
+- **55 frontend tests** + GitHub Actions CI
 - **NotificationCenter** -- real-time activity feed with tab filters
 
 ### v3.0
