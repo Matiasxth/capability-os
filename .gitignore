@@ -17,7 +17,6 @@ errors/
 # Settings with secrets
 system/settings.json
 *.env
-workspace/chrome-profile/
 
 # Frontend
 system/frontend/app/node_modules/
@@ -26,6 +25,7 @@ system/frontend/app/dist/
 # WhatsApp worker
 system/whatsapp_worker/node_modules/
 system/whatsapp_worker/session/
+system/whatsapp_worker/browser-session/
 
 # Debug images
 wa_debug*.png
@@ -33,21 +33,32 @@ whatsapp_debug*.png
 
 # Chrome debug profile
 .chrome-debug-profile/
+workspace/chrome-profile/
 
-# WhatsApp browser session data
-system/whatsapp_worker/browser-session/
-
-# Runtime data
+# Runtime data (generated at runtime, user-specific)
 agents.json
+workspaces.json
+queue.json
+memory/history.json
+memory/memories.json
+memory/vectors.json
 memory/MEMORY.md
 memory/metrics.json
 memory/traces/
+memory/daily/
+memory/sessions/
 skills/
-queue.json
+system/integrations/registry_data.json
 
 # Coverage
 .coverage
+htmlcov/
+
+# Claude Code local settings
+.claude/settings.local.json
 
 # OS/editor
 .DS_Store
 Thumbs.db
+*.swp
+*~
