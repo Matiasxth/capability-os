@@ -95,6 +95,15 @@ class AgentLoop:
         self._execution_history = execution_history
         self._markdown_memory = markdown_memory
         self._memory_compactor = memory_compactor
+        self._redis_cache = None
+        # Try to connect Redis cache for session persistence
+        try:
+            from system.infrastructure.message_queue import create_queue
+            from system.infrastructure.redis_cache import RedisCache
+            queue = create_queue({})
+            self._redis_cache = RedisCache(queue)
+        except Exception:
+            pass
 
     def _resolve_tools(self, agent_config: dict[str, Any] | None) -> list[dict[str, Any]]:
         """Get the tool list for this agent. If agent has tool_ids, filter to those."""
@@ -105,7 +114,18 @@ class AgentLoop:
         return self._default_tools
 
     def get_session(self, session_id: str) -> AgentSession | None:
-        return self._sessions.get(session_id)
+        session = self._sessions.get(session_id)
+        if session is None and self._redis_cache:
+            # Try Redis for cross-process session recovery
+            data = self._redis_cache.get_session(session_id)
+            if data:
+                session = AgentSession(
+                    session_id=data.get("session_id", session_id),
+                    messages=data.get("messages", []),
+                    status=data.get("status", "complete"),
+                )
+                self._sessions[session_id] = session
+        return session
 
     def run(
         self,
@@ -376,6 +396,13 @@ class AgentLoop:
             for m in history:
                 session.messages.append(m)
         self._sessions[session.session_id] = session
+        # Persist to Redis for cross-process recovery
+        if self._redis_cache:
+            self._redis_cache.store_session(session.session_id, {
+                "session_id": session.session_id,
+                "messages": session.messages[-20:],
+                "status": session.status,
+            })
         # Prune old sessions (keep last 20)
         if len(self._sessions) > 20:
             oldest_key = next(iter(self._sessions))
