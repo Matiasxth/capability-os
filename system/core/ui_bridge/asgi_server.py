@@ -20,8 +20,9 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 
-# Thread pool for running sync handlers
-_executor = ThreadPoolExecutor(max_workers=16)
+# Thread pool for running sync handlers (configurable via env)
+_POOL_SIZE = int(os.environ.get("CAPOS_THREAD_POOL", "32"))
+_executor = ThreadPoolExecutor(max_workers=_POOL_SIZE)
 
 
 class CapOSASGI:

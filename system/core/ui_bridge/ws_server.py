@@ -19,6 +19,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import os
 import socket
 import struct
 import threading
@@ -28,7 +29,7 @@ from typing import Any
 from system.core.ui_bridge.event_bus import EventBus
 
 _WS_MAGIC = b"258EAFA5-E914-47DA-95CA-5AB5E11635C8"
-_MAX_CLIENTS = 50
+_MAX_CLIENTS = int(os.environ.get("WS_MAX_CLIENTS", "200"))
 
 
 # ---------------------------------------------------------------------------
