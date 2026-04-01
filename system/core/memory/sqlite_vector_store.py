@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import struct
+import threading
 from pathlib import Path
 from threading import RLock
 from typing import Any
@@ -28,7 +29,23 @@ class SqliteVectorStore:
         self._lock = RLock()
         self._dims = dimensions
         self._conn: sqlite3.Connection | None = None
+        self._local = threading.local()  # thread-local connections for safe reads
         self._init_db()
+
+    def _get_read_conn(self) -> sqlite3.Connection:
+        """Get a thread-local read-only connection for safe concurrent reads."""
+        conn = getattr(self._local, "conn", None)
+        if conn is None:
+            conn = sqlite3.connect(self._path, check_same_thread=True)
+            try:
+                import sqlite_vec
+                conn.enable_load_extension(True)
+                sqlite_vec.load(conn)
+                conn.enable_load_extension(False)
+            except Exception:
+                pass
+            self._local.conn = conn
+        return conn
 
     def _init_db(self) -> None:
         try:

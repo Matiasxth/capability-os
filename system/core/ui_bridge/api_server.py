@@ -123,8 +123,11 @@ class CapabilityOSUIBridgeService:
         # Bridge EventBus → Redis for cross-process events
         from system.core.ui_bridge.event_bus import event_bus
         event_bus.set_bridge(self.message_queue)
+        # Redis cache layer for storage acceleration
+        from system.infrastructure.redis_cache import RedisCache
+        self.redis_cache = RedisCache(self.message_queue)
         if self.message_queue.is_redis:
-            print("  Redis: connected", flush=True)
+            print("  Redis: connected (cache + events + workers)", flush=True)
         else:
             print("  Redis: not available (in-memory fallback)", flush=True)
 
