@@ -19,6 +19,6 @@
     "@testing-library/react": "^16.0.0",
     "jsdom": "^24.1.1",
     "vite": "^5.4.10",
-    "vitest": "^2.1.2"
+    "vitest": "^4.1.2"
   }
 }
