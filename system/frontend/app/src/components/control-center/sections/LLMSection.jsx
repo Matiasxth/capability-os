@@ -2,15 +2,21 @@ import React, { useState } from "react";
 import sdk from "../../../sdk";
 
 const _PRESETS = {
+  anthropic: { label: "Anthropic", provider: "anthropic", base_url: "https://api.anthropic.com", models: ["claude-sonnet-4-20250514", "claude-haiku-4-5-20251001", "claude-opus-4-6-20250610"], needsKey: true },
+  openai: { label: "OpenAI", provider: "openai", base_url: "https://api.openai.com/v1", models: ["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"], needsKey: true },
+  gemini: { label: "Gemini", provider: "gemini", base_url: "https://generativelanguage.googleapis.com", models: ["gemini-2.0-flash", "gemini-2.5-pro", "gemini-2.5-flash"], needsKey: true },
+  deepseek: { label: "DeepSeek", provider: "deepseek", base_url: "https://api.deepseek.com/v1", models: ["deepseek-chat", "deepseek-reasoner"], needsKey: true },
   groq: { label: "Groq", provider: "openai", base_url: "https://api.groq.com/openai/v1", models: ["llama-3.1-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "gemma2-9b-it"], needsKey: true },
   ollama: { label: "Ollama", provider: "ollama", base_url: "http://localhost:11434", models: [], needsKey: false },
-  openai: { label: "OpenAI", provider: "openai", base_url: "https://api.openai.com/v1", models: ["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"], needsKey: true },
   custom: { label: "Custom", provider: "openai", base_url: "", models: [], needsKey: false }
 };
 
 function _detectPreset(url) {
   if (!url) return "ollama";
+  if (url.includes("anthropic.com")) return "anthropic";
   if (url.includes("groq.com")) return "groq";
+  if (url.includes("generativelanguage.googleapis.com")) return "gemini";
+  if (url.includes("deepseek.com")) return "deepseek";
   if (url.includes("localhost:11434") || url.includes("127.0.0.1:11434")) return "ollama";
   if (url.includes("openai.com")) return "openai";
   return "custom";

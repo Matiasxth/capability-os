@@ -30,8 +30,11 @@ export default function LLMSettings({
             value={llm.provider || "ollama"}
             onChange={(event) => updateLLM(settings, "provider", event.target.value, onChange)}
           >
-            <option value="ollama">ollama</option>
-            <option value="openai">openai</option>
+            <option value="anthropic">Anthropic</option>
+            <option value="openai">OpenAI</option>
+            <option value="gemini">Gemini</option>
+            <option value="deepseek">DeepSeek</option>
+            <option value="ollama">Ollama</option>
           </select>
         </label>
         <label>
