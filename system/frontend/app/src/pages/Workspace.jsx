@@ -70,7 +70,10 @@ export default function Workspace({ activeWorkspace, userName }) {
   function loadHistory(force){
     return sdk.memory.history(null, activeProjectId).then(r=>{
       const valid=(r.history||[]).filter(h=>h.intent&&h.intent.trim().length>0&&h.intent!=="session"&&h.intent!=="New session");
-      const mapped=valid.slice(0,20).map(h=>({id:h.execution_id,intent:h.intent,status:h.status==="ready"?"success":h.status,duration_ms:h.duration_ms,time:h.timestamp,plan_steps:h.plan_steps||null,step_runs:h.step_runs||null,error_message:h.error_message||null,failed_step:h.failed_step||null,final_output:h.key_outputs||{},chat_response:h.chat_response||null,chat_messages:h.chat_messages||null,message_count:h.message_count||0,isChat:h.capability_id==="chat",hasExecution:!!h.has_execution}));
+      const rawMapped=valid.slice(0,20).map(h=>({id:h.execution_id,intent:h.intent,status:h.status==="ready"?"success":h.status,duration_ms:h.duration_ms,time:h.timestamp,plan_steps:h.plan_steps||null,step_runs:h.step_runs||null,error_message:h.error_message||null,failed_step:h.failed_step||null,final_output:h.key_outputs||{},chat_response:h.chat_response||null,chat_messages:h.chat_messages||null,message_count:h.message_count||0,isChat:h.capability_id==="chat",hasExecution:!!h.has_execution}));
+      // Deduplicate by id — keep first occurrence (most recent due to API order)
+      const seen=new Set();
+      const mapped=rawMapped.filter(h=>{if(!h.id||seen.has(h.id))return false;seen.add(h.id);return true});
       const newIds=mapped.map(h=>h.id+":"+(h.message_count||0)+":"+(h.time||"")).join(",");
       if(force||newIds!==historyIdsRef.current){
         historyIdsRef.current=newIds;setHistory(mapped);
@@ -209,7 +212,7 @@ export default function Workspace({ activeWorkspace, userName }) {
           if(ev.event==="awaiting_confirmation"){
             setPendingConfirmation({...ev,session_id:sid||agentSessionId});
             setMessages(p=>{const c=[...p];c[c.length-1]={id:Date.now(),role:"system",content:"agent_steps",meta:{agentEvents:events,awaiting:true},ts:new Date()};return c});
-            setAgentSessionId(sid);setLoadingPlan(false);return;
+            setAgentSessionId(sid);if(sid)setCurrentSessionId(sid);setLoadingPlan(false);return;
           }
           // Live update: show steps as they arrive
           const stepsOnly=events.filter(e=>e.event!=="agent_start");
@@ -218,6 +221,8 @@ export default function Workspace({ activeWorkspace, userName }) {
           }
         }
         setAgentSessionId(sid);
+        // Sync currentSessionId with agent's session so flushSession uses the same ID
+        if(sid)setCurrentSessionId(sid);
         // Final render
         const hasToolCalls=events.some(e=>e.event==="tool_call");
         if(hasToolCalls){

@@ -204,9 +204,29 @@ class ExecutionHistory:
     # ------------------------------------------------------------------
 
     def get_recent(self, n: int = 20) -> list[dict[str, Any]]:
-        """Return the N most recent entries (newest first)."""
+        """Return the N most recent entries (newest first), deduplicated."""
         with self._lock:
-            return deepcopy(self._entries[:max(1, n)])
+            seen: set[str] = set()
+            result: list[dict[str, Any]] = []
+            for e in self._entries:
+                eid = e.get("execution_id", "")
+                # Dedup by id
+                if eid and eid in seen:
+                    continue
+                # Dedup by intent+messages — same conversation saved under different IDs
+                intent = e.get("intent", "")
+                msg_count = e.get("message_count", 0)
+                content_key = f"{intent}:{msg_count}"
+                if content_key in seen and intent:
+                    continue
+                if eid:
+                    seen.add(eid)
+                if intent:
+                    seen.add(content_key)
+                result.append(deepcopy(e))
+                if len(result) >= max(1, n):
+                    break
+            return result
 
     def get_by_capability(self, capability_id: str, limit: int = 20) -> list[dict[str, Any]]:
         """Return entries for a specific capability."""

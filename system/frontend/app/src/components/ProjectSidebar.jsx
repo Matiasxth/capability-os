@@ -106,12 +106,19 @@ export default function ProjectSidebar({
               : h.id?.startsWith("whatsapp_") ? "\U0001f4ac"
               : h.hasExecution ? "\u26a1" : "\U0001f4ac";
             return (
-              <div key={h.id} style={cx.histItem} onClick={() => onRestoreSession(h)}>
-                <span style={cx.histIcon}>{icon}</span>
-                <span style={cx.histText}>{(h.intent || "Session").slice(0, 40)}</span>
+              <div key={h.id} style={cx.histItem}>
+                <span style={cx.histIcon} onClick={() => onRestoreSession(h)}>{icon}</span>
+                <span style={{...cx.histText, cursor: "pointer"}} onClick={() => onRestoreSession(h)}>{(h.intent || "Session").slice(0, 40)}</span>
                 <span style={cx.histMeta}>
                   {h.message_count ? `${h.message_count}` : h.duration_ms ? `${h.duration_ms}ms` : ""}
                 </span>
+                <button
+                  style={{ background: "none", border: "none", color: "#6a70a0", cursor: "pointer", padding: "0 4px", fontSize: 14, opacity: 0.6, transition: "opacity 0.15s" }}
+                  title="Delete session"
+                  onClick={(e) => { e.stopPropagation(); onDeleteSession(h.id); }}
+                  onMouseEnter={e => e.target.style.opacity = 1}
+                  onMouseLeave={e => e.target.style.opacity = 0.6}
+                >{"\u2715"}</button>
               </div>
             );
           })}
