@@ -5,10 +5,35 @@
 set -e
 cd "$(dirname "$0")"
 
-PORT="${1:-8000}"
-if [[ "$1" == "--port" ]]; then PORT="$2"; shift 2; fi
+PORT=8000
 BG=false
-if [[ "$1" == "--background" ]]; then BG=true; fi
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --port|-p)
+            if [[ -z "$2" || ! "$2" =~ ^[0-9]+$ ]]; then
+                echo "Error: --port requires a numeric value"
+                exit 1
+            fi
+            PORT="$2"
+            shift 2
+            ;;
+        --background|-b)
+            BG=true
+            shift
+            ;;
+        --help|-h)
+            echo "Usage: ./start.sh [--port 8000] [--background]"
+            echo "  --port, -p PORT   Set HTTP port (default: 8000)"
+            echo "  --background, -b  Run in background"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1 (try --help)"
+            exit 1
+            ;;
+    esac
+done
 
 # Check if already running
 if command -v lsof &>/dev/null && lsof -iTCP:"$PORT" -sTCP:LISTEN &>/dev/null; then

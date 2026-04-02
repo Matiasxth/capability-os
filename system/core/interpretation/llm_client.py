@@ -71,6 +71,30 @@ class OllamaAdapter:
         headers = {"Content-Type": "application/json"}
         return _http_post_json(url, payload, headers, timeout_sec, "ollama")
 
+    def complete_with_tools(self, messages: list[dict], tools: list[dict], timeout_sec: float = 30.0) -> dict:
+        """Ollama tool calling via /api/chat (requires Ollama 0.4+)."""
+        url = f"{self.base_url.rstrip('/')}/api/chat"
+        ollama_tools = []
+        for t in tools:
+            ollama_tools.append({
+                "type": "function",
+                "function": {"name": t["name"], "description": t.get("description", ""), "parameters": t.get("parameters", {})},
+            })
+        payload: dict[str, Any] = {"model": self.model, "messages": messages, "stream": False, "tools": ollama_tools}
+        headers = {"Content-Type": "application/json"}
+        raw = _http_post_json_raw(url, payload, headers, timeout_sec)
+        msg = raw.get("message", {})
+        result: dict[str, Any] = {"choices": [{"message": {"role": "assistant", "content": msg.get("content"), "tool_calls": []}}]}
+        for tc in msg.get("tool_calls", []):
+            fn = tc.get("function", {})
+            result["choices"][0]["message"]["tool_calls"].append({
+                "id": f"call_{fn.get('name', 'unknown')}", "type": "function",
+                "function": {"name": fn.get("name", ""), "arguments": json.dumps(fn.get("arguments", {}))},
+            })
+        if not result["choices"][0]["message"]["tool_calls"]:
+            del result["choices"][0]["message"]["tool_calls"]
+        return result
+
 
 @dataclass
 class AnthropicAdapter:
@@ -143,6 +167,40 @@ class GeminiAdapter:
             if parts:
                 return parts[0].get("text", "")
         raise LLMClientError("gemini response missing content.")
+
+    def complete_with_tools(self, messages: list[dict], tools: list[dict], timeout_sec: float = 30.0) -> dict:
+        """Gemini function calling via generateContent API."""
+        url = f"{self.base_url.rstrip('/')}/v1beta/models/{self.model}:generateContent?key={self.api_key}"
+        gemini_tools = []
+        for t in tools:
+            gemini_tools.append({"name": t["name"], "description": t.get("description", ""), "parameters": t.get("parameters", {})})
+        contents = []
+        for m in messages:
+            role = "model" if m.get("role") == "assistant" else "user"
+            contents.append({"role": role, "parts": [{"text": m.get("content", "")}]})
+        payload: dict[str, Any] = {
+            "contents": contents,
+            "tools": [{"function_declarations": gemini_tools}],
+            "generationConfig": {"temperature": 0},
+        }
+        headers = {"Content-Type": "application/json"}
+        raw = _http_post_json_raw(url, payload, headers, timeout_sec)
+        candidates = raw.get("candidates", [])
+        result: dict[str, Any] = {"choices": [{"message": {"role": "assistant", "content": None, "tool_calls": []}}]}
+        if candidates:
+            parts = candidates[0].get("content", {}).get("parts", [])
+            for part in parts:
+                if "text" in part:
+                    result["choices"][0]["message"]["content"] = part["text"]
+                elif "functionCall" in part:
+                    fc = part["functionCall"]
+                    result["choices"][0]["message"]["tool_calls"].append({
+                        "id": f"call_{fc.get('name', 'unknown')}", "type": "function",
+                        "function": {"name": fc.get("name", ""), "arguments": json.dumps(fc.get("args", {}))},
+                    })
+        if not result["choices"][0]["message"]["tool_calls"]:
+            del result["choices"][0]["message"]["tool_calls"]
+        return result
 
 
 @dataclass

@@ -1,11 +1,14 @@
 {
   "_security_note": "NEVER commit settings.json with real API keys. If a key was committed, rotate it immediately at your provider's console.",
   "llm": {
-    "provider": "openai",
-    "base_url": "https://api.groq.com/openai/v1",
-    "model": "llama-3.3-70b-versatile",
+    "provider": "anthropic",
+    "base_url": "https://api.anthropic.com",
+    "model": "claude-sonnet-4-20250514",
     "api_key": "YOUR_API_KEY_HERE",
     "timeout_ms": 30000
+  },
+  "database": {
+    "url": ""
   },
   "browser": {
     "backend": "playwright",
@@ -16,6 +19,34 @@
   "agent": {
     "enabled": true,
     "max_iterations": 10
+  },
+  "workspace": {
+    "artifacts_path": "artifacts",
+    "sequences_path": "sequences"
+  },
+  "voice": {
+    "stt_provider": "whisper_api",
+    "tts_provider": "web_speech",
+    "tts_voice": "nova",
+    "tts_speed": 1.0,
+    "auto_speak": false,
+    "language": "es"
+  },
+  "whatsapp": {
+    "backend": "browser",
+    "allowed_user_ids": []
+  },
+  "telegram": {
+    "bot_token": "",
+    "polling_enabled": false
+  },
+  "slack": {
+    "bot_token": "",
+    "polling_enabled": false
+  },
+  "discord": {
+    "bot_token": "",
+    "polling_enabled": false
   },
   "a2a": {
     "enabled": true,

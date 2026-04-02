@@ -1,6 +1,7 @@
 """Execute a workflow definition in topological order.
 
-Supports node types: trigger, tool, agent, condition, delay, transform, output.
+Supports 13 node types: trigger, tool, agent, condition, delay, transform,
+output, loop, http, notification, script, prompt, file.
 """
 from __future__ import annotations
 
