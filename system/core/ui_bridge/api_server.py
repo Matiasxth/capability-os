@@ -594,28 +594,33 @@ class CapabilityOSUIBridgeService:
         configure(payload)
 
     def _test_llm_connection(self) -> dict[str, Any]:
+        import time as _time
         self._refresh_llm_client_settings()
         llm_settings = self.settings_service.get_settings(mask_secrets=False).get("llm", {})
         provider = llm_settings.get("provider", "unknown")
         model = llm_settings.get("model", "")
+        t0 = _time.monotonic()
         try:
             response = self.intent_interpreter.llm_client.complete(
                 system_prompt="You are a health check endpoint.",
                 user_prompt="Respond with exactly: ok",
             )
         except Exception as exc:
+            latency = int((_time.monotonic() - t0) * 1000)
             return {
                 "status": "error",
                 "provider": provider,
                 "model": model,
+                "latency_ms": latency,
                 "error_code": "llm_connection_error",
                 "error_message": str(exc),
             }
-
+        latency = int((_time.monotonic() - t0) * 1000)
         return {
             "status": "success",
             "provider": provider,
             "model": model,
+            "latency_ms": latency,
             "sample": response[:120],
             "error_code": None,
             "error_message": None,
