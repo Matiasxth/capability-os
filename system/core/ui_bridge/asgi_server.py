@@ -346,6 +346,11 @@ class CapOSASGI:
     # ------------------------------------------------------------------
 
     def _is_api_path(self, path: str) -> bool:
+        # SPA routes — always serve index.html, never treat as API
+        SPA_ROUTES = ("/workflows", "/editor", "/control-center", "/login")
+        if path in SPA_ROUTES:
+            return False
+
         API_PREFIXES = (
             "/capabilities", "/execute", "/interpret", "/plan", "/chat",
             "/settings", "/health", "/status", "/integrations/",
@@ -353,7 +358,7 @@ class CapOSASGI:
             "/workspaces", "/files/", "/llm/", "/system/",
             "/mcp/", "/a2a/", "/memory", "/metrics",
             "/agents", "/agent/", "/supervisor/", "/scheduler/",
-            "/skills", "/voice/", "/plugins", "/workflows",
+            "/skills", "/voice/", "/plugins", "/workflows/",
             "/auth/", "/logs", "/optimizations/", "/executions/",
             "/.well-known",
         )
