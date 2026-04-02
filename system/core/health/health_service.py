@@ -26,13 +26,19 @@ class HealthService:
         settings = self.settings_service.get_settings(mask_secrets=False)
         llm = settings.get("llm", {})
         provider = llm.get("provider", "unknown")
-        api_key = llm.get("api_key", "") or os.getenv("OPENAI_API_KEY", "").strip()
+        api_key = llm.get("api_key", "")
+        if not api_key:
+            env_keys = {"openai": "OPENAI_API_KEY", "anthropic": "ANTHROPIC_API_KEY", "gemini": "GEMINI_API_KEY", "deepseek": "DEEPSEEK_API_KEY"}
+            api_key = os.getenv(env_keys.get(provider, ""), "").strip()
+
+        VALID_PROVIDERS = {"openai", "ollama", "anthropic", "gemini", "deepseek"}
+        NEEDS_KEY = {"openai", "anthropic", "gemini", "deepseek"}
 
         issues: list[str] = []
-        if provider == "openai" and not api_key:
-            issues.append("openai provider requires api_key.")
-        if provider not in {"openai", "ollama"}:
-            issues.append("unsupported llm provider.")
+        if provider in NEEDS_KEY and not api_key:
+            issues.append(f"{provider} provider requires api_key.")
+        if provider not in VALID_PROVIDERS:
+            issues.append(f"unsupported llm provider: {provider}.")
 
         if issues:
             status = "not_configured"
