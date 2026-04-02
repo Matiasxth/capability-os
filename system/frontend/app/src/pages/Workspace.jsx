@@ -36,7 +36,7 @@ export default function Workspace({ activeWorkspace, userName }) {
   const [messages,setMessages]=useState(()=>sdk.session.restoreChatMessages());
   const restoredFromStorageRef=useRef(true);
   const [suggestedAction,setSuggestedAction]=useState(null);
-  const [currentSessionId,setCurrentSessionId]=useState(()=>"chat_"+Date.now());
+  const [currentSessionId,setCurrentSessionId]=useState(()=>sdk.session.restoreSessionId()||"chat_"+Date.now());
   const [deletingId,setDeletingId]=useState(null);
   const [confirmClear,setConfirmClear]=useState(false);
   const {toasts,addToast,removeToast}=useToast();
@@ -113,6 +113,9 @@ export default function Workspace({ activeWorkspace, userName }) {
     const fallbackId = setInterval(() => { if (!sdk.events.isConnected()) loadHistory(); }, 60000);
     return () => { sdk.events.off("*", handler); unsubConn(); clearInterval(fallbackId); };
   }, []);
+
+  // ── Persist sessionId to sessionStorage ──
+  useEffect(()=>{sdk.session.saveSessionId(currentSessionId)},[currentSessionId]);
 
   // ── Messages — persist to sessionStorage on every change ──
   useEffect(()=>{messagesRef.current=messages;if(threadRef.current)threadRef.current.scrollTop=threadRef.current.scrollHeight;sdk.session.saveChatMessages(messages)},[messages]);

@@ -5,6 +5,7 @@
 
 const TOKEN_KEY = "capos_token";
 const CHAT_KEY = "capos_chat_session";
+const SESSION_ID_KEY = "capos_session_id";
 const USERNAME_KEY = "capos_username";
 
 /** @returns {string|null} */
@@ -77,4 +78,15 @@ function deduplicateMessages(messages) {
 
 export function clearChatMessages() {
   sessionStorage.removeItem(CHAT_KEY);
+  sessionStorage.removeItem(SESSION_ID_KEY);
+}
+
+/** @param {string} id */
+export function saveSessionId(id) {
+  try { sessionStorage.setItem(SESSION_ID_KEY, id); } catch {}
+}
+
+/** @returns {string|null} */
+export function restoreSessionId() {
+  return sessionStorage.getItem(SESSION_ID_KEY);
 }
