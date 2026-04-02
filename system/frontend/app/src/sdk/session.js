@@ -33,11 +33,13 @@ export function setUsername(name) {
 
 /**
  * Persist chat messages to sessionStorage (survives refresh, cleared on tab close).
+ * Deduplicates by content+role before saving.
  * @param {Array} messages
  */
 export function saveChatMessages(messages) {
   try {
-    sessionStorage.setItem(CHAT_KEY, JSON.stringify(messages));
+    const deduped = deduplicateMessages(messages);
+    sessionStorage.setItem(CHAT_KEY, JSON.stringify(deduped));
   } catch { /* quota exceeded — silently ignore */ }
 }
 
@@ -45,10 +47,32 @@ export function saveChatMessages(messages) {
 export function restoreChatMessages() {
   try {
     const raw = sessionStorage.getItem(CHAT_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return deduplicateMessages(parsed);
   } catch {
     return [];
   }
+}
+
+/**
+ * Remove duplicate messages by matching role + content.
+ * Keeps the first occurrence of each unique message.
+ * @param {Array} messages
+ * @returns {Array}
+ */
+function deduplicateMessages(messages) {
+  if (!Array.isArray(messages)) return [];
+  const seen = new Set();
+  return messages.filter(m => {
+    const content = typeof m.content === "string" ? m.content : JSON.stringify(m.content);
+    // Skip dedup for loading/executing placeholders
+    if (m.meta?.loading || m.meta?.executing) return true;
+    const key = `${m.role}:${content}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export function clearChatMessages() {

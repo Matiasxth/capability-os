@@ -34,6 +34,7 @@ export default function Workspace({ activeWorkspace, userName }) {
   const [errorMessage,setErrorMessage]=useState("");
   const [history,setHistory]=useState([]);
   const [messages,setMessages]=useState(()=>sdk.session.restoreChatMessages());
+  const restoredFromStorageRef=useRef(true);
   const [suggestedAction,setSuggestedAction]=useState(null);
   const [currentSessionId,setCurrentSessionId]=useState(()=>"chat_"+Date.now());
   const [deletingId,setDeletingId]=useState(null);
@@ -115,12 +116,12 @@ export default function Workspace({ activeWorkspace, userName }) {
 
   // ── Messages — persist to sessionStorage on every change ──
   useEffect(()=>{messagesRef.current=messages;if(threadRef.current)threadRef.current.scrollTop=threadRef.current.scrollHeight;sdk.session.saveChatMessages(messages)},[messages]);
-  function addMsg(role,content,meta){setMessages(p=>[...p,{id:Date.now()+Math.random(),role,content,meta,ts:new Date()}])}
+  function addMsg(role,content,meta){restoredFromStorageRef.current=false;setMessages(p=>[...p,{id:Date.now()+Math.random(),role,content,meta,ts:new Date()}])}
   function showToast(msg,type="info"){addToast(msg,type)}
 
   // ── Session flush ──
   const flushSession=useCallback(()=>{
-    if(!sessionDirtyRef.current)return;
+    if(!sessionDirtyRef.current||restoredFromStorageRef.current)return;
     setMessages(cur=>{
       const visible=cur.filter(m=>!m.meta?.loading&&!m.meta?.executing);
       const firstUser=visible.find(m=>m.role==="user"&&typeof m.content==="string"&&m.content.trim().length>0);
@@ -332,7 +333,7 @@ export default function Workspace({ activeWorkspace, userName }) {
 
   function handleNewSession(){
     flushSession();setMessages([]);sdk.session.clearChatMessages();setPlan(null);setExecution(null);setErrorMessage("");setSuggestedAction(null);setPlanExecuted(false);
-    sessionDirtyRef.current=false;setCurrentSessionId("chat_"+Date.now());setActiveSessionId(null);activeSessionRef.current=null;
+    sessionDirtyRef.current=false;restoredFromStorageRef.current=false;setCurrentSessionId("chat_"+Date.now());setActiveSessionId(null);activeSessionRef.current=null;
   }
 
   function handleDeleteSession(id){
