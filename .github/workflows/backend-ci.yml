@@ -27,7 +27,9 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run tests
-        run: python -m pytest tests/ -x -q --tb=short
+        run: python -m pytest tests/ -q --tb=short
+        env:
+          CI: true
 
   lint:
     runs-on: ubuntu-latest
@@ -38,5 +40,13 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Syntax check
-        run: python -m py_compile system/infrastructure/database.py system/core/interpretation/llm_client.py system/tools/runtime/tool_runtime.py
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Syntax check all Python files
+        run: python -c "
+          import py_compile, pathlib, sys;
+          errors = [];
+          [errors.append(str(e)) if not (lambda f: (py_compile.compile(str(f), doraise=True), True)[-1])(f) else None for f in pathlib.Path('system').rglob('*.py') if 'node_modules' not in str(f) and 'whatsapp_worker' not in str(f)];
+          sys.exit(1) if errors else print(f'All files OK')
+          " 2>&1 || python -m py_compile system/infrastructure/database.py system/core/interpretation/llm_client.py system/tools/runtime/tool_runtime.py

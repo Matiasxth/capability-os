@@ -286,6 +286,47 @@ class ExecutionHistory:
             return len(self._entries)
 
     # ------------------------------------------------------------------
+    # Compaction
+    # ------------------------------------------------------------------
+
+    def get_compactable_sessions(
+        self, max_age_hours: int = 24, min_messages: int = 5,
+    ) -> list[dict[str, Any]]:
+        """Return old sessions with many messages that can be compacted."""
+        from datetime import datetime, timezone, timedelta
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+        with self._lock:
+            result: list[dict[str, Any]] = []
+            for e in self._entries:
+                if e.get("compacted"):
+                    continue
+                msg_count = e.get("message_count", 0)
+                if msg_count < min_messages:
+                    continue
+                ts_str = e.get("timestamp", "")
+                try:
+                    ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                    if ts < cutoff:
+                        result.append(deepcopy(e))
+                except (ValueError, TypeError):
+                    continue
+            return result
+
+    def compact_session(self, session_id: str, summary: str) -> bool:
+        """Replace a session's messages with a summary. Returns True if found."""
+        with self._lock:
+            for e in self._entries:
+                if e.get("execution_id") == session_id:
+                    original_count = e.get("message_count", len(e.get("chat_messages", [])))
+                    e["chat_messages"] = [{"role": "assistant", "content": summary, "type": "summary"}]
+                    e["message_count"] = 1
+                    e["compacted"] = True
+                    e["compacted_from"] = original_count
+                    self._save()
+                    return True
+        return False
+
+    # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
 
