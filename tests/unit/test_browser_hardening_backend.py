@@ -20,6 +20,10 @@ class _MockIPCClient:
         self.session_counter = 0
         self.active_session_id: str | None = None
         self.sessions: dict[str, dict[str, Any]] = {}
+        self._max_restart_retries = 2
+
+    def set_max_restart_retries(self, value: int) -> None:
+        self._max_restart_retries = max(0, int(value))
 
     def execute(
         self,

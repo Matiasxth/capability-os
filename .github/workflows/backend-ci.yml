@@ -1,0 +1,42 @@
+name: Backend CI
+
+on:
+  push:
+    paths:
+      - 'system/**/*.py'
+      - 'tests/**'
+      - 'requirements.txt'
+  pull_request:
+    paths:
+      - 'system/**/*.py'
+      - 'tests/**'
+      - 'requirements.txt'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests
+        run: python -m pytest tests/ -x -q --tb=short
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Syntax check
+        run: python -m py_compile system/infrastructure/database.py system/core/interpretation/llm_client.py system/tools/runtime/tool_runtime.py

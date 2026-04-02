@@ -54,16 +54,26 @@ class ServiceContainer:
         self._states[pid] = PluginState.REGISTERED
         logger.debug(f"Registered plugin: {pid}")
 
+    # Contracts where violations MUST be rejected even in non-strict mode.
+    # These control file I/O, code execution, or plugin installation.
+    _SECURITY_CRITICAL_CONTRACTS: set[str] = {
+        "ToolRuntimeContract",
+        "SecurityServiceContract",
+        "DatabaseContract",
+    }
+
     def register_service(self, contract_type: type, implementation: Any) -> None:
         """Register a service implementation for a Protocol contract.
 
         In strict mode, raises ContractViolationError if validation fails.
-        In default mode, logs warnings and registers anyway.
+        In default mode, logs warnings and registers anyway — EXCEPT for
+        security-critical contracts which always reject violations.
         """
         from system.sdk.validation import validate_contract
         violations = validate_contract(contract_type, implementation)
         if violations:
-            if self._strict:
+            is_critical = contract_type.__name__ in self._SECURITY_CRITICAL_CONTRACTS
+            if self._strict or is_critical:
                 from system.sdk.errors import ContractViolationError
                 raise ContractViolationError(
                     contract_type.__name__,

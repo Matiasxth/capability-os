@@ -16,6 +16,7 @@ TMP_ROOT.mkdir(parents=True, exist_ok=True)
 
 class _FakePlaywrightSession:
     def __init__(self, **kwargs: Any):
+        self._cdp_attached = False
         self.tabs = [{"url": "about:blank", "title": "Blank"}]
         self.active_tab_index = 0
         self.elements = {"body": "Fake body", "#name": ""}

@@ -1,2 +1,2 @@
 """CapabilityOS — AI Operating System."""
-__version__ = "0.2.0"
+__version__ = "3.2.0"

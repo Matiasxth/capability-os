@@ -24,6 +24,7 @@ from system.core.interpretation.llm_client import (
 # Response parsing tests
 # ---------------------------------------------------------------------------
 
+@patch("system.core.interpretation.llm_client._get_pool", return_value=None)
 class TestHttpPostJsonParsing(unittest.TestCase):
     """Test _http_post_json parses each provider's response format."""
 
@@ -35,7 +36,7 @@ class TestHttpPostJsonParsing(unittest.TestCase):
         return mock_resp
 
     @patch("system.core.interpretation.llm_client.urlopen")
-    def test_anthropic_parsing(self, mock_urlopen):
+    def test_anthropic_parsing(self, mock_urlopen, _mock_pool):
         mock_urlopen.return_value = self._mock_urlopen({
             "content": [{"type": "text", "text": "Hello from Claude"}],
             "model": "claude-sonnet-4-20250514",
@@ -45,13 +46,13 @@ class TestHttpPostJsonParsing(unittest.TestCase):
         self.assertEqual(result, "Hello from Claude")
 
     @patch("system.core.interpretation.llm_client.urlopen")
-    def test_anthropic_missing_content(self, mock_urlopen):
+    def test_anthropic_missing_content(self, mock_urlopen, _mock_pool):
         mock_urlopen.return_value = self._mock_urlopen({"content": []})
         with self.assertRaises(LLMClientError):
             _http_post_json("https://api.anthropic.com/v1/messages", {}, {}, 30.0, "anthropic")
 
     @patch("system.core.interpretation.llm_client.urlopen")
-    def test_gemini_parsing(self, mock_urlopen):
+    def test_gemini_parsing(self, mock_urlopen, _mock_pool):
         mock_urlopen.return_value = self._mock_urlopen({
             "candidates": [{
                 "content": {"parts": [{"text": "Hello from Gemini"}]},
@@ -62,13 +63,13 @@ class TestHttpPostJsonParsing(unittest.TestCase):
         self.assertEqual(result, "Hello from Gemini")
 
     @patch("system.core.interpretation.llm_client.urlopen")
-    def test_gemini_missing_candidates(self, mock_urlopen):
+    def test_gemini_missing_candidates(self, mock_urlopen, _mock_pool):
         mock_urlopen.return_value = self._mock_urlopen({"candidates": []})
         with self.assertRaises(LLMClientError):
             _http_post_json("https://url", {}, {}, 30.0, "gemini")
 
     @patch("system.core.interpretation.llm_client.urlopen")
-    def test_deepseek_uses_openai_format(self, mock_urlopen):
+    def test_deepseek_uses_openai_format(self, mock_urlopen, _mock_pool):
         mock_urlopen.return_value = self._mock_urlopen({
             "choices": [{"message": {"content": "Hello from DeepSeek"}}]
         })

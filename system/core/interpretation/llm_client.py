@@ -415,4 +415,49 @@ def _http_post_json(
             raise LLMClientError("ollama response missing 'response' text.")
         return content
 
+    if provider == "anthropic":
+        content_list = parsed.get("content", [])
+        if not isinstance(content_list, list) or not content_list:
+            raise LLMClientError("anthropic response missing content.")
+        text = content_list[0].get("text", "")
+        if not text:
+            raise LLMClientError("anthropic response missing text content.")
+        return text
+
+    if provider == "gemini":
+        candidates = parsed.get("candidates", [])
+        if not isinstance(candidates, list) or not candidates:
+            raise LLMClientError("gemini response missing candidates.")
+        parts = candidates[0].get("content", {}).get("parts", [])
+        if not parts:
+            raise LLMClientError("gemini response missing content parts.")
+        return parts[0].get("text", "")
+
     raise LLMClientError(f"Unsupported provider '{provider}'.")
+
+
+def _extract_stream_content(data: dict, provider: str) -> str | None:
+    """Extract text content from a streaming chunk for the given provider."""
+    if provider == "openai":
+        choices = data.get("choices", [])
+        if choices:
+            delta = choices[0].get("delta", {})
+            return delta.get("content")
+        return None
+
+    if provider == "anthropic":
+        if data.get("type") == "content_block_delta":
+            delta = data.get("delta", {})
+            if delta.get("type") == "text_delta":
+                return delta.get("text")
+        return None
+
+    if provider == "gemini":
+        candidates = data.get("candidates", [])
+        if candidates:
+            parts = candidates[0].get("content", {}).get("parts", [])
+            if parts:
+                return parts[0].get("text")
+        return None
+
+    return None
