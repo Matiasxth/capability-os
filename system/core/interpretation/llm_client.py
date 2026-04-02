@@ -115,7 +115,8 @@ class AnthropicAdapter:
         except ImportError:
             return self._complete_raw(system_prompt, user_prompt, timeout_sec)
         except Exception as exc:
-            raise LLMClientError(f"anthropic error: {exc}") from exc
+            msg = str(exc).encode("ascii", errors="replace").decode("ascii")
+            raise LLMClientError(f"anthropic error: {msg}") from exc
 
     def complete_with_tools(self, messages: list[dict], tools: list[dict], timeout_sec: float = 30.0) -> dict:
         try:

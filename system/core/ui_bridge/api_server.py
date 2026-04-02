@@ -602,9 +602,12 @@ class CapabilityOSUIBridgeService:
         t0 = _time.monotonic()
         try:
             response = self.intent_interpreter.llm_client.complete(
-                system_prompt="You are a health check endpoint.",
-                user_prompt="Respond with exactly: ok",
+                system_prompt="You are a health check. Reply with only the two letters: ok",
+                user_prompt="Say ok",
             )
+            # Sanitize response to avoid encoding issues on Windows console
+            if isinstance(response, str):
+                response = response.encode("ascii", errors="replace").decode("ascii")
         except Exception as exc:
             latency = int((_time.monotonic() - t0) * 1000)
             return {
