@@ -295,14 +295,18 @@ def _defaults_from_env(workspace_root: Path) -> dict[str, Any]:
     if provider not in VALID_LLM_PROVIDERS:
         provider = "ollama"
 
-    if provider == "openai":
-        base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").strip()
-        model = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
-        api_key = os.getenv("OPENAI_API_KEY", "").strip()
-    else:
-        base_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").strip()
-        model = os.getenv("OLLAMA_MODEL", "llama3.1:8b").strip()
-        api_key = os.getenv("OLLAMA_API_KEY", "").strip()
+    _PROVIDER_DEFAULTS: dict[str, tuple[str, str, str, str]] = {
+        # (env_base_url, default_base_url, env_model_default, env_key_name)
+        "openai": ("OPENAI_BASE_URL", "https://api.openai.com/v1", "gpt-4o-mini", "OPENAI_API_KEY"),
+        "ollama": ("OLLAMA_BASE_URL", "http://127.0.0.1:11434", "llama3.1:8b", "OLLAMA_API_KEY"),
+        "anthropic": ("ANTHROPIC_BASE_URL", "https://api.anthropic.com", "claude-sonnet-4-20250514", "ANTHROPIC_API_KEY"),
+        "gemini": ("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com", "gemini-2.0-flash", "GEMINI_API_KEY"),
+        "deepseek": ("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1", "deepseek-chat", "DEEPSEEK_API_KEY"),
+    }
+    env_url_key, default_url, default_model, env_key_name = _PROVIDER_DEFAULTS.get(provider, _PROVIDER_DEFAULTS["ollama"])
+    base_url = os.getenv(env_url_key, default_url).strip()
+    model = os.getenv(f"{provider.upper()}_MODEL", default_model).strip()
+    api_key = os.getenv(env_key_name, "").strip()
 
     timeout_raw = os.getenv("LLM_TIMEOUT_MS", str(DEFAULT_TIMEOUT_MS)).strip()
     timeout_ms = DEFAULT_TIMEOUT_MS
