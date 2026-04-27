@@ -12,7 +12,7 @@ sqlite-vec>=0.1              # Accelerated vector search (100x faster)
 
 # ── Testing ──
 pytest>=7.4
-pytest-cov>=4.0
+pytest-cov>=7.1.0
 
 # ── Optional ──
 # psycopg[binary]>=3.1       # PostgreSQL driver (falls back to SQLite)
