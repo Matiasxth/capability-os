@@ -8,7 +8,7 @@ PyJWT>=2.8                   # JWT token generation/validation
 uvicorn>=0.29                # ASGI server (async HTTP)
 redis>=5.0                   # Message queue for distributed workers
 anthropic>=0.40              # Anthropic Claude SDK (recommended LLM)
-sqlite-vec>=0.1              # Accelerated vector search (100x faster)
+sqlite-vec>=0.1.9              # Accelerated vector search (100x faster)
 
 # ── Testing ──
 pytest>=7.4
